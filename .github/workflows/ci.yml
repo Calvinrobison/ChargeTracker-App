@@ -1,0 +1,190 @@
+# Continuous integration.
+#
+# ACTION PINNING — READ BEFORE TRUSTING THIS WORKFLOW
+#
+# Actions below are referenced by MAJOR TAG, not by commit SHA. A tag is
+# mutable: whoever controls the action repository can change what it runs. For a
+# workflow that will eventually hold release secrets, every action must be
+# pinned to an immutable commit SHA with the version in a trailing comment:
+#
+#     uses: actions/checkout@<40-char-sha>  # v4.2.2
+#
+# The SHAs are deliberately NOT filled in here, because inventing one produces
+# either a broken workflow or — worse — a reference to a commit nobody checked.
+# Resolve them once with:
+#
+#     gh api repos/actions/checkout/commits/v4 --jq .sha
+#
+# `docs/IMPLEMENTATION_STATUS.md` records this as outstanding work.
+#
+# Least privilege: the default token is read-only for the whole workflow and no
+# job widens it. Nothing here needs write access, and nothing here has access to
+# release signing secrets — see release.yml for why that separation matters.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned toolchain. The app bundles its own Node; this is for the build only.
+  NODE_VERSION: '22.12.0'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The specs that need nothing installed. Runs first and fast, so a broken
+  # metric contract fails the build in under a minute.
+  # ---------------------------------------------------------------------------
+  specs-no-install:
+    name: Specs (no dependencies)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Migrations module is current
+        run: npm run check:migrations
+
+      - name: Domain, database, collector, contract and security specs
+        run: npm run test:nodeps
+
+  # ---------------------------------------------------------------------------
+  # Everything that needs the dependency tree.
+  # ---------------------------------------------------------------------------
+  checks:
+    name: Format, lint and types
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: specs-no-install
+    steps:
+      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # `npm ci` requires a committed lockfile. Until one exists this job
+      # fails, which is correct: an unlocked tree must not reach a release.
+      - name: Install from the lockfile
+        run: npm ci
+
+      - run: npm run format
+      - run: npm run lint
+      - run: npm run typecheck
+
+  # ---------------------------------------------------------------------------
+  # Windows packaging and smoke test. This is the only job that can prove the
+  # native SQLite module loads and the bundled browser starts, because both are
+  # platform-specific and neither can be established on Linux.
+  # ---------------------------------------------------------------------------
+  package-windows:
+    name: Windows package and smoke test
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      # The Chromium payload is cached by its resolved Playwright version, so
+      # ordinary pushes do not re-download 200 MB.
+      - name: Cache the bundled browser
+        uses: actions/cache@v4 # TODO: pin to a commit SHA
+        with:
+          path: .playwright-cache
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Bundle the browser
+        run: npm run setup:browser
+
+      - name: Build
+        run: npm run build
+
+      - name: Package
+        run: npm run package:win
+
+      # These are the checks that catch a package which builds cleanly and
+      # breaks on a user's machine.
+      - name: Verify the package
+        run: npm run verify:package
+
+      - name: Smoke test the installed build
+        run: npm run test:installed
+
+      - name: Upload the package report
+        if: always()
+        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        with:
+          name: package-report
+          path: |
+            release/*.yml
+            release/build-info.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        with:
+          name: failure-diagnostics
+          path: |
+            out/**/*.txt
+            release/builder-*.yml
+          retention-days: 3
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # UI smoke tests against LOCAL fixtures. No live source, no credentials, no
+  # network. A PR must never scrape a production provider.
+  # ---------------------------------------------------------------------------
+  ui-smoke:
+    name: UI smoke (local fixtures)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Build the renderer
+        run: npm run build
+
+      - name: UI smoke tests
+        run: npm run test:e2e
+
+      - name: Upload failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        with:
+          name: ui-failures
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+          if-no-files-found: ignore

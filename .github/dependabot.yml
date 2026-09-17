@@ -1,0 +1,95 @@
+# Dependency updates.
+#
+# Grouped deliberately. An Electron major, a native module, and a Playwright
+# bump each need a different kind of review, and batching them into one pull
+# request means none of them gets it:
+#
+#   - `electron` changes the Chromium and Node versions inside the app, so it
+#     can change renderer behaviour and can require rebuilding native modules.
+#   - `better-sqlite3` is a native module: a bump has to be proven to load from
+#     inside a packaged NSIS install, not just from `node_modules`.
+#   - `playwright-core` determines the bundled browser revision, so a bump
+#     changes a ~200 MB payload and can break `setup:browser`.
+#
+# Those three are therefore never grouped with anything.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels: [dependencies]
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+
+    groups:
+      # Safe to batch: type definitions only, no runtime effect.
+      types:
+        patterns: ['@types/*']
+        update-types: [minor, patch]
+
+      # Lint and formatting. A false positive is visible immediately in CI.
+      lint-and-format:
+        patterns:
+          - eslint
+          - '@eslint/*'
+          - '@typescript-eslint/*'
+          - eslint-plugin-*
+          - prettier
+        update-types: [minor, patch]
+
+      # Build tooling. Batched for patch and minor only; a major can change
+      # output layout, which `verify:package` would have to be re-checked for.
+      build-tooling:
+        patterns:
+          - vite
+          - electron-vite
+          - '@vitejs/*'
+          - typescript
+          - vitest
+        update-types: [minor, patch]
+
+    ignore:
+      # Deliberately ungrouped and reviewed by hand — see the header. Dependabot
+      # still opens individual pull requests for these; only grouping is
+      # prevented, by leaving them out of every group above.
+      #
+      # Majors are ignored outright, because each one needs a packaging run on
+      # Windows before it can be believed, and that cannot be delegated to an
+      # automatic merge.
+      - dependency-name: electron
+        update-types: [version-update:semver-major]
+      - dependency-name: better-sqlite3
+        update-types: [version-update:semver-major]
+      - dependency-name: playwright-core
+        update-types: [version-update:semver-major]
+      - dependency-name: playwright
+        update-types: [version-update:semver-major]
+      - dependency-name: '@playwright/test'
+        update-types: [version-update:semver-major]
+      - dependency-name: electron-builder
+        update-types: [version-update:semver-major]
+      - dependency-name: electron-updater
+        update-types: [version-update:semver-major]
+      # React majors land in the renderer, which has no automated coverage yet.
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: 'chore(ci)'
+    groups:
+      actions:
+        patterns: ['*']

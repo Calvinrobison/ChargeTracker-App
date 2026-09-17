@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Calvinrobison/ChargeTracker-App/security/advisories/new
+    about: >
+      Report privately, not as a public issue. See SECURITY.md. Anything
+      touching the update verification path is treated as high severity.
+  - name: What ChargeWatch can and cannot report
+    url: https://github.com/Calvinrobison/ChargeTracker-App/blob/main/docs/METRICS.md
+    about: >
+      Before filing a "the number is wrong" issue, this explains how each
+      metric is computed and why gaps are shown as gaps.

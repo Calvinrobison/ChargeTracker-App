@@ -1,0 +1,71 @@
+name: Feature request
+description: Suggest a capability, a source, or a change in behaviour.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things worth knowing before you write, because they rule out a
+        large class of otherwise reasonable requests:
+
+        **ChargeWatch observes; it does not reconstruct.** It records what a
+        public status page said, when it said it. It cannot report charging
+        sessions, energy delivered, driver identities, or revenue, because no
+        public source exposes them. A request for those is a request to
+        fabricate data, and will be declined rather than deferred.
+
+        **A source has to be permitted, not just technically reachable.** Adding
+        a network means establishing that observing it is allowed — terms,
+        robots policy, rate limits — before any code is written. See
+        `docs/SOURCES.md` and `docs/SOURCE_VERIFICATION.md`. A request to add a
+        source is welcome; a request to bypass a block is not.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of request
+      options:
+        - A new metric or view over data already collected
+        - A new data source or network
+        - A change to collection scheduling or behaviour
+        - Import, export or reporting
+        - Usability or accessibility
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to find out?
+      description: >
+        The question you want answered about charger availability — not the
+        feature. The question usually suggests a better feature than the one
+        that comes to mind first.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: textarea
+    id: data
+    attributes:
+      label: What data would it need?
+      description: >
+        If it needs something ChargeWatch does not observe, say where that data
+        would come from and whether it is public.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: This does not require inferring charging sessions, energy, or driver information from status readings.
+          required: true
+        - label: If this is a source request, I have noted whether observing it is permitted.
+          required: false

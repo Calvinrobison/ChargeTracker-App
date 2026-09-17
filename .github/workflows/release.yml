@@ -1,0 +1,232 @@
+# Release: build, verify, and stage a DRAFT GitHub release.
+#
+# ACTION PINNING — same caveat as ci.yml. Actions here are referenced by major
+# tag, not by an immutable commit SHA. That matters more in this workflow than
+# in CI, because this is the workflow that touches the signing key. Pin every
+# action to a SHA before this workflow is ever run with a real key configured.
+# `docs/IMPLEMENTATION_STATUS.md` records it as outstanding work.
+#
+# WHAT THIS WORKFLOW WILL NOT DO
+#
+#   1. It never publishes. It creates a DRAFT release. Promoting the draft is a
+#      separate, manual act, because that is the moment every installed copy
+#      starts offering the update.
+#   2. It never signs without a key. If `CHARGEWATCH_RELEASE_PRIVATE_KEY` is
+#      absent, `release:prepare` fails and the job fails. It does not fall back
+#      to an unsigned manifest — an unsigned release is one an installed copy
+#      would reject anyway, and staging one would suggest otherwise.
+#   3. It never skips verification. `release:verify` runs the SAME code the
+#      installed application runs, against the public keys the application
+#      ships. If it fails, nothing is uploaded.
+#
+# WHY THE SIGNING STEP IS ITS OWN JOB
+#
+# `build-and-package` runs the project's own build, which executes thousands of
+# lines of third-party postinstall and bundler code. The signing key is never
+# present in that environment. `sign-and-stage` has the key and runs no
+# project build steps: it downloads the already-built artifacts, signs the
+# manifest computed over their bytes, and verifies the result.
+#
+# This is not a hypothetical concern. A compromised transitive dependency with
+# a postinstall script is the normal way a release key gets exfiltrated.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the leading v (e.g. 0.1.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # never cancel a release mid-upload
+
+env:
+  NODE_VERSION: '22.12.0'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate. Cheap, and it runs before anything is built.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: Preconditions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+        with:
+          fetch-depth: 0 # release:prepare reads git state
+      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Resolve the version and tag
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version='${{ inputs.version }}'
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not a semantic version."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      # The three things that make a release traceable. Checked here so a
+      # 45-minute Windows build is not spent discovering a missing changelog.
+      - name: package.json, CHANGELOG and lockfile agree with the tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='${{ steps.resolve.outputs.version }}'
+          declared=$(node -p "require('./package.json').version")
+          if [ "$declared" != "$version" ]; then
+            echo "::error::package.json says $declared but the release is $version."
+            exit 1
+          fi
+          if ! grep -q "$version" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no entry for $version."
+            exit 1
+          fi
+          if [ ! -f package-lock.json ]; then
+            echo "::error::package-lock.json is missing. A release must be built from a locked tree."
+            exit 1
+          fi
+
+      - name: Migrations module is current
+        run: npm run check:migrations
+
+      - name: Specs
+        run: npm run test:nodeps
+
+  # ---------------------------------------------------------------------------
+  # Build and package. NO SIGNING KEY IS AVAILABLE IN THIS JOB.
+  # ---------------------------------------------------------------------------
+  build-and-package:
+    name: Build and package (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    needs: gate
+    steps:
+      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Bundle the browser
+        run: npm run setup:browser
+
+      - name: Package
+        run: npm run package:win
+
+      - name: Verify the package
+        run: npm run verify:package
+
+      - name: Smoke test the installed build
+        run: npm run test:installed
+
+      # Uploaded as-is. `release:prepare` hashes these exact bytes in the next
+      # job, so anything that rewrote them between here and there would break
+      # verification rather than pass silently.
+      - name: Upload the unsigned artifacts
+        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        with:
+          name: unsigned-release-${{ needs.gate.outputs.version }}
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+            release/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Sign, verify, stage a draft. This is the only job with the key.
+  # ---------------------------------------------------------------------------
+  sign-and-stage:
+    name: Sign, verify and stage a draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [gate, build-and-package]
+    # Requires a `release` environment with a manual reviewer, so signing
+    # cannot happen on a tag push alone. Configure it in repository settings;
+    # without it, this job runs unattended and the protection is absent.
+    environment: release
+    permissions:
+      contents: write # only this job needs it, only to create the draft
+    steps:
+      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download the unsigned artifacts
+        uses: actions/download-artifact@v4 # TODO: pin to a commit SHA
+        with:
+          name: unsigned-release-${{ needs.gate.outputs.version }}
+          path: release
+
+      - name: Refuse to proceed without a signing key
+        env:
+          CHARGEWATCH_RELEASE_PRIVATE_KEY: ${{ secrets.CHARGEWATCH_RELEASE_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          if [ -z "${CHARGEWATCH_RELEASE_PRIVATE_KEY:-}" ]; then
+            echo "::error::CHARGEWATCH_RELEASE_PRIVATE_KEY is not configured. An unsigned release" \
+                 "would be rejected by every installed copy, so nothing will be staged."
+            exit 1
+          fi
+
+      - name: Sign the manifest
+        env:
+          CHARGEWATCH_RELEASE_PRIVATE_KEY: ${{ secrets.CHARGEWATCH_RELEASE_PRIVATE_KEY }}
+        run: npm run release:prepare -- --version ${{ needs.gate.outputs.version }} --dir release
+
+      # The same verifier the application uses, against the public keys the
+      # application ships. A failure here means installed copies would reject
+      # the release.
+      - name: Verify as an installed copy would
+        run: npm run release:verify -- --dir release
+
+      - name: Stage a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run release:publish -- --tag ${{ needs.gate.outputs.tag }} --confirm
+
+      - name: What is left to do by hand
+        shell: bash
+        run: |
+          cat <<'EOF'
+          A DRAFT release has been created. It is not published, and no installed
+          copy can see it yet.
+
+          Before publishing:
+            1. Check that every asset uploaded completely.
+            2. Install the artifact on a clean Windows 11 profile and confirm it runs.
+            3. Confirm an existing installed copy discovers and accepts the update.
+
+          Then, deliberately:
+            gh release edit ${{ needs.gate.outputs.tag }} --draft=false
+          EOF

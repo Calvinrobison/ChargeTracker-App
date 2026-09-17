@@ -1,0 +1,83 @@
+name: Data accuracy concern
+description: A recorded observation, metric, or claim appears to misrepresent what was actually measured.
+labels: [bug, data-accuracy]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template exists because data honesty is the project's central
+        constraint, and a violation of it is more serious than a crash.
+
+        A report belongs here — rather than in a normal bug report — if
+        ChargeWatch appears to have:
+
+        - shown a missing measurement as `0` rather than as unknown;
+        - claimed a check ran when it did not;
+        - presented inferred activity as a recorded charging session;
+        - averaged percentages instead of weighting by port-minutes;
+        - carried a stale reading forward past its freshness budget;
+        - reported a metric over a partial window without labelling it;
+        - filled a coverage gap instead of reporting it.
+
+        Please include the window you were looking at. Almost every accuracy
+        question turns on which interval the number covers.
+
+  - type: input
+    id: version
+    attributes:
+      label: ChargeWatch version
+    validations:
+      required: true
+
+  - type: dropdown
+    id: violation
+    attributes:
+      label: Which kind of misrepresentation
+      options:
+        - Missing data displayed as zero
+        - A check claimed but not performed
+        - Inferred activity presented as a recorded session
+        - Averaging of percentages rather than port-minute weighting
+        - Stale reading carried forward too far
+        - Unlabelled partial-coverage metric
+        - A coverage gap that was filled rather than reported
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: claim
+    attributes:
+      label: What the app displayed
+      description: The exact figure or wording, and where it appeared.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What you believe was actually measured
+      description: >
+        Include the window, the station or scope, and the coverage percentage
+        shown for it. If you exported the underlying observations, the row
+        count and time range are more useful than the chart.
+    validations:
+      required: true
+
+  - type: textarea
+    id: export
+    attributes:
+      label: Supporting export
+      description: >
+        An export of the observations for that window and scope, redacted if
+        needed. Attach the file rather than pasting the whole thing.
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked the coverage indicator for the window in question.
+          required: true
+        - label: I have not attached an unredacted database or credentials.
+          required: true
