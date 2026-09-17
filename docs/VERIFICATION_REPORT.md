@@ -19,16 +19,16 @@ is marked green because it looks right in the source.
 | npm registry | **unreachable** — `403 x-deny-reason: host_not_allowed` |
 | Network | `github.com` hosts only |
 | Windows host | none available to the build environment; the owner has since run the specs on one |
-| Electron / Playwright / better-sqlite3 / TypeScript | **never installed, never run** |
+| Electron / Playwright / TypeScript | **never installed, never run** |
 
 ## Commands that ran
 
 ```
 $ node scripts/test-nodeps.mjs
-Running 15 spec file(s) on Node 22.22.2
-# tests 380
-# suites 103
-# pass 380
+Running 18 spec file(s) on Node 22.22.2
+# tests 404
+# suites 111
+# pass 404
 # fail 0
 # cancelled 0
 # skipped 0
@@ -177,7 +177,7 @@ them; this file is not.
 | 10 | Overview, Map, details, filters and onboarding complete and usable | **Partial** | The renderer is now written: Overview and Map workspaces, station rail and drawer, heatmap, trend, onboarding and settings, built to the UI handoff. 28 view-model specs and 31 formatter specs pass. **Nothing has rendered it** — no build, no browser. Usability is therefore unestablished. |
 | 11 | Tray, pause/resume, single-instance, sleep/wake, Quit | **NT** | All implemented in `src/main/index.ts` and `src/main/tray.ts`, including the power-monitor wiring and the graceful-quit path. None of it has been executed: it requires Electron. |
 | 12 | Exports match the selected data and sanitize untrusted text | **P** | 17 CSV specs including formula-injection payloads, plus a real export smoke run. Numeric measurements are deliberately left untouched. |
-| 13 | Backup/restore and migration recovery implemented and verified | **P (logic)** / **NT (with better-sqlite3)** | Restore validation and archive-path safety are covered by specs; the online backup path requires better-sqlite3 and was correctly refused on the `node:sqlite` driver here. |
+| 13 | Backup/restore and migration recovery implemented and verified | **P** | 6 online-backup specs now run against the **shipping** driver: a 250-site WAL database backed up, verified, digest-matched and restored; 810 rows captured including those still in the WAL; the database record written; and both refusal paths. Restore validation and archive-path safety are separately covered. See ADR-0003. |
 | 14 | Full Windows installer with working browser, native SQLite and assets | **NT** | No Windows host — B4. `scripts/verify-package.mjs` and `scripts/windows/test-installed.ps1` are written and will perform these checks; neither has run. |
 | 15 | A nondeveloper can use it without a terminal or paid credentials | **NT** | No installer exists yet. The design contains no API key, no account and no paid dependency; the installer is per-user and needs no administrator rights, but that claim is itself untested (see item 14). |
 | 16 | Update artifacts authenticated; failed verification cannot install | **P** | 35 release-manifest specs — attacker signatures, tampered payloads, unknown and retired keys, wrong application/platform/arch/channel, replayed sequences, traversal artifact names and digest mismatches all rejected — plus the end-to-end pipeline run quoted above. |

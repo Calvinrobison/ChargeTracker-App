@@ -11,10 +11,10 @@ refs), so this is an initial implementation. No unrelated changes existed to
 preserve.
 **Branch**: `chargewatch-v1` (local; not yet pushed — see *Blocked* below)
 **Schema version**: 1
-**Test count**: 380 specs, all passing, via `npm run test:nodeps` — on Linux
-with Node 22.22.2, and on Windows 11 x64 with Node 24.19.0. The Windows run
-found one real defect in a spec that had only ever run on Linux; it is fixed and
-recorded in `VERIFICATION_REPORT.md`.
+**Test count**: 404 specs, all passing, via `npm run test:nodeps` — on Linux
+with Node 22.22.2, and (at 380) on Windows 11 x64 with Node 24.19.0. The Windows
+run found one real defect in a spec that had only ever run on Linux; it is fixed
+and recorded in `VERIFICATION_REPORT.md`.
 
 ---
 
@@ -193,7 +193,7 @@ under Electron with better-sqlite3.
 | B1 | `package-lock.json` | npm registry returns `403 host_not_allowed` | `npm install` on a networked machine, then commit the lockfile (`docs/BUILDING.md`) |
 | B2 | Live ChargePoint collection | No route to `driver.chargepoint.com` **or** to its terms pages. The adapter ships `eligibilityState: needs_review`, `verificationState: blocked` | A terms review with recorded scope, then a bounded live read (`docs/SOURCE_VERIFICATION.md`) |
 | B3 | Bundled Mesa station catalog | No route to `afdc.energy.gov`. **No catalog data is shipped** — inventing station rows was not an option | `npm run catalog:refresh` on a networked machine |
-| B4 | Windows installer, bundled Chromium, native SQLite rebuild | No Windows host | `npm run package:win` on Windows 11 x64 |
+| B4 | Windows installer and bundled Chromium | No Windows host | `npm run package:win` on Windows 11 x64. The native SQLite rebuild is no longer part of this — see ADR-0003. |
 | B5 | A→B installed update proof | Same as B4, plus two built installers | `npm run test:update` |
 | B6 | Push to GitHub | Git proxy: repository not in the session's authorized set | Push from your own machine — commands in `docs/HANDOFF.md` |
 | B7 | License decision | Owner decision, not a technical blocker | Choose a license; `package.json` currently says `UNLICENSED` and is marked private |
@@ -213,6 +213,7 @@ Ordered by what unblocks the most.
 | --- | --- | --- | --- |
 | I1 | Commit `package-lock.json` | B1 | Everything below needs it. |
 | I2 | Fix whatever `npm run typecheck` reports | I1 | Never run. Expect real errors, concentrated in the renderer and `updates-backend.ts`. |
+| I2b | Run `npm run catalog:refresh` against a real AFDC export | network | The application shows nothing until a catalog exists. The script is now covered by 11 specs but has still never seen a genuine AFDC file. |
 | I3 | First `npm run build`, then `npm run test:e2e` | I2 | First evidence the renderer renders. Expect selector fixes in `tests/ui/honesty.spec.ts`. |
 | I4 | `npm run package:win` on Windows, then `scripts/windows/test-installed.ps1` on a non-elevated account | I3, B4 | First evidence the native module loads and the bundled browser starts. |
 | I5 | Pin every GitHub Action to a commit SHA | B8 | Do this before the release workflow ever holds a real signing key. |
