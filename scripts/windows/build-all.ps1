@@ -3,7 +3,7 @@
   Runs the whole chain from a fresh clone to a tested installer, in order.
 
 .DESCRIPTION
-  Every step in this script can be run by hand — see docs/BUILDING.md. The
+  Every step in this script can be run by hand - see docs/BUILDING.md. The
   script exists because the first build of this project has never happened
   anywhere, so the failure modes are unknown, and hitting them one command at a
   time is slow. It stops at the first real failure and says what the failure
@@ -16,7 +16,7 @@
 
   `npm run typecheck` has NEVER been executed on this codebase. The specs run
   the TypeScript through Node's type-stripping, which executes code but does
-  not check types, and no spec imports a .tsx file at all — so the renderer has
+  not check types, and no spec imports a .tsx file at all - so the renderer has
   never been parsed by anything. Errors at that step are expected, are not a
   sign that something is broken, and are the single most valuable output of
   this script. Use -SkipTypecheck to get to a build while you work through
@@ -59,7 +59,7 @@ function Write-Step {
   param([string] $Name)
   $script:stepNumber += 1
   Write-Host ''
-  Write-Host ("── {0}. {1} " -f $script:stepNumber, $Name).PadRight(78, '─') -ForegroundColor Cyan
+  Write-Host ("-- {0}. {1} " -f $script:stepNumber, $Name).PadRight(78, '-') -ForegroundColor Cyan
 }
 
 function Write-Note {
@@ -89,7 +89,7 @@ function Invoke-Step {
 }
 
 Write-Host ''
-Write-Host 'ChargeWatch — full build' -ForegroundColor Cyan
+Write-Host 'ChargeWatch - full build' -ForegroundColor Cyan
 Write-Host ('=' * 78) -ForegroundColor Cyan
 
 # ---------------------------------------------------------------- 1. toolchain

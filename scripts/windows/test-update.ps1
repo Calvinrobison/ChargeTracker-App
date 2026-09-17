@@ -7,7 +7,7 @@
   fingerprints that file, installs version B over it, and checks that:
 
     * B's install succeeded per-user with no elevation;
-    * B opens the SAME database file rather than creating a new one — proven by
+    * B opens the SAME database file rather than creating a new one - proven by
       the file's creation timestamp surviving the upgrade;
     * the schema is at or above A's, and every migration A applied is still
       recorded;
@@ -25,7 +25,7 @@
       manual step in docs/RELEASING.md.
     * That an upgrade preserves OBSERVATIONS specifically. This test seeds no
       synthetic observations, because a fabricated observation row is exactly
-      what this project refuses to create — even in a sandbox, even for a test.
+      what this project refuses to create - even in a sandbox, even for a test.
       Until a source is cleared for collection, the strongest honest claim is
       the one made above: the file is migrated in place, not replaced, and its
       contents survive. Re-run this test with a genuinely populated history
@@ -84,7 +84,7 @@ function Fail-Now {
 function Install-Silently {
   param([Parameter(Mandatory)] [string] $Path, [Parameter(Mandatory)] [string] $Label)
   Write-Host ''
-  Write-Host "Installing $Label…" -ForegroundColor Cyan
+  Write-Host "Installing $Label..." -ForegroundColor Cyan
   $run = Start-Process -FilePath $Path -ArgumentList '/S' -PassThru -Wait
   if ($run.ExitCode -ne 0) {
     Add-Result "$Label installs" 'FAIL' "exit code $($run.ExitCode)"
@@ -133,7 +133,7 @@ function Get-Fingerprint {
 }
 
 Write-Host ''
-Write-Host 'ChargeWatch — upgrade test (A to B)' -ForegroundColor Cyan
+Write-Host 'ChargeWatch - upgrade test (A to B)' -ForegroundColor Cyan
 Write-Host '-----------------------------------' -ForegroundColor Cyan
 
 # --------------------------------------------------------------- preconditions
@@ -235,7 +235,7 @@ try {
     Add-Result 'the upgrade changed the version' 'FAIL' `
       "both report $($reportA.appVersion), so B did not replace A"
   } else {
-    Add-Result 'the upgrade changed the version' 'PASS' "$($reportA.appVersion) → $($reportB.appVersion)"
+    Add-Result 'the upgrade changed the version' 'PASS' "$($reportA.appVersion) -> $($reportB.appVersion)"
   }
 
   $after = Get-Fingerprint -DatabaseFile $dbFile.FullName
@@ -259,10 +259,10 @@ try {
 
   if ($after.schemaVersion -lt $before.schemaVersion) {
     Add-Result 'schema did not go backwards' 'FAIL' `
-      "schema $($before.schemaVersion) → $($after.schemaVersion)"
+      "schema $($before.schemaVersion) -> $($after.schemaVersion)"
   } else {
     Add-Result 'schema did not go backwards' 'PASS' `
-      "schema $($before.schemaVersion) → $($after.schemaVersion)"
+      "schema $($before.schemaVersion) -> $($after.schemaVersion)"
   }
 
   # Every migration A applied must still be recorded. A rewritten history of
@@ -284,9 +284,9 @@ try {
     $wasCount = if ($null -eq $before.counts.$key) { 0 } else { [int]$before.counts.$key }
     $nowCount = if ($null -eq $after.counts.$key) { 0 } else { [int]$after.counts.$key }
     if ($nowCount -lt $wasCount) {
-      Add-Result "no $key were lost" 'FAIL' "$wasCount → $nowCount"
+      Add-Result "no $key were lost" 'FAIL' "$wasCount -> $nowCount"
     } elseif ($wasCount -gt 0) {
-      Add-Result "no $key were lost" 'PASS' "$wasCount → $nowCount"
+      Add-Result "no $key were lost" 'PASS' "$wasCount -> $nowCount"
     }
   }
 

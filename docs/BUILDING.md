@@ -201,6 +201,25 @@ It installs, runs the installed executable with `--self-check` against a
 throwaway data directory, reads the JSON report, and uninstalls. Your real
 history is never touched.
 
+## A note on the PowerShell scripts
+
+They are pure ASCII, and a spec (`tests/nodeps/scripts-ascii.test.ts`) fails the
+build if that stops being true.
+
+Windows PowerShell 5.1 — still the default `powershell.exe` on Windows 11 —
+reads a `.ps1` file as ANSI unless it carries a UTF-8 BOM. A UTF-8 file without
+one has every multi-byte character mangled, and if the damage lands inside a
+quoted string the parser loses the closing quote and the script fails before
+running a single line. `build-all.ps1` did exactly that on its first real run,
+over three box-drawing characters used as section rules.
+
+A BOM would also solve it, but a BOM is easy to lose to an editor or a copy-paste
+and impossible to notice by reading. ASCII is checkable, so ASCII is the rule:
+`-` for an em dash, `->` for an arrow, `...` for an ellipsis.
+
+`.gitattributes` also pins `*.ps1` to CRLF, so the scripts arrive with the line
+endings Windows expects regardless of the platform they were committed from.
+
 ## When something fails
 
 **`npm install` fails on `better-sqlite3`.** The `postinstall` script runs

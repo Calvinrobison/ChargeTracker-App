@@ -17,7 +17,7 @@
 
   What this script does NOT prove, and does not claim to:
     * that the user interface renders correctly (see the Playwright UI tests);
-    * that any charger data can be collected — no source is cleared for
+    * that any charger data can be collected - no source is cleared for
       collection yet, so the report's readiness section is expected to be unmet;
     * that an update from a previous version installs (see test-update.ps1).
 
@@ -83,7 +83,7 @@ function Fail-Now {
 }
 
 Write-Host ''
-Write-Host 'ChargeWatch — installed build test' -ForegroundColor Cyan
+Write-Host 'ChargeWatch - installed build test' -ForegroundColor Cyan
 Write-Host '----------------------------------' -ForegroundColor Cyan
 Write-Host ''
 
@@ -151,7 +151,7 @@ if (Test-Path $exePath) {
 }
 
 Write-Host ''
-Write-Host 'Installing (per-user, silent)…' -ForegroundColor Cyan
+Write-Host 'Installing (per-user, silent)...' -ForegroundColor Cyan
 $installStart = Get-Date
 $install = Start-Process -FilePath $Installer -ArgumentList '/S' -PassThru -Wait
 $installSeconds = ((Get-Date) - $installStart).TotalSeconds
@@ -199,7 +199,7 @@ if ($nativeSqlite) {
   Add-Result 'native SQLite module unpacked' 'PASS' $nativeSqlite.FullName
 } else {
   Add-Result 'native SQLite module unpacked' 'FAIL' `
-    'no better_sqlite3 .node under resources\app.asar.unpacked — it cannot be loaded from inside the archive'
+    'no better_sqlite3 .node under resources\app.asar.unpacked - it cannot be loaded from inside the archive'
 }
 
 # --------------------------------------------------------------- the self-check
@@ -210,7 +210,7 @@ New-Item -ItemType Directory -Path $sandbox -Force | Out-Null
 $reportPath = Join-Path $sandbox 'self-check.json'
 
 Write-Host ''
-Write-Host 'Running the installed build''s self-check…' -ForegroundColor Cyan
+Write-Host 'Running the installed build''s self-check...' -ForegroundColor Cyan
 Write-Host "  sandbox data directory: $sandbox" -ForegroundColor DarkGray
 
 $previousLocalAppData = $env:LOCALAPPDATA
@@ -247,7 +247,7 @@ if (-not (Test-Path $reportPath)) {
 
 $report = Get-Content $reportPath -Raw | ConvertFrom-Json
 Add-Result 'self-check report written' 'PASS' `
-  ("{0} — electron {1}, schema {2}, {3:N0}ms" -f $report.verdict, $report.electronVersion, $report.schemaVersion, $report.durationMs)
+  ("{0} - electron {1}, schema {2}, {3:N0}ms" -f $report.verdict, $report.electronVersion, $report.schemaVersion, $report.durationMs)
 
 foreach ($check in $report.integrity) {
   $status = if ($check.status -eq 'pass') { 'PASS' } else { 'FAIL' }
@@ -258,7 +258,7 @@ Write-Host ''
 Write-Host 'Operational readiness (reported, not required to pass):' -ForegroundColor Cyan
 foreach ($check in $report.readiness) {
   Add-Result ("readiness: " + $check.label) 'INFO' `
-    ("{0} — {1}" -f $check.status, $check.detail)
+    ("{0} - {1}" -f $check.status, $check.detail)
 }
 
 if ($report.fatal -and $report.fatal.Count -gt 0) {
@@ -305,7 +305,7 @@ if ($KeepInstalled -or $SkipUninstall) {
     Add-Result 'uninstaller present' 'FAIL' "no Uninstall*.exe in $installRoot"
   } else {
     Write-Host ''
-    Write-Host 'Uninstalling…' -ForegroundColor Cyan
+    Write-Host 'Uninstalling...' -ForegroundColor Cyan
     $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -PassThru -Wait
     if ($uninstall.ExitCode -ne 0) {
       Add-Result 'uninstaller exits cleanly' 'FAIL' "exit code $($uninstall.ExitCode)"
