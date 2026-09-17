@@ -11,7 +11,10 @@ refs), so this is an initial implementation. No unrelated changes existed to
 preserve.
 **Branch**: `chargewatch-v1` (local; not yet pushed — see *Blocked* below)
 **Schema version**: 1
-**Test count**: 380 specs, all passing, via `npm run test:nodeps`
+**Test count**: 380 specs, all passing, via `npm run test:nodeps` — on Linux
+with Node 22.22.2, and on Windows 11 x64 with Node 24.19.0. The Windows run
+found one real defect in a spec that had only ever run on Linux; it is fixed and
+recorded in `VERIFICATION_REPORT.md`.
 
 ---
 

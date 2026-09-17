@@ -7,6 +7,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 
 import { parseRetryAfter, resolveBundledChromium, safeHttpUrl } from '../../src/collector/browser.ts';
 import {
@@ -149,13 +150,26 @@ describe('bundled browser resolution', () => {
   });
 
   test('development builds resolve from the controlled setup directory', () => {
+    // The expected prefix is built with `join` rather than written as a
+    // literal, because `resolveBundledChromium` uses `join` too and that
+    // normalises separators to the host's. A literal POSIX prefix here passes
+    // on Linux and fails on Windows — which is the one platform this
+    // application actually ships on.
+    const developmentBrowserDir = join('repo-root', '.playwright-cache', 'chromium');
     const result = resolveBundledChromium({
       isPackaged: false,
       resourcesPath: 'ignored',
-      developmentBrowserDir: '/repo/.playwright-cache/chromium',
+      developmentBrowserDir,
       platform: 'linux',
     });
-    assert.ok(result.searched.every((p) => p.startsWith('/repo/.playwright-cache/chromium')));
+    assert.ok(result.searched.length > 0, 'a development build reports where it looked');
+    assert.ok(
+      result.searched.every((p) => p.startsWith(developmentBrowserDir)),
+      `every searched path must sit under the configured directory; got ${result.searched.join(', ')}`,
+    );
+    // The point of the setting: a development build must not fall back to a
+    // browser somewhere else on the machine.
+    assert.ok(result.searched.every((p) => !p.includes('resources')));
   });
 
   test('a missing browser is reported rather than guessed at', () => {

@@ -14,18 +14,18 @@ is marked green because it looks right in the source.
 | | |
 | --- | --- |
 | Build host | Linux x86-64 (cloud container), **not Windows** |
-| Node | 22.22.2 |
+| Node | 22.22.2 here; the suite has also been run on 24.19.0 on Windows 11 x64 — see below |
 | SQLite | 3.51.2, via Node's built-in `node:sqlite` |
 | npm registry | **unreachable** — `403 x-deny-reason: host_not_allowed` |
 | Network | `github.com` hosts only |
-| Windows host | none available |
+| Windows host | none available to the build environment; the owner has since run the specs on one |
 | Electron / Playwright / better-sqlite3 / TypeScript | **never installed, never run** |
 
 ## Commands that ran
 
 ```
 $ node scripts/test-nodeps.mjs
-Running 16 spec file(s) on Node 22.22.2
+Running 15 spec file(s) on Node 22.22.2
 # tests 380
 # suites 103
 # pass 380
@@ -34,6 +34,37 @@ Running 16 spec file(s) on Node 22.22.2
 # skipped 0
 # todo 0
 ```
+
+### And on Windows
+
+The suite was also run by the repository owner on **Windows 11 x64 with Node
+24.19.0** — the first time any of this code has executed on the target
+platform, and on a Node major it was not written against.
+
+That run reported **379 pass, 1 fail**. The failure was a genuine defect in a
+spec, not in the code it covers:
+`source-url-safety.test.ts` asserted that a resolved browser path began with the
+literal `/repo/.playwright-cache/chromium`, but `resolveBundledChromium` builds
+its paths with `node:path`'s `join`, which normalises separators to the host's.
+The assertion therefore passed on Linux and failed on Windows — the one platform
+this application ships on. The spec now builds its expected prefix with `join`
+too, and additionally asserts that a development build does not fall back to a
+browser elsewhere on the machine.
+
+This is recorded rather than quietly fixed because it is the clearest available
+evidence for a claim made throughout this report: **specs that have only ever run
+on one platform are weaker evidence than their pass count suggests.** One
+Windows run found one such defect immediately. The rest of the suite passed,
+including every database spec against real SQLite files, which is meaningful
+evidence that the schema and the domain logic are platform-independent.
+
+Two other things that run established:
+
+- The suite runs correctly on **Node 24**, not only the pinned 22.12. The
+  `--experimental-strip-types` and `node:sqlite` features the runner depends on
+  are present and behave the same.
+- `package.json` declares `"node": ">=22.12.0 <25"`. Node 24 is inside that
+  range; nothing has been tested on 25 or later.
 
 ```
 $ node scripts/generate-migrations.mjs --check
@@ -108,7 +139,7 @@ them; this file is not.
 | # | Criterion | Result | Evidence or blocker |
 | --- | --- | --- | --- |
 | 1 | Repo audited; unrelated changes preserved; base/branch/commit recorded | **P** | Repository was empty (`git ls-remote` returned no refs); nothing to preserve. Branch `chargewatch-v1`. |
-| 2 | Clean-clone build and documented development commands work | **Partial** | `npm run test:nodeps` and `npm run check:migrations` work from a clean clone with no install, and are the two commands `docs/BUILDING.md` leads with. `npm ci` and `npm run build` untested — B1. |
+| 2 | Clean-clone build and documented development commands work | **Partial** | `npm run test:nodeps` and `npm run check:migrations` work from a clean clone with no install — **confirmed on Windows 11 x64 by the owner**, on a machine with only Node and git installed. `npm ci` and `npm run build` still untested — B1. |
 | 3 | Licensed Mesa-area catalog bundled and distance-filtered | **B** | No route to AFDC. The radius filter is implemented and covered by 5 geo specs. **No catalog data is shipped**; inventing station rows was not an option. `scripts/catalog-refresh.mjs` is written and rejects malformed coordinates, but has never processed a real AFDC file. |
 | 4 | A real eligible browser adapter collects actual source observations | **B** | The ChargePoint adapter ships `eligibilityState: needs_review`, `verificationState: blocked`. Its parser is a pure function with 23 specs over structured page readings; the Playwright wiring around it has never run. See `SOURCE_VERIFICATION.md`. |
 | 5 | Source scope, eligibility, capabilities and verification documented | **P** | `SOURCES.md`, `SOURCE_VERIFICATION.md`, and the capability record in `src/collector/adapters/chargepoint/index.ts`; 5 specs assert the not-enabled state is surfaced rather than hidden. |
