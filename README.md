@@ -25,7 +25,7 @@ executed on Windows.
 | Specs passing | 380, via `npm run test:nodeps` — no install required |
 | Typechecked | **No.** `npm run typecheck` has never run |
 | Built | **No** |
-| Packaged | **No** |
+| Packaged | **No** — but every prerequisite is now in place; see below |
 | Collecting data | **No** — no source has been cleared for automated collection |
 | Station catalog | **Not bundled** — inventing station rows was not an option |
 
@@ -105,7 +105,22 @@ These run on Node's built-in test runner using TypeScript type-stripping and
 scheduler, the source parser, the IPC contract, the security policy, the update
 verifier and the display formatters.
 
-### The rest
+### Everything else, in one command
+
+```powershell
+.\scripts\windows\build-all.ps1
+```
+
+Runs the whole chain — toolchain checks, specs, icons, install, typecheck,
+browser payload, build, package, verify, install and self-check — stopping at
+the first real failure with an explanation of what it means. Safe to re-run.
+
+**Expect the typecheck step to fail the first time.** It has never been run on
+this codebase, and the renderer has never been parsed by anything. That is the
+most valuable output the script produces, not a sign of a broken setup. Pass
+`-SkipTypecheck` to reach a build while you work through it.
+
+### Or step by step
 
 ```powershell
 npm install              # writes package-lock.json; commit it
