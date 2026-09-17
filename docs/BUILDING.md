@@ -11,9 +11,76 @@ What you need, what each command does, and what to do when one fails.
 | Disk | ~1 GB free — the bundled Chromium payload is around 200 MB before packaging and again inside the installer. |
 | Network | The npm registry and the Playwright CDN, once. After that the build is offline. |
 
-No Visual Studio installation is needed: `better-sqlite3` ships prebuilt
-binaries for the Electron ABI and `electron-builder install-app-deps` (run
-automatically by `postinstall`) fetches the right one.
+### The native module, and when you need a C++ toolchain
+
+`better-sqlite3` is a native module. `electron-builder install-app-deps`, which
+`postinstall` runs, looks for a **prebuilt binary matching the exact Electron
+ABI** in `package.json`. If one exists, nothing needs compiling. If one does
+not, it falls back to compiling from source with `node-gyp`, which needs Python
+and the Visual Studio C++ build tools.
+
+An earlier version of this document claimed no Visual Studio installation was
+ever needed. **That was wrong**, and the first real build on Windows proved it:
+Electron 44.4.1 had no matching `better-sqlite3` prebuild, the fallback ran, and
+it failed with `Could not find any Python installation to use`.
+
+Two things make this worse than it sounds:
+
+- **A space in the repository path breaks `node-gyp`** — a long-standing problem
+  (`nodejs/node-gyp#65`). `C:\Users\First Last\...` is where most people keep
+  things, so this bites often. If you have to compile, move the repository to
+  something like `C:\dev\ChargeTracker-App` first.
+- **The toolchain is large.** Python plus the VC++ workload is several GB and
+  around twenty minutes.
+
+`build-all.ps1` now checks for Python, the C++ build tools and a space in the
+path *before* starting a 500 MB install, so you find out in two seconds rather
+than ten minutes.
+
+#### Your three options
+
+**1. Pin Electron to a version with a prebuild.** Cheapest — nothing to install.
+Find what `better-sqlite3` publishes and set `electron` in `package.json` to
+match:
+
+```powershell
+npm view better-sqlite3 versions --json
+npm view better-sqlite3@12.2.0 --json | findstr /i electron
+```
+
+The cost is running an older Electron than the latest.
+
+**2. Install the toolchain.**
+
+```powershell
+winget install --id Python.Python.3.12 -e
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e `
+  --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+```
+
+Then move the repository somewhere without a space in the path and re-run.
+
+**3. Drop the native module.** Electron 44 bundles Node 22 or newer, which ships
+`node:sqlite` built in — and this repository **already has that driver**
+(`src/database/drivers/node-sqlite.ts`). Every one of the 387 specs runs against
+it, so it is not a hypothetical path.
+
+This would remove the native module, the rebuild step, the `asarUnpack`
+configuration and this entire class of packaging failure, permanently.
+
+The one thing to establish first is whether Electron's bundled `node:sqlite`
+exposes the **online backup API**. `src/database/backup.ts` refuses any driver
+that cannot do a proper online backup, rather than copying a live WAL file and
+producing an archive that looks fine and is subtly corrupt — so if the API is
+absent, backups stop working and that refusal is correct, not a bug to route
+around. Check it in one command once Electron is installed:
+
+```powershell
+npx electron -e "const s=require('node:sqlite'); console.log('node', process.versions.node); console.log('backup:', typeof s.backup, '| DatabaseSync.backup:', typeof new s.DatabaseSync(':memory:').backup)"
+```
+
+If either prints `function`, option 3 is viable and is the best long-term
+answer. If both print `undefined`, keep `better-sqlite3` and take option 1 or 2.
 
 ## The commands that need nothing installed
 
@@ -226,6 +293,12 @@ endings Windows expects regardless of the platform they were committed from.
 `electron-builder install-app-deps`, which needs to reach GitHub for the
 prebuilt binary. Behind a proxy, set `ELECTRON_BUILDER_BINARIES_MIRROR` rather
 than disabling TLS verification.
+
+**`npm install` fails with `Could not find any Python installation to use`.**
+No prebuilt `better-sqlite3` binary matched your Electron version, so it tried
+to compile. See *The native module* above for the three ways out. Do not install
+a random Python and expect it to work while the repository still sits in a path
+with a space in it — fix both or neither.
 
 **`setup:browser` cannot reach the CDN.** Set `PLAYWRIGHT_DOWNLOAD_HOST`. Do not
 work around it by pointing the application at a system Chrome: the bundled

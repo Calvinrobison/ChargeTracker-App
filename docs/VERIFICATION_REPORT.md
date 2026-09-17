@@ -71,6 +71,33 @@ $ node scripts/generate-migrations.mjs --check
 Migrations module is up to date (1 migrations).
 ```
 
+### The first real `npm install`, and a claim it falsified
+
+The owner ran `scripts/windows/build-all.ps1` on Windows 11 with Node 24.19.0.
+It got through the toolchain check, 387 specs, and the icon check, then failed
+during `npm install`:
+
+```
+- preparing  moduleName=better-sqlite3 arch=x64
+  Attempting to build a module with a space in the path
+Error: Could not find any Python installation to use
+node-gyp failed to rebuild '...\node_modules\better-sqlite3'
+```
+
+`docs/BUILDING.md` had stated: *"No Visual Studio installation is needed:
+`better-sqlite3` ships prebuilt binaries for the Electron ABI."* **That claim
+was false** and has been corrected. No prebuilt binary existed for Electron
+44.4.1, so `electron-builder install-app-deps` fell back to compiling from
+source, which needs Python and the Visual Studio C++ build tools.
+
+It is recorded here rather than quietly fixed because it is the same failure
+mode this report warns about throughout: a statement that was plausible,
+untested, and wrong. It had been written into the requirements table as though
+it were established.
+
+`build-all.ps1` now checks for Python, the C++ build tools, and a space in the
+repository path **before** starting a 500 MB install.
+
 The release pipeline was exercised end to end with a real Ed25519 key pair
 generated for the purpose, then deleted along with every artifact it produced.
 It behaved correctly in both directions:

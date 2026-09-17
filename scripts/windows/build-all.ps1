@@ -136,7 +136,7 @@ if (-not $SkipTests) {
     'Fix these before building. They run on Node alone, so a failure here is',
     'a real defect, not an environment problem.'
   )
-  Write-Good '380 specs passed'
+  Write-Good 'Specs passed'
 }
 
 # ------------------------------------------------------------------ 3. icons
@@ -151,7 +151,61 @@ Invoke-Step 'npm run check:icons' 'The icon set is missing or unreadable.' @(
   'Run: npm run make:icons'
 )
 
-# ---------------------------------------------------------------- 4. install
+# --------------------------------------------- 4. native build prerequisites
+
+Write-Step 'Native module prerequisites'
+
+# better-sqlite3 is a native module. If a prebuilt binary exists for the exact
+# Electron ABI in use, npm install just downloads it. If not, it compiles from
+# source, and compiling needs a full C++ toolchain. Finding that out ten minutes
+# into a 500 MB install is a waste of your time, so it is checked here.
+
+$script:nativeRisk = @()
+
+# A space in the path breaks node-gyp. This is a long-standing, well-known
+# problem (nodejs/node-gyp#65), and "C:\Users\First Last\..." is the default
+# location for most people, so it bites constantly.
+if ($repoRoot -match ' ') {
+  $script:nativeRisk += "The repository path contains a space: $repoRoot"
+  $script:nativeRisk += '  node-gyp cannot reliably compile from a path with a space in it.'
+  $script:nativeRisk += '  If a source build is needed, move the repo somewhere like C:\dev\ChargeTracker-App.'
+}
+
+$python = $null
+foreach ($candidate in @('python', 'python3', 'py')) {
+  try {
+    $version = & $candidate --version 2>&1
+    if ($LASTEXITCODE -eq 0) { $python = "$candidate ($version)"; break }
+  } catch { }
+}
+if ($python) { Write-Good "python: $python" }
+else { $script:nativeRisk += 'Python is not on PATH. node-gyp requires it to compile from source.' }
+
+# Visual Studio C++ build tools, via vswhere, which ships with any modern VS.
+$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+$msvc = $null
+if (Test-Path $vswhere) {
+  $msvc = & $vswhere -latest -products '*' `
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+    -property displayName 2>$null
+}
+if ($msvc) { Write-Good "C++ build tools: $msvc" }
+else { $script:nativeRisk += 'Visual Studio C++ build tools were not found. node-gyp requires them to compile from source.' }
+
+if ($script:nativeRisk.Count -eq 0) {
+  Write-Good 'A source build would succeed if no prebuilt binary is available.'
+} else {
+  Write-Host ''
+  Write-Host '   No C++ toolchain, so better-sqlite3 must come from a PREBUILT binary.' -ForegroundColor Yellow
+  Write-Host '   That works only if one exists for this exact Electron version.' -ForegroundColor Yellow
+  Write-Host ''
+  foreach ($line in $script:nativeRisk) { Write-Host "   $line" -ForegroundColor Yellow }
+  Write-Host ''
+  Write-Host '   Continuing. If the install fails on better-sqlite3, see the guidance' -ForegroundColor Yellow
+  Write-Host '   printed at that point and in docs/BUILDING.md.' -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------- 5. install
 
 Write-Step 'Dependencies'
 
@@ -166,11 +220,39 @@ if ($Force -or -not (Test-Path 'node_modules')) {
   } else {
     Write-Note 'No package-lock.json yet. This first install resolves and writes one.'
     Write-Note 'Downloads roughly 500 MB including Electron. This takes a while.'
-    Invoke-Step 'npm install' 'npm install failed.' @(
-      'If it failed on better-sqlite3, the postinstall step needs to reach GitHub',
-      'for a prebuilt binary. Behind a proxy set ELECTRON_BUILDER_BINARIES_MIRROR.',
-      'Never disable TLS verification to get past it.'
-    )
+    Write-Note '> npm install'
+    & cmd /c 'npm install 2>&1' | ForEach-Object { Write-Host "   $_" }
+    if ($LASTEXITCODE -ne 0) {
+      $detail = @(
+        'If the failure names better-sqlite3 and node-gyp, then no PREBUILT binary',
+        'exists for the Electron version in package.json, so npm tried to COMPILE it,',
+        'and compiling needs a toolchain this machine does not have.',
+        '',
+        'Three ways out, cheapest first:',
+        '',
+        '  1. Pin Electron down to a version better-sqlite3 publishes a prebuild for.',
+        '     Nothing needs installing. Find the candidates with:',
+        '       npm view better-sqlite3 dist-tags',
+        '       npm view better-sqlite3@12 --json | findstr /i electron',
+        '     Then set that version in package.json and re-run.',
+        '',
+        '  2. Install the compiler toolchain (several GB, ~20 minutes):',
+        '       winget install --id Python.Python.3.12 -e',
+        '       winget install --id Microsoft.VisualStudio.2022.BuildTools -e ' +
+          '--override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"',
+        '     Then MOVE THE REPO somewhere without a space in the path, e.g.',
+        '     C:\dev\ChargeTracker-App, and re-run. node-gyp cannot reliably',
+        '     compile from "C:\Users\First Last\...".',
+        '',
+        '  3. Drop the native module entirely and use Node built-in node:sqlite,',
+        '     which Electron already bundles. The repository already has that driver',
+        '     and every spec runs against it. See docs/BUILDING.md for the caveat.',
+        '',
+        'If it failed on a NETWORK error instead, set ELECTRON_BUILDER_BINARIES_MIRROR',
+        'if you are behind a proxy. Never disable TLS verification to get past it.'
+      )
+      Stop-With 'npm install failed.' $detail
+    }
   }
 } else {
   Write-Note 'node_modules already present (use -Force to reinstall)'
