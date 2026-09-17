@@ -33,7 +33,23 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
-const outDir = join(root, 'resources', 'catalog');
+/**
+ * Where the catalog is written.
+ *
+ * `--out` exists so this script can be run against a scratch directory --
+ * by its specs, and by a maintainer who wants to inspect the result before it
+ * goes anywhere near the repository. Without it, every trial run overwrites the
+ * shipped catalog, and a test run would put synthetic stations exactly where
+ * real ones belong. That is not hypothetical: it happened while writing the
+ * specs for this script.
+ */
+const outDir = resolveOutDir();
+
+function resolveOutDir() {
+  const index = process.argv.indexOf('--out');
+  const supplied = index === -1 ? null : process.argv[index + 1];
+  return supplied ? resolve(process.cwd(), supplied) : join(root, 'resources', 'catalog');
+}
 
 const CENTER = { latitude: 33.4152, longitude: -111.8315 };
 const EARTH_RADIUS_MILES = 3958.7613;
@@ -394,6 +410,6 @@ writeFileSync(
 );
 writeFileSync(join(outDir, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`, 'utf8');
 
-console.log(`\nWrote ${sites.length} stations to resources/catalog/mesa-stations.json`);
-console.log('Wrote resources/catalog/provenance.json');
-console.log('\nCommit both. The app records this provenance with every import.');
+console.log(`\nWrote ${sites.length} stations to ${join(outDir, 'mesa-stations.json')}`);
+console.log(`Wrote ${join(outDir, 'provenance.json')}`);
+console.log('\nReview both, then commit them. The app records this provenance with every import.');

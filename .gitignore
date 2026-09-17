@@ -45,3 +45,6 @@ coverage/
 playwright-report/
 test-results/
 tests/tmp/
+
+# Catalog preview output from `npm run catalog:refresh -- --out ...`
+catalog-preview/

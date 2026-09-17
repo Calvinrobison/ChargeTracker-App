@@ -104,11 +104,27 @@ nothing else. AFDC was unreachable from the build environment, and writing
 plausible-looking station rows would have put fabricated locations in front of
 someone with no way to tell they were invented.
 
-To populate it:
+To populate it, download the AFDC export once and point the script at it:
 
 ```powershell
-npm run catalog:refresh
+# 1. Get the CSV from https://afdc.energy.gov/data_download
+# 2. Look at what it would produce, without writing anything:
+npm run catalog:refresh -- --file .\alt_fuel_stations.csv --out .\catalog-preview --dry-run
+
+# 3. Write it somewhere you can inspect:
+npm run catalog:refresh -- --file .\alt_fuel_stations.csv --out .\catalog-preview
+
+# 4. Once you are satisfied, write it for real and commit both files:
+npm run catalog:refresh -- --file .\alt_fuel_stations.csv
 ```
+
+No download URL is hardcoded on purpose: the endpoint moves, and the AFDC API
+needs a developer key that must never ship inside the application.
+
+`--out` exists so a trial run cannot overwrite the shipped catalog. That is not
+a theoretical concern — while writing the specs for this script, a test run
+wrote synthetic stations into `resources/catalog/` exactly where real ones
+belong. `--out` was added in response.
 
 Review what it produces before committing. The field mapping in
 `CatalogImportRecord` is a declared shape that has never processed a real AFDC
