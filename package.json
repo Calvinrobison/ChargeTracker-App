@@ -39,8 +39,7 @@
   "dependencies": {
     "better-sqlite3": "^12.2.0",
     "electron-updater": "^6.6.2",
-    "playwright-core": "^1.55.0",
-    "zod": "^3.25.76"
+    "playwright-core": "^1.55.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",

@@ -18,6 +18,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
+    // Bans TypeScript syntax that has no JavaScript equivalent (parameter
+    // properties, non-declare enums, namespaces). Required because the
+    // dependency-free specs run under Node's type-stripping, which cannot
+    // transform those forms. Keeping the whole codebase erasable means
+    // `npm run test:nodeps` works on a machine with no package install.
+    "erasableSyntaxOnly": true,
     "composite": true,
     "declaration": true,
     "declarationMap": true,
