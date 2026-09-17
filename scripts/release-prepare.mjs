@@ -212,7 +212,6 @@ const buildInfo = {
     electron: pkg.devDependencies?.electron ?? null,
     electronBuilder: pkg.devDependencies?.['electron-builder'] ?? null,
     electronUpdater: pkg.dependencies?.['electron-updater'] ?? null,
-    betterSqlite3: pkg.dependencies?.['better-sqlite3'] ?? null,
     playwrightCore: pkg.dependencies?.['playwright-core'] ?? null,
   },
   note:

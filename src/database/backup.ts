@@ -3,7 +3,7 @@
  *
  * The rule that shapes this module: copying only the main database file while
  * WAL writes are active is NOT a valid backup. Every backup goes through
- * SQLite's online backup API (better-sqlite3's `backup`), and a driver that
+ * SQLite's online backup API (node:sqlite's `backup`), and a driver that
  * cannot do that reports `supportsOnlineBackup: false` and is refused here.
  *
  * Restore never writes into an actively used SQLite file. It stops collection,

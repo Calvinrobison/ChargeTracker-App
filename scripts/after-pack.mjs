@@ -27,16 +27,19 @@ export default async function afterPack(context) {
     );
   }
 
-  // 2. Native SQLite, unpacked from the asar.
+  // 2. No stray native module.
+  //
+  // SQLite comes from `node:sqlite`, which Electron ships. If a `.node` binary
+  // has appeared in the package, some dependency has pulled a native module
+  // back in — which would reintroduce the ABI rebuild this design removed, and
+  // would do it silently.
   const unpackedRoot = join(resources, 'app.asar.unpacked');
-  const nativeModule = existsSync(unpackedRoot)
-    ? findFile(unpackedRoot, 'better_sqlite3.node', 0)
-    : null;
-  if (!nativeModule) {
+  const strayNative = existsSync(unpackedRoot) ? findFileBySuffix(unpackedRoot, '.node', 0) : null;
+  if (strayNative) {
     problems.push(
-      `better_sqlite3.node was not found under ${unpackedRoot}.\n` +
-        '    A native module cannot be loaded from inside app.asar. Check "asarUnpack" in\n' +
-        '    electron-builder.yml, and that "electron-builder install-app-deps" ran.',
+      `A native module appeared in the package: ${strayNative}\n` +
+        '    ChargeWatch uses node:sqlite and is meant to have no native dependency.\n' +
+        '    Find what pulled this in before shipping it.',
     );
   }
 
@@ -59,6 +62,20 @@ function findFile(dir, name, depth) {
     if (entry.isFile() && entry.name === name) return path;
     if (entry.isDirectory()) {
       const found = findFile(path, name, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/** `findFile` matches an exact name; this matches an extension. */
+function findFileBySuffix(dir, suffix, depth) {
+  if (depth > 8 || !existsSync(dir)) return null;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isFile() && entry.name.endsWith(suffix)) return path;
+    if (entry.isDirectory()) {
+      const found = findFileBySuffix(path, suffix, depth + 1);
       if (found) return found;
     }
   }

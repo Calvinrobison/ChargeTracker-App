@@ -23,7 +23,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
 const EXTERNAL = [
-  'better-sqlite3',
   'playwright-core',
   'playwright',
   'electron',

@@ -63,7 +63,7 @@ export interface DatabaseWorkerConfig {
   readonly stagingDir: string;
   readonly appVersion: string;
   readonly timeZone: string;
-  /** Injected so tests can use node:sqlite and production uses better-sqlite3. */
+  /** Injected so a test can substitute a driver; both use node:sqlite. */
   readonly openDriver: (path: string) => SqliteDriver;
   readonly nowMs?: () => number;
 }

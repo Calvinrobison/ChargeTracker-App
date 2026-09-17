@@ -1,17 +1,15 @@
 # Dependency updates.
 #
-# Grouped deliberately. An Electron major, a native module, and a Playwright
-# bump each need a different kind of review, and batching them into one pull
+# Grouped deliberately. An Electron major and a Playwright bump each need a
+# different kind of review, and batching them into one pull
 # request means none of them gets it:
 #
 #   - `electron` changes the Chromium and Node versions inside the app, so it
 #     can change renderer behaviour and can require rebuilding native modules.
-#   - `better-sqlite3` is a native module: a bump has to be proven to load from
-#     inside a packaged NSIS install, not just from `node_modules`.
 #   - `playwright-core` determines the bundled browser revision, so a bump
 #     changes a ~200 MB payload and can break `setup:browser`.
 #
-# Those three are therefore never grouped with anything.
+# Those two are therefore never grouped with anything.
 
 version: 2
 updates:
@@ -63,8 +61,6 @@ updates:
       # Windows before it can be believed, and that cannot be delegated to an
       # automatic merge.
       - dependency-name: electron
-        update-types: [version-update:semver-major]
-      - dependency-name: better-sqlite3
         update-types: [version-update:semver-major]
       - dependency-name: playwright-core
         update-types: [version-update:semver-major]

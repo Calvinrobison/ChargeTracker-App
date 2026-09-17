@@ -11,76 +11,30 @@ What you need, what each command does, and what to do when one fails.
 | Disk | ~1 GB free — the bundled Chromium payload is around 200 MB before packaging and again inside the installer. |
 | Network | The npm registry and the Playwright CDN, once. After that the build is offline. |
 
-### The native module, and when you need a C++ toolchain
+### There is no native module
 
-`better-sqlite3` is a native module. `electron-builder install-app-deps`, which
-`postinstall` runs, looks for a **prebuilt binary matching the exact Electron
-ABI** in `package.json`. If one exists, nothing needs compiling. If one does
-not, it falls back to compiling from source with `node-gyp`, which needs Python
-and the Visual Studio C++ build tools.
+ChargeWatch uses **`node:sqlite`**, which ships inside Node and therefore inside
+Electron. There is nothing to rebuild for the Electron ABI, nothing to unpack
+from the asar, and no compiler toolchain needed on a build machine. `npm install`
+has no `postinstall` step.
+
+This was not the original design. The project used `better-sqlite3` until the
+first real Windows build failed: no prebuilt binary existed for Electron 44.4.1,
+so it fell back to compiling from source, which needs Python and the Visual
+Studio C++ build tools — and `node-gyp` cannot reliably compile from a path with
+a space in it, which `C:\Users\First Last\...` always has.
 
 An earlier version of this document claimed no Visual Studio installation was
-ever needed. **That was wrong**, and the first real build on Windows proved it:
-Electron 44.4.1 had no matching `better-sqlite3` prebuild, the fallback ran, and
-it failed with `Could not find any Python installation to use`.
+ever needed. That claim was wrong, and is recorded as such in
+`docs/VERIFICATION_REPORT.md`.
 
-Two things make this worse than it sounds:
+`docs/adr/0003-node-sqlite-over-better-sqlite3.md` has the full reasoning,
+including the cost: `node:sqlite` is marked experimental.
 
-- **A space in the repository path breaks `node-gyp`** — a long-standing problem
-  (`nodejs/node-gyp#65`). `C:\Users\First Last\...` is where most people keep
-  things, so this bites often. If you have to compile, move the repository to
-  something like `C:\dev\ChargeTracker-App` first.
-- **The toolchain is large.** Python plus the VC++ workload is several GB and
-  around twenty minutes.
-
-`build-all.ps1` now checks for Python, the C++ build tools and a space in the
-path *before* starting a 500 MB install, so you find out in two seconds rather
-than ten minutes.
-
-#### Your three options
-
-**1. Pin Electron to a version with a prebuild.** Cheapest — nothing to install.
-Find what `better-sqlite3` publishes and set `electron` in `package.json` to
-match:
-
-```powershell
-npm view better-sqlite3 versions --json
-npm view better-sqlite3@12.2.0 --json | findstr /i electron
-```
-
-The cost is running an older Electron than the latest.
-
-**2. Install the toolchain.**
-
-```powershell
-winget install --id Python.Python.3.12 -e
-winget install --id Microsoft.VisualStudio.2022.BuildTools -e `
-  --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-```
-
-Then move the repository somewhere without a space in the path and re-run.
-
-**3. Drop the native module.** Electron 44 bundles Node 22 or newer, which ships
-`node:sqlite` built in — and this repository **already has that driver**
-(`src/database/drivers/node-sqlite.ts`). Every one of the 387 specs runs against
-it, so it is not a hypothetical path.
-
-This would remove the native module, the rebuild step, the `asarUnpack`
-configuration and this entire class of packaging failure, permanently.
-
-The one thing to establish first is whether Electron's bundled `node:sqlite`
-exposes the **online backup API**. `src/database/backup.ts` refuses any driver
-that cannot do a proper online backup, rather than copying a live WAL file and
-producing an archive that looks fine and is subtly corrupt — so if the API is
-absent, backups stop working and that refusal is correct, not a bug to route
-around. Check it in one command once Electron is installed:
-
-```powershell
-npx electron -e "const s=require('node:sqlite'); console.log('node', process.versions.node); console.log('backup:', typeof s.backup, '| DatabaseSync.backup:', typeof new s.DatabaseSync(':memory:').backup)"
-```
-
-If either prints `function`, option 3 is viable and is the best long-term
-answer. If both print `undefined`, keep `better-sqlite3` and take option 1 or 2.
+`verify-package.mjs` and the `afterPack` hook now **fail the build if any
+`.node` binary appears in the package**. A native module reappearing means some
+dependency has quietly reintroduced the ABI rebuild, and that would only break
+on someone else's machine.
 
 ## The commands that need nothing installed
 
@@ -146,8 +100,6 @@ Three dependencies deserve attention when npm resolves something newer than
 
 - **`electron`** changes the Chromium and Node versions inside the application,
   so it can change renderer behaviour and can require rebuilding native modules.
-- **`better-sqlite3`** is a native module. A bump has to be proven to load from
-  inside a packaged NSIS install, not just from `node_modules`.
 - **`playwright-core`** determines the bundled browser revision, so a bump
   changes a ~200 MB payload and can break `setup:browser`.
 
@@ -220,9 +172,10 @@ Three bundles plus two worker entries:
   `utilityProcess.fork` needs a real file to run; a worker bundled into the main
   chunk cannot be forked
 
-`better-sqlite3`, `playwright-core` and `electron-updater` are external. They are
-native or depend on binaries on disk; bundling them produces a build that fails
-at runtime rather than at build time, which is the worse failure.
+`playwright-core` and `electron-updater` are external. They depend on binaries
+on disk; bundling them produces a build that fails at runtime rather than at
+build time, which is the worse failure. There is no SQLite entry here, because
+there is no SQLite dependency.
 
 ### `npm run package:win`
 
@@ -242,9 +195,10 @@ program.
 ### `npm run verify:package`
 
 Inspects the packaged build for the faults that look fine at build time and
-break on a user's machine: a missing bundled Chromium, `better-sqlite3` left
-inside `app.asar`, missing worker bundles, missing icons or notices, a private
-key or a database or test fixtures in the package, and an update configuration
+break on a user's machine: a missing bundled Chromium, a native `.node` binary
+that should not be there at all, missing worker bundles, missing icons or
+notices, a private key or a database or test fixtures in the package, and an
+update configuration
 that points nowhere.
 
 It reports a check it could not perform as **SKIP**, never as a pass, and prints
@@ -289,16 +243,11 @@ endings Windows expects regardless of the platform they were committed from.
 
 ## When something fails
 
-**`npm install` fails on `better-sqlite3`.** The `postinstall` script runs
-`electron-builder install-app-deps`, which needs to reach GitHub for the
-prebuilt binary. Behind a proxy, set `ELECTRON_BUILDER_BINARIES_MIRROR` rather
-than disabling TLS verification.
-
-**`npm install` fails with `Could not find any Python installation to use`.**
-No prebuilt `better-sqlite3` binary matched your Electron version, so it tried
-to compile. See *The native module* above for the three ways out. Do not install
-a random Python and expect it to work while the repository still sits in a path
-with a space in it — fix both or neither.
+**`npm install` fails while compiling a native module.** It should not: there
+are no native dependencies. If one has appeared, something in the tree pulled it
+in. Find it with `npm ls --all | findstr /i gyp` and deal with the cause rather
+than installing a compiler — `verify-package.mjs` will fail the build anyway if
+a `.node` binary reaches the package.
 
 **`setup:browser` cannot reach the CDN.** Set `PLAYWRIGHT_DOWNLOAD_HOST`. Do not
 work around it by pointing the application at a system Chrome: the bundled

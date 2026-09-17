@@ -7,18 +7,21 @@
  *    `utilityProcess.fork` has a real file to run inside app.asar. A worker
  *    bundled into the main chunk cannot be forked.
  *
- * 2. `better-sqlite3` and `playwright-core` are EXTERNAL. They are native or
- *    depend on binaries on disk; bundling them produces a build that fails at
- *    runtime rather than at build time, which is the worse failure. They stay
- *    in production `dependencies` and are unpacked from the asar by
- *    electron-builder.
+ * 2. `playwright-core` is EXTERNAL. It depends on a browser binary on disk;
+ *    bundling it produces a build that fails at runtime rather than at build
+ *    time, which is the worse failure.
+ *
+ *    SQLite is NOT in this list, because there is no SQLite dependency: the
+ *    application uses `node:sqlite`, which Electron already ships. There is no
+ *    native module to rebuild for the Electron ABI and nothing to unpack from
+ *    the asar.
  */
 
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'node:path';
 
-const NATIVE_OR_BINARY_DEPS = ['better-sqlite3', 'playwright-core', 'playwright', 'electron-updater'];
+const NATIVE_OR_BINARY_DEPS = ['playwright-core', 'playwright', 'electron-updater'];
 
 export default defineConfig({
   main: {

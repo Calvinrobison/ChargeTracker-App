@@ -2,9 +2,10 @@
  * Database tests against a real SQLite engine (node:sqlite).
  *
  * These exercise the actual migrations, constraints, indexes and repository
- * SQL that the packaged app uses. The production driver is better-sqlite3;
- * scripts/verify-package.mjs separately proves the packaged native module
- * loads, because a passing Node test does not establish that.
+ * SQL that the packaged app uses -- through the same driver it uses. The
+ * application and these specs both open SQLite with `node:sqlite`, so a pass
+ * here is evidence about the code that ships rather than about a stand-in for
+ * it. See docs/adr/0003-node-sqlite-over-better-sqlite3.md.
  *
  * Run: node --experimental-strip-types --test tests/nodeps/database.test.ts
  */

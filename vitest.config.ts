@@ -10,9 +10,8 @@
  *                  that breaks them under one runner but not the other is
  *                  caught rather than hidden.
  *
- *   `integration`  specs that need the dependency tree — better-sqlite3 under
- *                  the Electron ABI, electron-updater, the Playwright browser
- *                  API. The directory is empty until those specs are written;
+ *   `integration`  specs that need the dependency tree — electron-updater and
+ *                  the Playwright browser API. The directory is empty until those specs are written;
  *                  see docs/IMPLEMENTATION_STATUS.md.
  *
  * The UI tests are NOT here. They run under Playwright against the built

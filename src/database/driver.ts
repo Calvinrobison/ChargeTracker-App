@@ -1,7 +1,7 @@
 /**
  * A minimal synchronous SQLite driver interface.
  *
- * Production uses better-sqlite3 inside the database worker. Tests can run the
+ * Production and the specs both use node:sqlite. Tests can run the
  * identical SQL, migrations and repositories against Node's built-in
  * `node:sqlite`, which means the schema and queries are exercised against a
  * real SQLite engine rather than a mock.

@@ -7,7 +7,7 @@
  *
  *  - a missing bundled Chromium → the app tries to download a browser at first
  *    run, which it promises not to do;
- *  - better-sqlite3 left inside app.asar → a native module that cannot load;
+ *  - a native module reappearing → an Electron ABI rebuild this design removed;
  *  - missing worker bundles → `utilityProcess.fork` fails and the app appears
  *    corrupt;
  *  - missing migrations → an empty database on first launch;
@@ -99,18 +99,20 @@ if (!unpacked) {
     );
   }
 
-  // 2. Native SQLite unpacked from the asar.
-  const unpackedNode = walk(join(resources, 'app.asar.unpacked'), 0, 8).filter((file) =>
-    file.endsWith('.node'),
-  );
-  const sqliteNative = unpackedNode.find((file) => /better[_-]?sqlite3/i.test(file));
-  if (sqliteNative) {
-    record('better-sqlite3 native module unpacked', 'PASS', sqliteNative);
+  // 2. No native module at all.
+  //
+  // SQLite comes from `node:sqlite`, which Electron ships, so this package is
+  // meant to contain no `.node` binary. If one appears, a dependency has pulled
+  // a native module back in, which reintroduces the Electron ABI rebuild this
+  // design removed — silently, and only breaking on someone else's machine.
+  const nativeBinaries = walk(unpacked, 0, 8).filter((file) => file.endsWith('.node'));
+  if (nativeBinaries.length === 0) {
+    record('no native modules in the package', 'PASS', 'SQLite comes from node:sqlite');
   } else {
     record(
-      'better-sqlite3 native module unpacked',
+      'no native modules in the package',
       'FAIL',
-      'no better_sqlite3.node under app.asar.unpacked. A native module cannot be loaded from inside the archive; check asarUnpack.',
+      `native binaries found, which this build should not contain: ${nativeBinaries.slice(0, 5).join(', ')}`,
     );
   }
 

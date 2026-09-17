@@ -33,8 +33,9 @@ version and is recorded in `build-info.json` in each release.
 
 ### SQLite
 
-SQLite is used through `better-sqlite3` in the shipped application, and through
-Node's built-in `node:sqlite` in the dependency-free test suite.
+SQLite is used through Node's built-in `node:sqlite`, in both the shipped
+application and the test suite. ChargeWatch bundles no SQLite binary of its own;
+it uses the copy inside the Node that Electron ships.
 
 SQLite itself is in the **public domain**.
 
@@ -49,7 +50,6 @@ against a resolved tree; see the notice at the top.
 
 | Package | Purpose | Declared licence |
 | --- | --- | --- |
-| `better-sqlite3` | The history database in the packaged application | MIT |
 | `electron-updater` | Update discovery and installation, behind ChargeWatch's own verification | MIT |
 | `playwright-core` | Driving the bundled Chromium | Apache-2.0 |
 
@@ -65,7 +65,7 @@ against a resolved tree; see the notice at the top.
 
 Not shipped: `electron`, `electron-builder`, `electron-vite`, `vite`,
 `typescript`, `eslint` and its plugins, `prettier`, `vitest`, `playwright`,
-`@playwright/test`, `@electron/rebuild`, and the `@types/*` packages. These are
+`@playwright/test`, and the `@types/*` packages. These are
 MIT, Apache-2.0 or BSD-licensed as declared by each.
 
 Electron is MIT-licensed and incorporates Chromium and Node.js; the Electron

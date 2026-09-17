@@ -10,8 +10,9 @@
 #  * The Chromium payload ships as `resources/browser/`, OUTSIDE app.asar, and
 #    is resolved from `process.resourcesPath`. Nothing depends on the builder's
 #    home cache, which does not exist on a user's machine.
-#  * better-sqlite3 is unpacked from the asar: a native module cannot be loaded
-#    from inside an archive.
+#  * There is NO native module. SQLite comes from `node:sqlite`, which Electron
+#    already ships, so nothing has to be rebuilt for the Electron ABI and
+#    nothing has to be unpacked from the asar.
 #  * `publish` is set but release CI passes `--publish never`; publication is a
 #    separate, authorised step (see docs/RELEASING.md).
 
@@ -31,12 +32,8 @@ files:
   - '!node_modules/**/test/**'
   - '!node_modules/**/*.md'
 
-# Native modules and anything that reads files from disk at runtime cannot live
-# inside the asar archive.
-asarUnpack:
-  - '**/node_modules/better-sqlite3/**'
-  - '**/node_modules/bindings/**'
-  - '**/node_modules/file-uri-to-path/**'
+# Nothing needs unpacking from the asar. The bundled browser is already outside
+# it via extraResources, and there is no native module.
 
 extraResources:
   # Assembled by `npm run setup:browser`; see scripts/setup-browser.mjs. Not

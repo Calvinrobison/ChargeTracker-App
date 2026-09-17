@@ -1,14 +1,20 @@
 /**
  * Database worker entry point.
  *
- * Runs as an Electron utility process. This is the ONLY place better-sqlite3
- * is loaded, and the only process that writes the database.
+ * Runs as an Electron utility process, and is the only process that writes the
+ * database.
+ *
+ * SQLite comes from `node:sqlite`, which ships inside Node and therefore inside
+ * Electron. There is no native module to rebuild for the Electron ABI and
+ * nothing to unpack from the asar. See src/database/drivers/node-sqlite.ts.
  *
  * Message shape: { id, op, payload } in, { id, ok, value | error } out, plus
  * unsolicited { notify, payload } for status changes.
  */
 
-import { openBetterSqlite } from '../database/drivers/better-sqlite3.ts';
+import { DatabaseSync as DatabaseSyncAvailable } from 'node:sqlite';
+
+import { openNodeSqlite } from '../database/drivers/node-sqlite.ts';
 import { DatabaseWorker, type DatabaseWorkerConfig } from '../database/worker.ts';
 import type { FilterState, WindowRequest } from '../shared/ipc.ts';
 import type { RankSort } from '../domain/ranking.ts';
@@ -26,11 +32,31 @@ function readConfigFromArgv(): Omit<DatabaseWorkerConfig, 'openDriver'> {
   return parsed;
 }
 
+/**
+ * Confirms SQLite is actually available before anything depends on it.
+ *
+ * `node:sqlite` is built into Node, but it arrived recently and spent several
+ * releases behind `--experimental-sqlite`. Electron chooses its own Node
+ * version, so this is checked rather than assumed — and if it is ever missing,
+ * the user gets one clear sentence instead of a utility process that dies
+ * during module loading with nothing useful attached to it.
+ */
+function assertSqliteAvailable(): void {
+  if (typeof DatabaseSyncAvailable !== 'function') {
+    throw new Error(
+      'This build of Electron does not provide node:sqlite, so ChargeWatch cannot open its ' +
+        `history file. Electron ships Node ${process.versions.node}. Your data has not been ` +
+        'changed. See docs/BUILDING.md.',
+    );
+  }
+}
+
 const config = readConfigFromArgv();
+assertSqliteAvailable();
 const worker = new DatabaseWorker({
   ...config,
-  // better-sqlite3 is required here and nowhere else in the application.
-  openDriver: (path: string) => openBetterSqlite(path),
+  // The same driver the specs run against, so what is tested is what ships.
+  openDriver: (path: string) => openNodeSqlite(path),
 });
 
 function send(message: unknown): void {
