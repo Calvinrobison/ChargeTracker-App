@@ -86,6 +86,56 @@ const EXTERNAL_LINK_ORIGINS = [
 const isDevelopment = !app.isPackaged;
 
 // ---------------------------------------------------------------------------
+// Self-check mode
+// ---------------------------------------------------------------------------
+
+/**
+ * `--self-check` runs the real startup sequence with no window, no tray, no
+ * collection loop and no updater, writes a machine-readable report and exits.
+ *
+ * It exists because the things most likely to be broken in a packaged build —
+ * a native SQLite module that will not load for the Electron ABI, a bundled
+ * Chromium that is not where `process.resourcesPath` says it should be,
+ * migrations that were not embedded — cannot be established by any check that
+ * runs before packaging. They need the installed application to actually open
+ * its database and actually start its browser.
+ *
+ * The report separates two kinds of result, because conflating them would make
+ * the check either useless or dishonest:
+ *
+ *   - INTEGRITY checks (writable data folder, database, bundled browser) must
+ *     pass. A failure means the package is broken and the exit code is 1.
+ *   - READINESS checks (an eligible source, a loaded station catalog) are
+ *     reported but do not fail the run. They are expected to be unmet in a
+ *     fresh install until a source has been cleared for collection and a
+ *     catalog has been imported. Failing on them would mean a correct package
+ *     could never pass, so they are reported as unmet rather than as broken.
+ *
+ * `--self-check` is deliberately not a way to fake a check: every line in the
+ * report comes from the same `runHealthChecks()` the onboarding screen shows.
+ */
+const SELF_CHECK_INTEGRITY_IDS = ['data_dir', 'database', 'browser'] as const;
+const SELF_CHECK_READINESS_IDS = ['sources', 'catalog'] as const;
+
+const selfCheckRequested = process.argv.some(
+  (argument) => argument === '--self-check' || argument.startsWith('--self-check='),
+);
+
+function selfCheckOutputPath(fallbackDir: string): string {
+  const inline = process.argv.find((argument) => argument.startsWith('--self-check='));
+  if (inline) {
+    const value = inline.slice('--self-check='.length).trim();
+    if (value.length > 0) return value;
+  }
+  const flagIndex = process.argv.indexOf('--self-check-out');
+  if (flagIndex !== -1) {
+    const value = process.argv[flagIndex + 1];
+    if (value && !value.startsWith('--')) return value;
+  }
+  return join(fallbackDir, 'self-check.json');
+}
+
+// ---------------------------------------------------------------------------
 // Single instance
 // ---------------------------------------------------------------------------
 
@@ -123,7 +173,10 @@ function setting<T>(key: string, fallback: T): T {
 }
 
 function emit<N extends EventName>(event: N, payload: EventPayloads[N]): void {
-  windows.send(IPC_CHANNEL_EVENT, { contractVersion: IPC_CONTRACT_VERSION, event, payload });
+  // `windows` is absent in self-check mode, which runs the startup sequence
+  // without a user interface. An event with nowhere to go is dropped rather
+  // than crashing the check that produced it.
+  windows?.send(IPC_CHANNEL_EVENT, { contractVersion: IPC_CONTRACT_VERSION, event, payload });
 }
 
 // ---------------------------------------------------------------------------
@@ -1034,6 +1087,126 @@ function startUpdates(): void {
     });
 }
 
+/**
+ * Runs the startup sequence far enough to prove the package works, writes the
+ * report, and exits. Never creates a window, a tray icon, an updater or a
+ * collection schedule.
+ */
+async function runSelfCheck(): Promise<void> {
+  const startedMs = Date.now();
+  const resolution = resolveDataPaths({
+    localAppDataDir: app.getPath('userData').replace(/[\\/][^\\/]+$/, ''),
+    installDir: app.getAppPath(),
+    platform: process.platform,
+  });
+  paths = resolution.paths;
+
+  logger = new Logger({
+    logsDir: paths.logsDir,
+    minLevel: 'debug',
+    homeDirectory: homedir(),
+    mirrorToConsole: true,
+  });
+  logger.log('info', `${BRANDING.productName} ${app.getVersion()} self-check`);
+
+  const outputPath = selfCheckOutputPath(paths.root);
+  const fatal: string[] = [];
+
+  try {
+    await startDatabase();
+  } catch (error) {
+    fatal.push(`the database worker did not start: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  if (databaseState?.status === 'ready') {
+    try {
+      await startCollector();
+    } catch (error) {
+      fatal.push(
+        `the collector worker did not start: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  try {
+    await runHealthChecks();
+  } catch (error) {
+    fatal.push(
+      `the health checks could not complete: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const byId = (id: string) => healthChecks.find((check) => check.id === id) ?? null;
+  const integrity = SELF_CHECK_INTEGRITY_IDS.map((id) => ({
+    id,
+    // A check that did not run is reported as not_run, never as a pass.
+    ...(byId(id) ?? { label: id, status: 'not_run' as const, detail: 'the check did not run', recoveryAction: null }),
+  }));
+  const readiness = SELF_CHECK_READINESS_IDS.map((id) => ({
+    id,
+    ...(byId(id) ?? { label: id, status: 'not_run' as const, detail: 'the check did not run', recoveryAction: null }),
+  }));
+
+  const brokenIntegrity = integrity.filter((check) => check.status !== 'pass');
+  const verdict = fatal.length === 0 && brokenIntegrity.length === 0 ? 'pass' : 'fail';
+
+  const report = {
+    formatVersion: 1,
+    verdict,
+    ranAtIso: new Date(startedMs).toISOString(),
+    durationMs: Date.now() - startedMs,
+    appVersion: app.getVersion(),
+    electronVersion: process.versions.electron ?? null,
+    chromeVersion: process.versions.chrome ?? null,
+    nodeVersion: process.versions.node,
+    packaged: app.isPackaged,
+    platform: process.platform,
+    arch: process.arch,
+    schemaVersion: TARGET_SCHEMA_VERSION,
+    dataDirectory: paths.root,
+    resourcesPath: process.resourcesPath,
+    pathWarnings: resolution.warnings,
+    database: databaseState,
+    // These must pass for the package to be considered sound.
+    integrity,
+    // Reported, but expected to be unmet until a source is cleared and a
+    // catalog is imported. They do not fail the run.
+    readiness,
+    fatal,
+    note:
+      'integrity failures mean the installed package is broken. readiness entries describe what ' +
+      'the installation cannot yet do, which is not the same thing. Nothing here is inferred: every ' +
+      'line comes from the same startup checks the application shows on its onboarding screen.',
+  };
+
+  try {
+    await mkdir(paths.root, { recursive: true });
+    await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+    logger.log('info', `self-check ${verdict}; report written to ${outputPath}`);
+  } catch (error) {
+    logger.log(
+      'error',
+      `the self-check report could not be written to ${outputPath}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  try {
+    await collectorWorker?.stop(20_000);
+  } catch {
+    // Already reported through the checks above.
+  }
+  try {
+    await databaseWorker?.stop(20_000);
+  } catch {
+    // Same.
+  }
+  logger.close();
+
+  // The exit code is the gate. A caller that only reads stdout still gets a
+  // truthful answer.
+  app.exit(verdict === 'pass' ? 0 : 1);
+}
+
 async function bootstrap(): Promise<void> {
   const resolution = resolveDataPaths({
     localAppDataDir: app.getPath('userData').replace(/[\\/][^\\/]+$/, ''),
@@ -1208,6 +1381,15 @@ app.on('second-instance', () => {
 
 app.whenReady().then(
   () => {
+    if (selfCheckRequested) {
+      void runSelfCheck().catch((error: unknown) => {
+        // A crash in the check is a failure of the check, not a pass.
+        // eslint-disable-next-line no-console
+        console.error(`self-check crashed: ${error instanceof Error ? error.message : String(error)}`);
+        app.exit(1);
+      });
+      return;
+    }
     void bootstrap().catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       logger?.log('error', `startup failed: ${message}`);

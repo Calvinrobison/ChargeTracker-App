@@ -159,6 +159,10 @@ if (!unpacked) {
     { pattern: /(^|[\\/])\.env$/i, label: 'an .env file' },
     { pattern: /demo[-_]?history/i, label: 'demo history' },
     { pattern: /test[-_]?keys?/i, label: 'test signing keys' },
+    // Fixture view models are synthetic by construction. A package that
+    // contains one could show invented stations as though they were observed.
+    { pattern: /(^|[\\/])tests[\\/]/i, label: 'test code or fixtures' },
+    { pattern: /(^|[\\/])fixtures?\.(ts|js|mjs|json)$/i, label: 'fixture data' },
     { pattern: /\.sqlite$/i, label: 'a database file' },
   ];
   const offenders = [];

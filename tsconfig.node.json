@@ -28,6 +28,7 @@
     "tests/nodeps/**/*.ts",
     "scripts/**/*.mts",
     "electron.vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "playwright.config.ts"
   ]
 }

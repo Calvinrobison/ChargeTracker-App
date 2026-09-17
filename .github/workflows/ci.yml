@@ -128,8 +128,13 @@ jobs:
       - name: Verify the package
         run: npm run verify:package
 
+      # -AllowElevated because a hosted runner's default account is an
+      # administrator. The script then reports the "needs no administrator
+      # rights" claim as NOT established rather than passing it, so this job
+      # cannot be mistaken for proof that a normal user can install.
       - name: Smoke test the installed build
-        run: npm run test:installed
+        shell: pwsh
+        run: ./scripts/windows/test-installed.ps1 -AllowElevated
 
       - name: Upload the package report
         if: always()
