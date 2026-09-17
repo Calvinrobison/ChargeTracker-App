@@ -36,6 +36,21 @@ inside `app.asar` is a reliable way to ship an application that opens an empty
 database. If this check fails, run `npm run generate:migrations` and commit the
 result.
 
+## The one-command path
+
+```powershell
+.\scripts\windows\build-all.ps1
+```
+
+Runs everything below in order, stops at the first real failure, and explains
+what the failure means. It is safe to re-run: steps already done are skipped
+unless you pass `-Force`. `-StopAfter build` stops before packaging;
+`-SkipTypecheck` gets you to a build while you work through the first
+typecheck.
+
+Expect the typecheck step to fail the first time. That is not a broken setup —
+see below.
+
 ## The full sequence
 
 ```powershell
@@ -92,6 +107,24 @@ lint error rather than a confusing runtime one.
 
 `check:migrations` → `test:nodeps` → `format` → `lint` → `typecheck`. This is
 the gate to run before opening a pull request.
+
+### `npm run make:icons`
+
+Generates `resources/icons/icon.ico` and two PNGs from `scripts/make-icons.mjs`.
+
+The icon is generated rather than committed as a binary because
+`electron-builder.yml` and the main process both resolve `icon.ico` by path: if
+it is absent, packaging fails, and if it is present but malformed, packaging
+succeeds and the installed application has a blank icon in the taskbar, the
+Start menu and the tray — which looks like a corrupted install. Generating it
+keeps the source of truth readable and the output reproducible.
+
+`npm run check:icons` verifies the file exists and parses as an ICO, and
+`package:win` runs it before electron-builder so a missing icon fails in two
+seconds rather than deep inside packaging.
+
+The design is deliberately plain. It is a real, working icon and an honest
+placeholder — not a claim that anyone has done brand design.
 
 ### `npm run setup:browser`
 
