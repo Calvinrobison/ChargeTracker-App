@@ -13,16 +13,29 @@
     "node": ">=22.12.0 <25"
   },
   "scripts": {
-    "test:nodeps": "node scripts/test-nodeps.mjs",
+    "postinstall": "electron-builder install-app-deps",
+    "setup:browser": "node scripts/setup-browser.mjs",
+    "setup:browser:verify": "node scripts/setup-browser.mjs --verify",
+    "dev": "electron-vite dev",
     "generate:migrations": "node scripts/generate-migrations.mjs",
     "check:migrations": "node scripts/generate-migrations.mjs --check",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "verify": "npm run check:migrations && npm run test:nodeps && npm run format && npm run lint && npm run typecheck"
+    "test:nodeps": "node scripts/test-nodeps.mjs",
+    "verify": "npm run check:migrations && npm run test:nodeps && npm run format && npm run lint && npm run typecheck",
+    "build": "npm run check:migrations && electron-vite build && node scripts/build-workers.mjs",
+    "package:win": "npm run build && npm run setup:browser:verify && electron-builder --win --publish never",
+    "verify:package": "node scripts/verify-package.mjs",
+    "catalog:refresh": "node scripts/catalog-refresh.mjs",
+    "keys:bootstrap": "node scripts/keys-bootstrap.mjs",
+    "keys:show": "node scripts/keys-bootstrap.mjs --show",
+    "release:prepare": "node scripts/release-prepare.mjs",
+    "release:verify": "node --experimental-strip-types --no-warnings scripts/release-verify.mjs",
+    "release:publish": "node scripts/release-publish.mjs"
   },
-  "//scripts-not-yet-implemented": "dev, build, package:win, verify:package, setup:browser, catalog:refresh, keys:bootstrap, release:prepare, release:verify, release:publish, test:installed and test:update are specified in docs/IMPLEMENTATION_STATUS.md as outstanding work. They are deliberately absent rather than present as stubs that would report success without doing anything.",
+  "//scripts-not-yet-implemented": "test, test:integration, test:e2e, test:installed and test:update are specified in docs/IMPLEMENTATION_STATUS.md as outstanding work. They are deliberately absent rather than present as stubs that would report success without doing anything. Use npm run test:nodeps, which runs 349 real specs with no install required.",
   "dependencies": {
     "better-sqlite3": "^12.2.0",
     "electron-updater": "^6.6.2",

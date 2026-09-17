@@ -1,0 +1,111 @@
+/*
+ * Design tokens, taken verbatim from the UI handoff.
+ *
+ * Every colour, size and radius in the app comes from here. A component that
+ * hard-codes a hex value is a bug: the handoff is the contract, and one place
+ * to change it is the point.
+ *
+ * Elevation comes from background separation, not shadows. The only shadows in
+ * the product are the marker halo, the map tooltip and the marker drop.
+ */
+
+:root {
+  /* Surfaces */
+  --bg-app: #0d1412;
+  --bg-secondary: #131d1a;
+  --bg-panel: #192520;
+  --bg-inset: #0f1815;
+  --bg-hover-row: #1e2c26;
+
+  /* Lines */
+  --border: #2b3b35;
+  --border-hover: #3f5a50;
+
+  /* Text */
+  --text-primary: #e8efeb;
+  --text-secondary: #91a39b;
+  --text-tertiary: #6f8279;
+
+  /* Accent */
+  --accent: #5dbb97;
+  --accent-selected: #86e0ba;
+  --on-accent: #0b1512;
+  --accent-wash: rgba(93, 187, 151, 0.14);
+  --accent-selected-wash: rgba(134, 224, 186, 0.16);
+
+  /* Status */
+  --status-available: #55b88c;
+  --status-warning: #e7b66a;
+  --status-critical: #d66c6c;
+  --status-warning-wash: rgba(231, 182, 106, 0.14);
+
+  /* Warning banner surface */
+  --warn-bg: #1f2119;
+  --warn-border: #4a4128;
+  --warn-text: #e7b66a;
+  --warn-button-label: #1a1408;
+
+  /* Neutral dots */
+  --dot-catalog: #4d5c55;
+  --dot-provisional: #91a39b;
+  --ring-null: #3a4a43;
+  --badge-text: #c7d3cd;
+
+  /* Heatmap ramp, low to high, plus the no-data step */
+  --heat-0: #16211d;
+  --heat-1: #23453a;
+  --heat-2: #3a7d64;
+  --heat-3: #55b88c;
+  --heat-4: #e7b66a;
+  --heat-5: #d66c6c;
+
+  /* Shadows — the only three in the product */
+  --shadow-marker-halo: 0 0 0 5px rgba(134, 224, 186, 0.18), 0 0 0 1.5px #86e0ba;
+  --shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-marker-drop: 0 1px 3px rgba(0, 0, 0, 0.5);
+
+  /* Floating map chrome */
+  --chrome-bg: rgba(19, 29, 26, 0.94);
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Radii */
+  --radius-control: 8px;
+  --radius-control-lg: 9px;
+  --radius-chip: 6px;
+  --radius-card: 11px;
+  --radius-card-lg: 12px;
+  --radius-panel: 14px;
+
+  /* Layout */
+  --topbar-height: 58px;
+  --rail-width: 302px;
+  --rail-collapsed-width: 62px;
+  --drawer-width: 404px;
+
+  /*
+   * Inter is the design typeface. No webfont is loaded: the handoff requires a
+   * bundled copy and no CDN, and no Inter files are vendored yet (see
+   * docs/IMPLEMENTATION_STATUS.md). Until then this falls back to Segoe UI
+   * Variable, which is what Windows 11 ships and is close in proportion.
+   */
+  --font-sans:
+    Inter, 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+}
+
+/*
+ * The app is dark-themed. A light theme is not implemented, but the token
+ * layer is where it would go, and the user's stored choice is respected the
+ * moment it exists rather than being reset.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
