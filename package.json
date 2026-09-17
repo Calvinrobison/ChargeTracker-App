@@ -21,7 +21,7 @@
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run --project unit",
-    "test:nodeps": "node --experimental-strip-types --test tests/nodeps/**/*.test.ts",
+    "test:nodeps": "node scripts/test-nodeps.mjs",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
     "verify": "npm run format && npm run lint && npm run typecheck && npm run test && npm run test:integration",
