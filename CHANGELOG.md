@@ -40,6 +40,25 @@ project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - **Tooling.** Catalog refresh, browser bundling, key bootstrap, package
   verification and a release pipeline whose verify step uses the same code the
   application uses.
+- **`--self-check` startup mode.** Runs the real startup sequence with no
+  window, tray, collection loop or updater, writes a machine-readable report and
+  exits nonzero if the installation is broken. It separates integrity (writable
+  data folder, database, bundled browser) from readiness (an eligible source, a
+  loaded catalog), so a correct package is not failed for things it is not yet
+  able to do.
+- **Windows test harness.** `test-installed.ps1` installs a package, runs the
+  self-check against a throwaway data directory and uninstalls.
+  `test-update.ps1` proves an upgrade migrates the existing history file in
+  place rather than replacing it. `db-probe.mjs` reads a history file read-only
+  and prints a fingerprint.
+- **Continuous integration.** Four-job CI with the no-install specs first, and a
+  release workflow that keeps the signing key out of the job that runs the
+  project build, refuses to sign without a key rather than falling back to an
+  unsigned manifest, and stages a draft rather than publishing.
+- **Display-layer specs.** 31 specs over the renderer's formatters — the last
+  place a missing measurement could become a number.
+- **Issue and pull request templates**, including a data-accuracy template and a
+  data-honesty checklist that applies to every change.
 
 ### Known limitations
 
