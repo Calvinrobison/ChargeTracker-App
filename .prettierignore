@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+package-lock.json
+src/database/migrations/index.ts
+resources/catalog/
+docs/screenshots/

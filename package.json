@@ -13,29 +13,16 @@
     "node": ">=22.12.0 <25"
   },
   "scripts": {
-    "postinstall": "electron-builder install-app-deps",
-    "setup:browser": "node scripts/setup-browser.mjs",
-    "dev": "electron-vite dev",
+    "test:nodeps": "node scripts/test-nodeps.mjs",
+    "generate:migrations": "node scripts/generate-migrations.mjs",
+    "check:migrations": "node scripts/generate-migrations.mjs --check",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "vitest run --project unit",
-    "test:nodeps": "node scripts/test-nodeps.mjs",
-    "test:integration": "vitest run --project integration",
-    "test:e2e": "playwright test",
-    "verify": "npm run format && npm run lint && npm run typecheck && npm run test && npm run test:integration",
-    "build": "electron-vite build",
-    "package:win": "npm run build && electron-builder --win --publish never",
-    "verify:package": "node scripts/verify-package.mjs",
-    "test:installed": "powershell -ExecutionPolicy Bypass -File scripts/windows/test-installed.ps1",
-    "test:update": "powershell -ExecutionPolicy Bypass -File scripts/windows/test-update.ps1",
-    "catalog:refresh": "node scripts/catalog-refresh.mjs",
-    "keys:bootstrap": "node scripts/keys-bootstrap.mjs",
-    "release:prepare": "node scripts/release-prepare.mjs",
-    "release:verify": "node scripts/release-verify.mjs",
-    "release:publish": "node scripts/release-publish.mjs"
+    "verify": "npm run check:migrations && npm run test:nodeps && npm run format && npm run lint && npm run typecheck"
   },
+  "//scripts-not-yet-implemented": "dev, build, package:win, verify:package, setup:browser, catalog:refresh, keys:bootstrap, release:prepare, release:verify, release:publish, test:installed and test:update are specified in docs/IMPLEMENTATION_STATUS.md as outstanding work. They are deliberately absent rather than present as stubs that would report success without doing anything.",
   "dependencies": {
     "better-sqlite3": "^12.2.0",
     "electron-updater": "^6.6.2",
@@ -43,6 +30,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.1",
+    "@eslint/js": "^9.35.0",
     "@playwright/test": "^1.55.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/leaflet": "^1.9.20",

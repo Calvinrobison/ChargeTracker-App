@@ -1,0 +1,14 @@
+{
+  "printWidth": 100,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "semi": true,
+  "arrowParens": "always",
+  "endOfLine": "lf",
+  "overrides": [
+    {
+      "files": ["*.ps1", "*.cmd", "*.bat"],
+      "options": { "endOfLine": "crlf" }
+    }
+  ]
+}
