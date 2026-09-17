@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "outDir": "./out/types/node",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@domain/*": ["src/domain/*"],
+      "@database/*": ["src/database/*"],
+      "@collector/*": ["src/collector/*"],
+      "@main/*": ["src/main/*"]
+    }
+  },
+  "include": [
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "src/collector/**/*.ts",
+    "src/database/**/*.ts",
+    "src/domain/**/*.ts",
+    "src/shared/**/*.ts",
+    "tests/unit/**/*.ts",
+    "tests/integration/**/*.ts",
+    "tests/nodeps/**/*.ts",
+    "scripts/**/*.mts",
+    "electron.vite.config.ts",
+    "vitest.config.ts"
+  ]
+}

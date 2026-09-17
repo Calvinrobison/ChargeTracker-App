@@ -1,0 +1,47 @@
+# dependencies
+node_modules/
+
+# build output
+out/
+dist/
+release/
+*.tsbuildinfo
+
+# local runtime data (never commit a real database or profile)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+data/
+browser-profiles/
+logs/
+backups/
+exports/
+diagnostics/
+update-cache/
+
+# browser payloads assembled at build time, never committed
+resources/browser/
+.playwright-cache/
+
+# secrets and private keys
+*.pem
+*.key
+!resources/update-keys/*.pub.pem
+.env
+.env.local
+secrets/
+release-keys/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+tests/tmp/

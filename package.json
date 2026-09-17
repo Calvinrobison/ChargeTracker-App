@@ -1,0 +1,71 @@
+{
+  "name": "chargewatch",
+  "productName": "ChargeWatch",
+  "version": "0.1.0",
+  "description": "Local historical observation tool for public EV charger status around Mesa, Arizona.",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": {
+    "name": "Calvin Robison"
+  },
+  "main": "out/main/index.js",
+  "engines": {
+    "node": ">=22.12.0 <25"
+  },
+  "scripts": {
+    "postinstall": "electron-builder install-app-deps",
+    "setup:browser": "node scripts/setup-browser.mjs",
+    "dev": "electron-vite dev",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run --project unit",
+    "test:nodeps": "node --experimental-strip-types --test tests/nodeps/**/*.test.ts",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "playwright test",
+    "verify": "npm run format && npm run lint && npm run typecheck && npm run test && npm run test:integration",
+    "build": "electron-vite build",
+    "package:win": "npm run build && electron-builder --win --publish never",
+    "verify:package": "node scripts/verify-package.mjs",
+    "test:installed": "powershell -ExecutionPolicy Bypass -File scripts/windows/test-installed.ps1",
+    "test:update": "powershell -ExecutionPolicy Bypass -File scripts/windows/test-update.ps1",
+    "catalog:refresh": "node scripts/catalog-refresh.mjs",
+    "keys:bootstrap": "node scripts/keys-bootstrap.mjs",
+    "release:prepare": "node scripts/release-prepare.mjs",
+    "release:verify": "node scripts/release-verify.mjs",
+    "release:publish": "node scripts/release-publish.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "electron-updater": "^6.6.2",
+    "playwright-core": "^1.55.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "@playwright/test": "^1.55.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/leaflet": "^1.9.20",
+    "@types/node": "^22.18.1",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@typescript-eslint/eslint-plugin": "^8.42.0",
+    "@typescript-eslint/parser": "^8.42.0",
+    "@vitejs/plugin-react": "^5.0.2",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.0",
+    "eslint": "^9.35.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "leaflet": "^1.9.4",
+    "playwright": "^1.55.0",
+    "prettier": "^3.6.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "recharts": "^3.2.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5",
+    "vitest": "^3.2.4"
+  }
+}
