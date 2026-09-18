@@ -18,15 +18,22 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
+    // Every import in this codebase carries an explicit `.ts` extension,
+    // because the dependency-free spec runner is Node, and Node requires the
+    // real filename. TypeScript needs to be told that is deliberate.
+    //
+    // It is only permitted alongside `noEmit`, which is right here anyway:
+    // nothing consumes tsc's output. electron-vite builds the three bundles and
+    // scripts/build-workers.mjs builds the two worker entries, so tsc's only
+    // job is to check types.
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     // Bans TypeScript syntax that has no JavaScript equivalent (parameter
     // properties, non-declare enums, namespaces). Required because the
     // dependency-free specs run under Node's type-stripping, which cannot
     // transform those forms. Keeping the whole codebase erasable means
     // `npm run test:nodeps` works on a machine with no package install.
     "erasableSyntaxOnly": true,
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
     "sourceMap": true
   }
 }

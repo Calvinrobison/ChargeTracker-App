@@ -119,7 +119,6 @@ export interface UpdateServiceConfig {
   readonly safeInstallTrayHiddenMs?: number;
   readonly checkIntervalMs?: number;
   readonly jitterFraction?: number;
-  readonly nowMs?: () => number;
   readonly random?: () => number;
 }
 
@@ -132,7 +131,6 @@ export class UpdateService {
   private readonly backend: UpdaterBackend;
   private readonly host: UpdateHost;
   private readonly config: UpdateServiceConfig;
-  private readonly nowMs: () => number;
 
   private state: UpdateState = 'idle';
   private detail: string | null = null;
@@ -149,7 +147,6 @@ export class UpdateService {
     this.backend = backend;
     this.host = host;
     this.config = config;
-    this.nowMs = config.nowMs ?? (() => Date.now());
     // Take control of install timing before anything else can happen.
     this.backend.configureManualControl();
   }

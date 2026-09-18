@@ -66,6 +66,13 @@ export interface DatabaseWorkerConfig {
   /** Injected so a test can substitute a driver; both use node:sqlite. */
   readonly openDriver: (path: string) => SqliteDriver;
   readonly nowMs?: () => number;
+  /**
+   * Optional, because the specs construct this worker directly and have no
+   * channel to log to. Where it is absent, a swallowed failure stays swallowed
+   * -- which is why the one place that swallows on purpose says so loudly in a
+   * comment.
+   */
+  readonly log?: (level: 'debug' | 'info' | 'warn' | 'error', message: string) => void;
 }
 
 export type DatabaseReadyState =
@@ -177,7 +184,7 @@ export class DatabaseWorker {
     if (outcome.status === 'failed' || outcome.status === 'checksum_mismatch') {
       // Both the original backup and the working copy are preserved; the caller
       // opens a recovery screen and leaves collection stopped.
-      this.recordUpdateEvent('migration_failed', outcome.detail);
+      this.recordUpdateEvent({ event: 'migration_failed', detail: outcome.detail });
       return { status: 'migration_failed', detail: outcome.detail, backupPath };
     }
 
@@ -280,16 +287,6 @@ export class DatabaseWorker {
       }
     }, 30_000);
     this.heartbeatTimer.unref?.();
-  }
-
-  private recordUpdateEvent(event: string, detail: string | null): void {
-    try {
-      this.requireDriver()
-        .prepare('INSERT INTO update_events (event, detail, occurred_at_ms) VALUES (?,?,?)')
-        .run(event, detail, this.nowMs());
-    } catch {
-      /* bookkeeping only */
-    }
   }
 
   // -------------------------------------------------------------------------
@@ -1597,9 +1594,19 @@ export class DatabaseWorker {
       this.requireDriver()
         .prepare('INSERT INTO update_events (event, detail, occurred_at_ms) VALUES (?,?,?)')
         .run(input.event, detail, this.nowMs());
-    } catch {
-      // An unrecognised event name fails the CHECK constraint; bookkeeping must
-      // never break an update.
+    } catch (error) {
+      // Bookkeeping must never break an update, so this is swallowed -- but it
+      // is no longer swallowed SILENTLY. A duplicate method definition once
+      // made every internal call pass a string where an object was expected,
+      // so `event` was undefined, the CHECK constraint rejected every row, and
+      // this empty catch hid it completely. The update audit trail was empty
+      // and nothing said so.
+      this.config.log?.(
+        'warn',
+        `an update event could not be recorded (${input.event}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 

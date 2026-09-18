@@ -57,6 +57,7 @@ const worker = new DatabaseWorker({
   ...config,
   // The same driver the specs run against, so what is tested is what ships.
   openDriver: (path: string) => openNodeSqlite(path),
+  log: (level, message) => notify('log', { level, message }),
 });
 
 function send(message: unknown): void {

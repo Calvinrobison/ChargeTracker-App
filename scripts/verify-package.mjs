@@ -22,7 +22,7 @@
  * Usage: node scripts/verify-package.mjs [--dir release]
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,6 +59,46 @@ function walk(dir, depth = 0, limit = 6) {
     else files.push(path);
   }
   return files;
+}
+
+/**
+ * Reads an asar archive's directory listing.
+ *
+ * Layout: a 4-byte pickle size, the header size, the payload size, then the
+ * length-prefixed JSON listing. Returns null rather than throwing, so a format
+ * change downgrades this to a reported SKIP instead of failing the build for
+ * the wrong reason.
+ */
+function readAsarListing(path) {
+  try {
+    const fd = openSync(path, 'r');
+    try {
+      const prefix = Buffer.alloc(16);
+      if (readSync(fd, prefix, 0, 16, 0) !== 16) return null;
+      const jsonLength = prefix.readUInt32LE(12);
+      if (!Number.isFinite(jsonLength) || jsonLength <= 0 || jsonLength > 64 * 1024 * 1024) return null;
+      const json = Buffer.alloc(jsonLength);
+      if (readSync(fd, json, 0, jsonLength, 16) !== jsonLength) return null;
+      const parsed = JSON.parse(json.toString('utf8'));
+      return parsed && typeof parsed === 'object' && parsed.files ? parsed : null;
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** Walks the asar listing for a path given as segments. */
+function hasAsarEntry(listing, segments) {
+  let node = listing;
+  for (const segment of segments) {
+    if (!node || typeof node !== 'object' || !node.files) return false;
+    node = node.files[segment];
+    if (!node) return false;
+  }
+  // A file entry has a size; a directory has `files`.
+  return typeof node.size === 'number' || node.unpacked === true;
 }
 
 const unpacked = findUnpackedDir();
@@ -119,13 +159,29 @@ if (!unpacked) {
   // 3. Worker bundles.
   const asar = join(resources, 'app.asar');
   if (existsSync(asar)) {
-    // The asar is a single file; its contents cannot be listed without the
-    // asar module. Report honestly rather than claiming a check we did not run.
-    record(
-      'worker bundles inside app.asar',
-      'SKIP',
-      'app.asar is packed; run `npx asar list resources/app.asar | findstr out/workers` to confirm out/workers/database.js and collector.js are present.',
-    );
+    // An asar begins with a small pickle header followed by a JSON directory
+    // listing, so its contents CAN be listed with nothing installed. This used
+    // to be reported as SKIP; a required check that is never performed is the
+    // kind of gap that ships a package whose workers cannot be forked.
+    const listing = readAsarListing(asar);
+    if (!listing) {
+      record(
+        'worker bundles inside app.asar',
+        'SKIP',
+        `${asar} could not be read as an asar archive. Run: npx asar list "${asar}" | findstr out/workers`,
+      );
+    } else {
+      const missing = ['database.js', 'collector.js'].filter(
+        (name) => !hasAsarEntry(listing, ['out', 'workers', name]),
+      );
+      record(
+        'worker bundles inside app.asar',
+        missing.length === 0 ? 'PASS' : 'FAIL',
+        missing.length === 0
+          ? 'out/workers/database.js and out/workers/collector.js are present'
+          : `missing from app.asar: ${missing.map((n) => `out/workers/${n}`).join(', ')}. utilityProcess.fork would fail and the app would look corrupt.`,
+      );
+    }
   } else {
     const workers = ['database.js', 'collector.js'].map((name) =>
       join(unpacked, 'resources', 'app', 'out', 'workers', name),

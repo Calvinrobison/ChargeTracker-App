@@ -17,15 +17,15 @@ import type {
 } from '../domain/types.ts';
 import type { PortSnapshot } from '../domain/types.ts';
 
-function asNumberOrNull(value: SqlValue): number | null {
+function asNumberOrNull(value: SqlValue | undefined): number | null {
   return value === null || value === undefined ? null : Number(value);
 }
 
-function asStringOrNull(value: SqlValue): string | null {
+function asStringOrNull(value: SqlValue | undefined): string | null {
   return value === null || value === undefined ? null : String(value);
 }
 
-function bool(value: SqlValue): boolean {
+function bool(value: SqlValue | undefined): boolean {
   return Number(value ?? 0) === 1;
 }
 

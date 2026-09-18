@@ -49,14 +49,24 @@ import type {
   StationDetailView,
   StationView,
   SummaryView,
+  TrendPointView,
   TrendView,
   VisitsPanelView,
 } from '../shared/ipc.ts';
 
-function num(value: SqlValue): number | null {
+/**
+ * Column readers.
+ *
+ * They take `SqlValue | undefined` because `noUncheckedIndexedAccess` types
+ * every `row.column` as possibly undefined -- correctly: a column the query did
+ * not select is genuinely absent, not null. Handling both here is the point of
+ * these helpers, and it keeps the distinction that matters everywhere else
+ * intact: a column that IS selected and IS null returns null, never 0 or ''.
+ */
+function num(value: SqlValue | undefined): number | null {
   return value === null || value === undefined ? null : Number(value);
 }
-function str(value: SqlValue): string | null {
+function str(value: SqlValue | undefined): string | null {
   return value === null || value === undefined ? null : String(value);
 }
 
@@ -480,7 +490,7 @@ export class QueryService {
       }
     }
 
-    const points: TrendView['points'] = [];
+    const points: TrendPointView[] = [];
     const dayCount = Math.min(400, Math.ceil(elapsedDays(window)) + 1);
     for (let i = 0; i < dayCount; i += 1) {
       const instant = window.startMs + i * DAY_MS;
@@ -724,6 +734,12 @@ export class QueryService {
       this.driver.prepare('SELECT MAX(observed_at_ms) AS m FROM observations').get()?.m ?? null,
     );
 
+    // NOTE: `partial_coverage` is declared in CollectionStatusView and handled
+    // by the renderer, but nothing below ever produces it -- deriving it needs
+    // a coverage figure this method is not given. TypeScript found the dead
+    // branch that revealed it. Tracked in docs/IMPLEMENTATION_STATUS.md; the
+    // branch is removed rather than left as unreachable code pretending the
+    // state is reachable.
     let kind: CollectionStatusView['kind'];
     if (input.userPaused) kind = 'paused';
     else if (!input.running) kind = monitoredCount === 0 ? 'not_started' : 'paused';
@@ -743,9 +759,7 @@ export class QueryService {
               ? 'Source issue'
               : kind === 'catching_up'
                 ? `Catching up · ${input.queueLag} waiting`
-                : kind === 'partial_coverage'
-                  ? 'Partial coverage'
-                  : 'Not started';
+                : 'Not started';
 
     return {
       kind,

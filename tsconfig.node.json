@@ -26,6 +26,13 @@
     "tests/unit/**/*.ts",
     "tests/integration/**/*.ts",
     "tests/nodeps/**/*.ts",
+    "tests/fixtures/**/*.ts",
+    // format.ts is renderer code, but tests/nodeps/format.test.ts imports it:
+    // it is a pure module with no DOM, and the honesty rules it enforces are
+    // worth testing without a browser.
+    "src/renderer/src/format.ts",
+    // Imported with a JSON import attribute by src/main/index.ts.
+    "resources/update-keys/keys.json",
     "scripts/**/*.mts",
     "electron.vite.config.ts",
     "vitest.config.ts",

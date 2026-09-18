@@ -36,7 +36,6 @@ import {
   subtract,
 } from './time.ts';
 
-const FAR_PAST = 0;
 const FAR_FUTURE = 4_102_444_800_000;
 
 export type ExclusionReason =

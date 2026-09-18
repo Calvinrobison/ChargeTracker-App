@@ -1,4 +1,7 @@
 {
+  // The two projects are typechecked directly by `npm run typecheck`, which
+  // invokes each with -p. There are no project references, because nothing
+  // consumes tsc's emitted output -- see "noEmit" in tsconfig.base.json.
   "files": [],
-  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.web.json" }]
+  "include": []
 }

@@ -212,6 +212,7 @@ Ordered by what unblocks the most.
 | # | Work | Depends on | Notes |
 | --- | --- | --- | --- |
 | I1 | Commit `package-lock.json` | B1 | Everything below needs it. |
+| I2a | `partial_coverage` collection status is never emitted | — | Declared in `CollectionStatusView` and handled by the renderer, but `QueryService.collectionStatus` has no coverage figure to derive it from. Found by typecheck as an unreachable branch; the branch was removed rather than left pretending the state is reachable. |
 | I2 | Fix whatever `npm run typecheck` reports | I1 | Never run. Expect real errors, concentrated in the renderer and `updates-backend.ts`. |
 | I2b | Run `npm run catalog:refresh` against a real AFDC export | network | The application shows nothing until a catalog exists. The script is now covered by 11 specs but has still never seen a genuine AFDC file. |
 | I3 | First `npm run build`, then `npm run test:e2e` | I2 | First evidence the renderer renders. Expect selector fixes in `tests/ui/honesty.spec.ts`. |

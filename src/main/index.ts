@@ -43,6 +43,7 @@ import {
   type CollectionStatusView,
   type EventName,
   type EventPayloads,
+  type ResponseOf,
   type SourceHealthView,
   type StationDetailView,
 } from '../shared/ipc.ts';
@@ -666,7 +667,9 @@ function registerHandlers(): void {
     }
   });
 
-  router.register('backup.list', async () => ({ backups: await db('listBackups') }));
+  router.register('backup.list', async () => ({
+    backups: await db<ResponseOf<'backup.list'>['backups']>('listBackups'),
+  }));
 
   router.register('restore.preview', async (payload) => {
     const preview = await db<{
@@ -1137,15 +1140,13 @@ async function runSelfCheck(): Promise<void> {
   }
 
   const byId = (id: string) => healthChecks.find((check) => check.id === id) ?? null;
-  const integrity = SELF_CHECK_INTEGRITY_IDS.map((id) => ({
-    id,
-    // A check that did not run is reported as not_run, never as a pass.
-    ...(byId(id) ?? { label: id, status: 'not_run' as const, detail: 'the check did not run', recoveryAction: null }),
-  }));
-  const readiness = SELF_CHECK_READINESS_IDS.map((id) => ({
-    id,
-    ...(byId(id) ?? { label: id, status: 'not_run' as const, detail: 'the check did not run', recoveryAction: null }),
-  }));
+  /** A check that did not run is reported as not_run, never as a pass. */
+  const notRun = (id: string) =>
+    ({ label: id, status: 'not_run' as const, detail: 'the check did not run', recoveryAction: null });
+  // `id` goes last: the spread carries its own, and a trailing key is the one
+  // that wins. Putting it first made it dead.
+  const integrity = SELF_CHECK_INTEGRITY_IDS.map((id) => ({ ...(byId(id) ?? notRun(id)), id }));
+  const readiness = SELF_CHECK_READINESS_IDS.map((id) => ({ ...(byId(id) ?? notRun(id)), id }));
 
   const brokenIntegrity = integrity.filter((check) => check.status !== 'pass');
   const verdict = fatal.length === 0 && brokenIntegrity.length === 0 ? 'pass' : 'fail';
@@ -1416,7 +1417,13 @@ app.on('before-quit', (event) => {
 });
 
 // Respect a Windows shutdown or sign-out: never start an installer then.
-powerMonitor.on('shutdown', (event: { preventDefault: () => void } | undefined) => {
+// Electron's types declare 'shutdown' for Linux and macOS only, but a Windows
+// session end must not be ignored: it is the one moment an update installer
+// must never start. Subscribed through a widened handle rather than dropped,
+// with the reason recorded here so it does not look like a stray cast.
+(powerMonitor as unknown as {
+  on(event: 'shutdown', listener: (event?: { preventDefault: () => void }) => void): void;
+}).on('shutdown', (event?: { preventDefault: () => void }) => {
   sessionEnding = true;
   logger?.log('info', 'the OS is ending the session');
   event?.preventDefault?.();
