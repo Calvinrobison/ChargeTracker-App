@@ -18,7 +18,7 @@
  *   node scripts/setup-browser.mjs --verify   # only check what is present
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,5 +131,53 @@ if (!installed) {
   process.exit(1);
 }
 
+pruneUnusedPayload();
+
 console.log(`\nBundled Chromium ready: ${installed}`);
 console.log(`Payload size: ${(directorySize(browserDir) / (1024 * 1024)).toFixed(0)} MB`);
+
+/**
+ * Removes the parts of Playwright's download that ChargeWatch never executes.
+ *
+ * `playwright install chromium` fetches everything a general Playwright user
+ * might want. ChargeWatch launches with an explicit `executablePath` pointing
+ * at chrome.exe (see src/collector/browser.ts), so Playwright never chooses a
+ * binary for itself and the rest is dead weight in a 300 MB installer:
+ *
+ *   chromium_headless_shell   ~115 MB  only used when Playwright picks the
+ *                                      binary itself for headless launches
+ *   ffmpeg                    ~1.3 MB  video recording, which is never enabled
+ *   winldd                    ~0.1 MB  a dependency-inspection tool for
+ *                                      diagnosing missing DLLs, not a runtime
+ *                                      component
+ *
+ * Every byte here ends up inside the installer and on every user's disk, and a
+ * smaller installer is also less to go wrong during extraction.
+ *
+ * This prunes only directories it can identify by name, and it runs AFTER the
+ * executable has been confirmed present, so a naming change upstream leaves a
+ * slightly larger payload rather than a broken one.
+ */
+function pruneUnusedPayload() {
+  const UNUSED_PREFIXES = ['chromium_headless_shell', 'ffmpeg', 'winldd'];
+  let freedBytes = 0;
+
+  for (const entry of readdirSync(browserDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (!UNUSED_PREFIXES.some((prefix) => entry.name.startsWith(prefix))) continue;
+
+    const path = join(browserDir, entry.name);
+    // Never remove the directory the resolved executable lives in, whatever
+    // it is called.
+    if (installed.startsWith(path)) continue;
+
+    const size = directorySize(path);
+    rmSync(path, { recursive: true, force: true });
+    freedBytes += size;
+    console.log(`  removed ${entry.name} (${(size / (1024 * 1024)).toFixed(0)} MB, never executed)`);
+  }
+
+  if (freedBytes > 0) {
+    console.log(`  ${(freedBytes / (1024 * 1024)).toFixed(0)} MB trimmed from the installer payload`);
+  }
+}

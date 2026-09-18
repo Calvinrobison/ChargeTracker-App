@@ -45,6 +45,56 @@ cadence — the history stays correct either way, just coarser.
 
 ## The application will not start, or starts wrong
 
+**The installer exits with code -1073740940 (0xC0000374).**
+
+That is `STATUS_HEAP_CORRUPTION` — the NSIS installer process crashed rather
+than reporting an error. Nothing was installed, and nothing on your machine was
+changed.
+
+Seen once, during the first packaging run of this project, on a 328 MB
+installer. The cause was not established. Work through these in order; each one
+is cheap and eliminates a class of cause:
+
+1. **Run it interactively.** `/S` suppresses the window, including any error it
+   would have shown:
+
+   ```powershell
+   .\release\ChargeWatch-Setup-0.1.0.exe
+   ```
+
+   If the interactive run succeeds, the fault is in silent-mode extraction. If
+   it crashes the same way, the installer or its payload is the problem.
+
+2. **Check what faulted.** The crash is recorded with the faulting module:
+
+   ```powershell
+   Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'} -MaxEvents 5 |
+     Format-List TimeCreated, Message
+   ```
+
+   A third-party DLL named there — a security product's hook, in particular —
+   points away from ChargeWatch.
+
+3. **Rule out real-time scanning.** Antivirus inspecting a 300 MB extraction is
+   a common source of odd installer exit codes. Add the repository's `release`
+   folder to your scanner's exclusions temporarily and retry. Put the exclusion
+   back afterwards.
+
+4. **Rebuild the package.** A partially written artifact produces exactly this
+   shape of failure:
+
+   ```powershell
+   Remove-Item -Recurse -Force .\release
+   npm run package:win
+   npm run verify:package
+   ```
+
+5. **Try without differential packaging.** `differentialPackage: true` in
+   `electron-builder.yml` adds blockmap machinery to the installer. Setting it
+   to `false` produces a simpler installer; the cost is that updates download
+   in full rather than as a delta. If this is what fixes it, record that in the
+   file rather than leaving the reason unexplained.
+
 **Windows SmartScreen blocks the installer.**
 
 The installer is not code-signed. Choose **More info → Run anyway** if you trust
