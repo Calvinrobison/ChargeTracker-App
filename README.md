@@ -10,23 +10,25 @@ browser and its own database.
 
 ---
 
-## ⚠ Current status: not installable yet
+## Current status: installs and runs, but has no data yet
 
-**There is no download.** No release has been published. The application itself
-runs — `release\win-unpacked\ChargeWatch.exe` launches — but the one installer
-ever produced crashes on install, and that is the blocker. `docs/HANDOFF.md`
-section 1a states both open failures without varnish.
+**There is no download yet.** No release has been published. The application
+builds, installs and starts on Windows: as of 2026-09-18 a packaged installer
+exited 0, and the installed copy passes its own integrity self-check. What it
+does not yet have is data — no station catalog is bundled and no source is
+cleared for collection — so a fresh install shows an empty map.
+`docs/IMPLEMENTATION_STATUS.md` has the ordered roadmap.
 
 |                 |                                                                     |
 | --------------- | ------------------------------------------------------------------- |
-| Specs passing   | 413, via `npm run test:nodeps` (no install) and `npm test` (Vitest) |
+| Specs passing   | 418, via `npm run test:nodeps` (no install) and `npm test` (Vitest) |
 | UI specs        | 42 passing, via `npm run test:e2e` against the built renderer       |
 | Typechecked     | **Yes**, `npm run typecheck` is clean                               |
 | Linted          | **Yes**, `npm run lint` and `npm run format` are clean              |
-| Built           | **Yes** — bundles on Linux; `win-unpacked` runs on Windows          |
-| Packaged        | **Once** — 328 MB installer, passes `verify:package`                |
-| Installs        | **No** — exits `STATUS_HEAP_CORRUPTION`; cause not established      |
-| Collecting data | **No** — no source has been cleared for automated collection        |
+| Built           | **Yes** — on Linux and on Windows                                   |
+| Packaged        | **Yes** — 247 MB installer, `verify:package` 9/10                   |
+| Installs        | **Yes** — exit 0; self-check passes from the installed copy         |
+| Signed          | **No** — unsigned, so Windows SmartScreen warns on download         |
 | Station catalog | **Not bundled** — inventing station rows was not an option          |
 
 `docs/VERIFICATION_REPORT.md` has the item-by-item scorecard, including what was
@@ -96,7 +98,7 @@ for the bundled browser.
 From a clean clone, with nothing installed:
 
 ```powershell
-npm run test:nodeps      # 413 specs, no dependencies needed
+npm run test:nodeps      # 418 specs, no dependencies needed
 npm run check:migrations # confirms the embedded schema matches the SQL files
 ```
 

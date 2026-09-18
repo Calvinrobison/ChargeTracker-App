@@ -12,79 +12,98 @@ to break.
 
 ## 1. Get the branch onto GitHub
 
-The work is on a local branch `chargewatch-v1`. It was never pushed, because the
-build environment's git proxy refused the repository:
-
-```
-Calvinrobison/ChargeTracker-App is not in this session's authorized repository set.
-```
-
-That is an environment restriction, not a repository problem. From your own
-machine:
+The work is on `fix/toolchain-green`, pushed to the fork
+`the-x1x1/ChargeTracker-App` and open upstream as pull request #8.
 
 ```powershell
-git clone https://github.com/Calvinrobison/ChargeTracker-App.git
+git clone https://github.com/the-x1x1/ChargeTracker-App.git
 cd ChargeTracker-App
-
-# Apply the branch. If you received it as a bundle or an archive, unpack it
-# here first; otherwise add the working copy as a remote and fetch from it.
-git checkout -b chargewatch-v1
-git push -u origin chargewatch-v1
+git checkout fix/toolchain-green
 ```
 
-Then open a pull request. The pull request template will prompt you through the
-data-honesty checklist; it applies to this change like any other.
+The maintainer account cannot push to `Calvinrobison/ChargeTracker-App`, which
+is why the fork exists and why releases are cut from it. See
+`build: publish releases from the-x1x1 fork` — that commit is fork-specific and
+should not be merged upstream.
 
-**Do not merge to `main` before running the checks in section 2.** The two open
-failures in section 1a are unresolved: the installer built from this branch
-still crashes on install.
+The pull request template will prompt you through the data-honesty checklist;
+it applies to this change like any other.
+
+**Run the checks in section 2 before merging.** The blockers in section 1a have
+moved a long way, but nothing here has been seen working with real data.
 
 ---
 
-## 1a. Read this before anything else: the two open failures
+## 1a. Read this before anything else: where the blockers actually stand
 
-The application **runs**. `release\win-unpacked\ChargeWatch.exe` launches. What
-is not resolved is packaging it and installing it, and two attempts to explain
-the packaging failure were wrong before the third one was accepted as unknown.
-The honest state:
+The application **runs, installs and starts**. On 2026-09-18 a full build was
+made and installed on Windows 11 (build 26200) with Node 24.19.0,
+electron-builder 26.15.3 and Electron 44.4.2. What is still missing is data and
+distribution, not a working package.
 
-### Open A - the installer crashes on install (`I0`)
+Three defects were found and fixed in that session. All three were
+Windows-only, and none of them could have been caught on Linux.
 
-`ChargeWatch-Setup-0.1.0.exe` built once, at 328 MB, passed
-`npm run verify:package` 10/10, and then exited **-1073740940**
-(`STATUS_HEAP_CORRUPTION`) on a silent install. Nothing was installed.
+### Fixed - the packaged app could not start (`I1`)
 
-**Cause not established.** It has been wrongly attributed twice: to
-differential packaging, and to a 32-bit 7-Zip. Neither survives its own
-evidence, and both retractions are recorded in `VERIFICATION_REPORT.md`
-criterion 14. The single most useful next step is an **interactive** run - `/S`
-suppressed whatever the installer wanted to say - and the faulting module from
-the Windows Application log. `docs/TROUBLESHOOTING.md` has the sequence.
+Every IPC message from the application's own window was rejected:
 
-### Open B - packaging fails to compress (`I0b`)
+```
+WARN rejected an IPC message: the sender document is not the application:
+file:///C:/Users/.../app.asar/out/renderer/index.html
+```
 
-With `differentialPackage: false`, 7-Zip dies on `Can't allocate required
-memory!`. Observed at `-mx=9` and `-mx=5`, with the bundled 32-bit compressor
-and with a 64-bit 7-Zip 26.03, on a machine with 12 logical processors, 15.8 GB
-RAM and 5.9 GB free. **A 16 MB dictionary failing with 5.9 GB free is not
-explained by any theory offered so far.**
+`WindowManager.appOrigins` built the trusted prefix as `'file://' + path`. On
+POSIX the path starts with `/`, giving `file:///opt/...`. On Windows it starts
+with a drive letter, giving `file://C:/...` with two slashes, while Electron
+reports three. Origins are compared by string prefix, so the match could never
+succeed and the first call the renderer made failed. The window showed
+"ChargeWatch could not start".
 
-`differentialPackage` is now `true`, which pins the dictionary to 1 MB and is
-the only configuration that has ever produced an installer here. That is a
-workaround standing on one observation, not a fix.
-`scripts\windows\diagnose-7z.ps1` measures the question properly - commit
-limit, page file, then a ladder of settings run directly against
-`release\win-unpacked` - and changes nothing.
+It survived because the specs asserted against a hand-written `APP_ORIGINS`
+constant already in the correct form - the consumer was covered, the producer
+was not - and because `window.ts` imports Electron and cannot be loaded by the
+dependency-free runner. Construction now lives in `security.ts`, which imports
+nothing, with five specs over it.
 
-### The thing under both of them (`I0c`)
+### Fixed - the history file was written to the roaming profile (`I2`)
 
-432 MB of the 814 MiB payload is a complete second Chromium, shipped beside the
-one already inside Electron, for a collector that **cannot currently run** -
+The data root was derived from `app.getPath('userData')`, which on Windows
+comes from `%APPDATA%` - the **roaming** profile. The application raised
+`cloud_roaming_directory` against its own data directory on every start, and
+`README.md` documented `%LOCALAPPDATA%`, a location it never used. On a machine
+with OneDrive this is a corruption risk to a live WAL database. Windows now
+reads `%LOCALAPPDATA%` directly.
+
+### Fixed - `--self-check` hung instead of failing (`I3`)
+
+Each RPC had a timeout but they run in sequence, and the collector's default is
+120 s, so an unresponsive worker made the check sit through one timeout after
+another - about ten minutes, silent, no report. There is now a 90 s ceiling on
+the whole run.
+
+### Not reproduced - the installer crash (`I0`) and the compressor failure (`I0b`)
+
+`I0` did not reproduce. The installer built and exited **0** on a silent
+install, and the app launched. `I0b` did not reproduce either: electron-builder
+downloaded `7zip-win-x64.tar.gz` and compressed without complaint, which also
+retires the 32-bit-compressor theory by observation rather than argument.
+
+**Do not record these as fixed.** Nothing was changed that targeted them, and
+the artifact differs from the one that failed: 247 MB now against the 328 MB
+recorded before. That 81 MB is unexplained and is the most likely reason the
+symptom vanished. If `I0` returns, the payload size is the first thing to
+compare. Two confident explanations for this crash have already been retracted;
+a third should not be offered without evidence.
+
+### Still open - the thing under all of it (`I0c`)
+
+432 MB of the payload is a complete second Chromium, shipped beside the one
+already inside Electron, for a collector that **cannot currently run** because
 no source is cleared for collection (`docs/SOURCES.md`). It is most of the
-installer's size and the reason there is so much to compress. Whether to keep
-bundling it, drive collection through Electron's own browser, or fetch it on
-first use is a product decision nobody has made. It is written down rather than
-quietly carried.
+installer's size. Whether to keep bundling it, drive collection through
+Electron's own browser, or fetch it on first use is a product decision nobody
+has made.
 
 ### A caution about this repository's checks
 
@@ -113,7 +132,7 @@ Run these in order. Each one is expected to find something.
 npm run test:nodeps
 ```
 
-Expect `# pass 413`, `# fail 0`. This needs Node 22.12+ and nothing else — no
+Expect `# pass 418`, `# fail 0`. This needs Node 22.12+ and nothing else — no
 install, no network. If it fails here, something is wrong with your Node
 version before anything else is worth investigating.
 
@@ -138,7 +157,8 @@ that can change behaviour rather than just surface.
 npm run typecheck
 ```
 
-**This now runs clean**, on Linux with Node 22.22.2. So do `npm run lint` and
+**This now runs clean**, on Linux with Node 22.22.2 and on Windows 11 with
+Node 24.19.0. So do `npm run lint` and
 `npm run format` — `eslint.config.js` was renamed to `eslint.config.mjs` and
 given a globals configuration (it had been producing 416 bogus `no-undef`
 errors), and the tree was run through prettier for the first time.

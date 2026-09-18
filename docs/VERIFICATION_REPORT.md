@@ -65,9 +65,54 @@ inferred:
   Chromium against the built renderer bundle with a stub bridge — **not
   Electron**, no database, no network.
 
-The build succeeded on **Linux only**, and a build is not a package. Packaging
-remains where the Windows session left it: one installer produced, crashing on
-install (criterion 14).
+That block ran on **Linux only**, and a build is not a package. The Windows
+package, install and launch are recorded in the next section.
+
+### The first Windows package, install and launch (2026-09-18)
+
+Windows 11 build 26200, Node 24.19.0, electron-builder 26.15.3, Electron
+44.4.2. This is the first time the application has been packaged, installed and
+started.
+
+```
+npm run verify          # 418 pass, 0 fail; format, lint, typecheck clean
+npm run build           # main, preload, renderer, both workers
+npm run package:win     # release\ChargeWatch-Setup-0.1.0.exe, 247 MB
+npm run verify:package  # 9 passed, 1 failed
+Start-Process ... -Wait # ExitCode 0
+ChargeWatch.exe --self-check   # verdict "pass", 817 ms
+```
+
+The one `verify:package` failure is `keys.json has no keys`: signing keys are
+not committed, so a fresh clone has none. It blocks releasing, not installing.
+
+The self-check from the installed copy reported `verdict: "pass"` with all
+three integrity checks green — data folder writable, database ready (schema 1,
+WAL), bundled browser starts — and both readiness checks failing as designed,
+for no cleared source and no catalog.
+
+**`I0` and `I0b` did not reproduce.** The installer built and installed
+cleanly. Neither is recorded as fixed: nothing was changed that targeted them,
+and this artifact is 247 MB against the 328 MB that crashed. That difference is
+unexplained and is the first thing to compare if the crash returns.
+
+Three defects were found and fixed, all Windows-only:
+
+- **The packaged app could not start.** `appOrigins` produced `file://C:/...`
+  where Electron reports `file:///C:/...`, so every IPC message from the
+  application's own window was rejected. The specs asserted against a
+  hand-written constant in the correct form, covering the consumer and not the
+  producer, and the producer lived in a module the dependency-free runner
+  cannot load. Moved into `security.ts` with five specs.
+- **The history file was written to `%APPDATA%`**, the roaming profile, where
+  the app raised `cloud_roaming_directory` against its own data directory.
+- **`--self-check` had no overall deadline**, so an unresponsive worker
+  produced ten silent minutes rather than a failure.
+
+The first of those stopped the application starting at all, and no amount of
+testing on Linux would have found any of them. That is the sharpest available
+evidence for this report's recurring claim: **a suite that runs on one platform
+is weaker evidence than its pass count suggests.**
 
 ### And on Windows
 

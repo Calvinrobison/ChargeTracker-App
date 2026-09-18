@@ -90,6 +90,25 @@ project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   correct in each case.
 - **Formatting.** `prettier --check` had never passed; 105 files did not match
   the project's own configuration.
+- **The packaged Windows app could not start.** `WindowManager.appOrigins` built
+  the trusted renderer prefix as `'file://' + path`, which is correct on POSIX
+  and yields `file://C:/...` — two slashes — on Windows, where Electron reports
+  three. Origins are matched by string prefix, so every IPC message from the
+  application's own window was rejected and the first call the renderer made
+  failed, showing "ChargeWatch could not start". Construction moved to
+  `security.ts`, which imports nothing and can therefore be reached by the
+  dependency-free specs; five specs now cover it. Only reachable in a packaged
+  build — in development the renderer is served over http.
+- **The history file was written to the roaming profile.** The data root came
+  from `app.getPath('userData')`, which on Windows derives from `%APPDATA%`.
+  The application raised `cloud_roaming_directory` against its own data
+  directory on every start, and a live WAL database in a OneDrive-synced folder
+  can be corrupted by the sync client. Windows now reads `%LOCALAPPDATA%`,
+  which is what the documentation already promised.
+- **`--self-check` hung instead of failing.** Each RPC had a timeout, but they
+  run in sequence and the collector's default is 120 s, so an unresponsive
+  worker produced roughly ten silent minutes and no report. The run now has a
+  90 s ceiling and exits non-zero when it expires.
 
 ### Known limitations
 

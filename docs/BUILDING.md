@@ -74,6 +74,40 @@ including the cost: `node:sqlite` is marked experimental.
 dependency has quietly reintroduced the ABI rebuild, and that would only break
 on someone else's machine.
 
+## npm 10 and npm 12 do not install the same tree
+
+npm 12 blocks package install scripts by default. On a fresh `npm ci` it prints:
+
+```
+npm warn install-scripts 3 packages had install scripts blocked because they are not covered by allowScripts:
+npm warn install-scripts   electron-winstaller@5.4.0 (install: node ./script/select-7z-arch.js)
+npm warn install-scripts   esbuild@0.25.12 (postinstall: node install.js)
+npm warn install-scripts   esbuild@0.28.2 (postinstall: node install.js)
+```
+
+This is a warning, not an error, and the install "succeeds". But esbuild's
+postinstall is what downloads its platform binary, and electron-vite builds
+through esbuild, so `npm run build` fails afterwards for a reason that does not
+mention npm at all. Approve them once:
+
+```powershell
+npm install-scripts approve esbuild
+npm install-scripts approve electron-winstaller
+npm ci
+```
+
+Separately, and on both npm versions seen so far, Electron's own postinstall can
+complete without producing a binary. The symptom is `Error: Electron uninstall`
+from electron-vite. Check and repair it directly:
+
+```powershell
+Test-Path node_modules\electron\dist      # False means the binary is missing
+node node_modules\electron\install.js     # downloads ~100 MB
+```
+
+Both of these cost an afternoon on 2026-09-18 and neither is obvious from the
+error it eventually produces.
+
 ## The commands that need nothing installed
 
 These are the two you can run on a clean clone with no network at all.
