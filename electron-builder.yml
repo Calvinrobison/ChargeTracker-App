@@ -89,33 +89,27 @@ nsis:
   # explicit action, never a side effect of uninstalling.
   deleteAppDataOnUninstall: false
 
-  # OFF, deliberately.
+  # ON, because it is the only configuration that has ever produced an
+  # installer on the build machine.
   #
   # Differential packaging embeds blockmap machinery so an update can download
-  # only the changed blocks instead of the whole installer. That is worth
-  # having -- but only when there is a PREVIOUS RELEASE to compute a delta
-  # against, and there are none. Today it buys nothing and costs a more
-  # complicated installer over a ~250 MB payload.
+  # only changed blocks. With no previous release to delta against it buys
+  # nothing yet -- but it has a side effect that matters today:
+  # configureDifferentialAwareArchiveOptions pins the 7z dictionary to 1 MB so
+  # blocks stay small enough to delta.
   #
-  # KNOWN SIDE EFFECT. With differentialPackage ON, electron-builder forces
-  # the 7z dictionary down to 1 MB (configureDifferentialAwareArchiveOptions
-  # in app-builder-lib, so blocks stay small enough to delta). Turning it off
-  # restores the -mx=9 default of 64 MB per encoder thread, which this payload
-  # cannot allocate: packaging fails with "Can't allocate required memory!".
-  # scripts/windows/build-all.ps1 compensates with
-  # ELECTRON_BUILDER_COMPRESSION_LEVEL=5. The 1 MB dictionary was masking how
-  # large the payload has become; it did not make it acceptable.
+  # That 1 MB dictionary is what lets the payload compress at all here.
+  # Turning it off restored 7-Zip's defaults and every packaging run since has
+  # died on "Can't allocate required memory!" -- at -mx=9 and at -mx=5, with
+  # both the bundled 32-bit compressor and a 64-bit 7-Zip 26.03, on a machine
+  # with 5.9 GB free. Why a 16 MB dictionary cannot be allocated there is not
+  # understood; scripts/windows/diagnose-7z.ps1 exists to find out.
   #
-  # Note what this does NOT explain. The build that produced the installer
-  # exiting with STATUS_HEAP_CORRUPTION (-1073740940) had this setting ON, so
-  # it compressed with a 1 MB dictionary and never went near that memory
-  # ceiling. The two failures are unrelated and that crash is still
-  # undiagnosed.
-  #
-  # So this setting is off on its own merits only: there is no previous
-  # release to delta against. Turn it back on once one exists, and confirm the
-  # installer still runs when you do.
-  differentialPackage: false
+  # So this is on for a reason that has nothing to do with deltas, and that
+  # reason is written here so nobody turns it off again expecting it to be
+  # free. It is not the explanation for the installer crash (I0): that build
+  # had this setting on.
+  differentialPackage: true
 
 publish:
   provider: github
