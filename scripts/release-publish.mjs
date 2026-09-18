@@ -34,7 +34,7 @@ const flag = (name) => process.argv.includes(`--${name}`);
 const tag = arg('tag');
 const releaseDir = resolve(root, arg('dir', 'release'));
 const dryRun = flag('dry-run') || !flag('confirm');
-const repo = arg('repo', 'Calvinrobison/ChargeTracker-App');
+const repo = arg('repo', 'the-x1x1/ChargeTracker-App');
 
 if (!tag) {
   console.error('A tag is required: node scripts/release-publish.mjs --tag v0.1.1 --dry-run');

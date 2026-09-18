@@ -113,7 +113,7 @@ nsis:
 
 publish:
   provider: github
-  owner: Calvinrobison
+  owner: the-x1x1
   repo: ChargeTracker-App
   releaseType: release
   # Drafts and prereleases are ignored by the updater unless the channel says

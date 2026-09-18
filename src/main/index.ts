@@ -57,7 +57,7 @@ import type { DatabaseReadyState } from '../database/worker.ts';
 const BRANDING = {
   productName: 'ChargeWatch',
   appId: 'com.formicaria.chargewatch',
-  releaseOwner: 'Calvinrobison',
+  releaseOwner: 'the-x1x1',
   releaseRepo: 'ChargeTracker-App',
 } as const;
 
