@@ -1307,6 +1307,33 @@ async function runSelfCheck(): Promise<void> {
   app.exit(verdict === 'pass' ? 0 : 1);
 }
 
+/**
+ * Runs one startup stage, logging when it begins, how long it took, and what
+ * it threw.
+ *
+ * Bootstrap used to log a single line — "ChargeWatch <version> starting" — and
+ * then nothing until shutdown. When a stage hung, the log could not say which
+ * one, so the only evidence a stuck launch produced was the absence of
+ * evidence. The stages that follow allow 180, 120 and 60 seconds respectively;
+ * a log that stops after one of these names it immediately.
+ */
+async function stage<T>(name: string, run: () => Promise<T>): Promise<T> {
+  logger.log('info', `startup: ${name}`);
+  const started = Date.now();
+  try {
+    const result = await run();
+    logger.log('info', `startup: ${name} - done in ${Date.now() - started} ms`);
+    return result;
+  } catch (error) {
+    logger.log(
+      'error',
+      `startup: ${name} - FAILED after ${Date.now() - started} ms: ` +
+        (error instanceof Error ? error.message : String(error)),
+    );
+    throw error;
+  }
+}
+
 async function bootstrap(): Promise<void> {
   const resolution = resolveDataPaths({
     localAppDataDir: localAppDataDirectory(),
@@ -1409,26 +1436,38 @@ async function bootstrap(): Promise<void> {
   );
 
   registerHandlers();
-  await startDatabase();
+
+  // The tray is created BEFORE the subsystems, not after them.
+  //
+  // Everything below this line can legitimately take minutes on a first run:
+  // opening the history file allows 180 seconds, starting the collector 120,
+  // and resuming collection another 60. Until this moved, none of the tray,
+  // the window or any log line appeared until all of it had finished, so a
+  // slow or stuck stage presented as an application that started and then did
+  // nothing at all. A tray icon is the cheapest possible way to say "this is
+  // running", and it needs neither the database nor the browser.
+  tray.create();
+
+  await stage('opening the history file', startDatabase);
 
   if (databaseState?.status === 'ready') {
-    await startCollector();
-    await runHealthChecks();
+    await stage('starting the collector', startCollector);
+    await stage('running health checks', runHealthChecks);
 
     // Resume collection only if it was running before, and only if a source is
     // actually eligible. Otherwise the status line says so instead.
     if (setting('collection.running', false) && !setting('collection.userPaused', false)) {
-      await collector('start', {}, 60_000).catch((error: unknown) => {
-        logger.log(
-          'warn',
-          `collection could not resume: ${error instanceof Error ? error.message : String(error)}`,
-        );
+      await stage('resuming collection', async () => {
+        await collector('start', {}, 60_000).catch((error: unknown) => {
+          logger.log(
+            'warn',
+            `collection could not resume: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       });
     }
     await refreshCollectionStatus().catch(() => undefined);
   }
-
-  tray.create();
 
   // `--hidden` is passed by the login item so a start-with-Windows launch does
   // not pop a window in the user's face.
