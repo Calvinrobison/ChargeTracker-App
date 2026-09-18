@@ -110,6 +110,13 @@ const isDevelopment = !app.isPackaged;
 const SELF_CHECK_INTEGRITY_IDS = ['data_dir', 'database', 'browser'] as const;
 const SELF_CHECK_READINESS_IDS = ['sources', 'catalog'] as const;
 
+/**
+ * The ceiling on a whole `--self-check` run. Generous next to the 817 ms a
+ * healthy run takes, and far below the sum of the individual RPC timeouts it
+ * replaces as the effective limit.
+ */
+const SELF_CHECK_DEADLINE_MS = 90_000;
+
 const selfCheckRequested = process.argv.some(
   (argument) => argument === '--self-check' || argument.startsWith('--self-check='),
 );
@@ -126,6 +133,31 @@ function selfCheckOutputPath(fallbackDir: string): string {
     if (value && !value.startsWith('--')) return value;
   }
   return join(fallbackDir, 'self-check.json');
+}
+
+/**
+ * The local (non-roaming) application data directory.
+ *
+ * On Windows this MUST NOT be derived from `app.getPath('userData')`. Electron
+ * builds that from `app.getPath('appData')`, which is `%APPDATA%` — the
+ * ROAMING profile. Stripping its last segment therefore yielded
+ * `...\AppData\Roaming`, and the history file was created in a directory that
+ * OneDrive and every other sync client replicates. A live SQLite database in
+ * WAL mode there can be corrupted by the sync client, which is why
+ * `resolveDataPaths` lists `appdata\roaming` as a roaming hint — the
+ * application was raising `cloud_roaming_directory` against its own data
+ * directory on every start, and README.md documented a location it did not use.
+ *
+ * `%LOCALAPPDATA%` is the correct home and the one the documentation promises.
+ * The fallback keeps the old derivation for the case where the variable is
+ * missing, because a wrong directory still beats refusing to start.
+ */
+function localAppDataDirectory(): string {
+  if (process.platform === 'win32') {
+    const local = process.env.LOCALAPPDATA?.trim();
+    if (local && local.length > 0) return local;
+  }
+  return app.getPath('userData').replace(/[\\/][^\\/]+$/, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -1135,7 +1167,7 @@ function startUpdates(): void {
 async function runSelfCheck(): Promise<void> {
   const startedMs = Date.now();
   const resolution = resolveDataPaths({
-    localAppDataDir: app.getPath('userData').replace(/[\\/][^\\/]+$/, ''),
+    localAppDataDir: localAppDataDirectory(),
     installDir: app.getAppPath(),
     platform: process.platform,
   });
@@ -1151,6 +1183,29 @@ async function runSelfCheck(): Promise<void> {
 
   const outputPath = selfCheckOutputPath(paths.root);
   const fatal: string[] = [];
+
+  /**
+   * A hard ceiling on the whole check.
+   *
+   * Every RPC below already has its own timeout, but they are sequential and
+   * the collector's default is 120 s. An unresponsive worker therefore did not
+   * fail the check — it made it sit through one timeout after another, roughly
+   * ten minutes in total, with no output and no report. A diagnostic tool that
+   * hangs is worse than one that fails, because the operator learns nothing and
+   * cannot tell a slow check from a dead one.
+   *
+   * On expiry the process exits non-zero rather than writing a report: a report
+   * assembled from half-finished checks would claim more than was established.
+   */
+  const deadline = setTimeout(() => {
+    logger.log(
+      'error',
+      `self-check exceeded ${SELF_CHECK_DEADLINE_MS} ms and was abandoned; a worker did not respond`,
+    );
+    logger.close();
+    app.exit(1);
+  }, SELF_CHECK_DEADLINE_MS);
+  deadline.unref();
 
   try {
     await startDatabase();
@@ -1244,6 +1299,7 @@ async function runSelfCheck(): Promise<void> {
   } catch {
     // Same.
   }
+  clearTimeout(deadline);
   logger.close();
 
   // The exit code is the gate. A caller that only reads stdout still gets a
@@ -1253,7 +1309,7 @@ async function runSelfCheck(): Promise<void> {
 
 async function bootstrap(): Promise<void> {
   const resolution = resolveDataPaths({
-    localAppDataDir: app.getPath('userData').replace(/[\\/][^\\/]+$/, ''),
+    localAppDataDir: localAppDataDirectory(),
     installDir: app.getAppPath(),
     platform: process.platform,
   });
