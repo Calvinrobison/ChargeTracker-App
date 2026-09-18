@@ -106,6 +106,9 @@ export function MapWorkspace(props: MapWorkspaceProps): ReactNode {
   const periodLabel = DATE_PRESET_LABELS[state.datePreset];
   const legend = legendFor(state.metric, periodLabel);
   const selected = state.selectedId;
+  // Captured once per render so callbacks close over a stable, narrowed value
+  // rather than re-reading props at call time.
+  const detail = props.detail;
 
   return (
     <div className="app-body">
@@ -254,12 +257,16 @@ export function MapWorkspace(props: MapWorkspaceProps): ReactNode {
       </main>
 
       {/* No selection means no drawer at all, so the map gets the width. */}
-      {selected !== null && props.detail !== null ? (
+      {selected !== null && detail !== null ? (
         <StationDrawer
-          detail={props.detail}
+          detail={detail}
           timeZone={props.bootstrap.studyArea.timeZone}
           onClose={() => dispatch({ type: 'selectStation', id: null })}
-          onToggleSaved={() => props.onToggleSaved(selected, !props.detail.station.saved)}
+          // `detail` is captured, not read through props inside the callback.
+          // A callback runs after the render that created it, by which point
+          // props.detail may have become null -- so reading it there would
+          // throw on a real click, not just fail a type check.
+          onToggleSaved={() => props.onToggleSaved(selected, !detail.station.saved)}
           onOpenSource={() => props.onOpenSource(selected)}
           onExportStation={() => props.onExportStation(selected)}
           onAddVisitCounts={() => props.onAddVisitCounts(selected)}

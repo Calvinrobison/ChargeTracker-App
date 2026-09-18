@@ -151,36 +151,26 @@ Invoke-Step 'npm run check:icons' 'The icon set is missing or unreadable.' @(
   'Run: npm run make:icons'
 )
 
-# --------------------------------------------- 4. no native module expected
+# ------------------------------------------------ 4. native module policy
 
 Write-Step 'Native modules'
 
 # ChargeWatch uses node:sqlite, which ships inside Node and therefore inside
-# Electron. There is nothing to compile, so no Python and no C++ toolchain are
-# needed -- see docs/adr/0003-node-sqlite-over-better-sqlite3.md.
+# Electron. Nothing needs compiling, so no Python and no C++ toolchain.
+# See docs/adr/0003-node-sqlite-over-better-sqlite3.md.
 #
-# This step exists to catch the reverse problem: a dependency quietly
-# reintroducing a native module, which would bring back the ABI rebuild and
-# only break on someone else's machine.
+# This step deliberately does NOT scan node_modules. An earlier version did,
+# and reported electron-builder's own prebuilt extract-zip binaries as a
+# problem -- they are devDependencies that never reach the package, so the
+# warning was pure noise. A check that cries wolf gets ignored, including on
+# the day it is right.
+#
+# The real question is whether a native module reaches the PACKAGE, and
+# verify:package answers it by inspecting the packaged output, which is the
+# only authoritative place to look. That runs at step 10.
 
-if (Test-Path 'node_modules') {
-  $nativeBinaries = @(Get-ChildItem -Path 'node_modules' -Filter '*.node' -Recurse -File -ErrorAction SilentlyContinue |
-    Select-Object -First 5)
-  if ($nativeBinaries.Count -gt 0) {
-    Write-Host ''
-    Write-Host '   A native module is present in node_modules:' -ForegroundColor Yellow
-    foreach ($binary in $nativeBinaries) {
-      Write-Host ("     {0}" -f $binary.FullName.Replace($repoRoot, '.')) -ForegroundColor Yellow
-    }
-    Write-Host '   ChargeWatch is meant to have no native dependency. Find what pulled' -ForegroundColor Yellow
-    Write-Host '   this in: npm ls --all | findstr /i gyp' -ForegroundColor Yellow
-    Write-Host '   verify:package will fail the build if it reaches the package.' -ForegroundColor Yellow
-  } else {
-    Write-Good 'none, as intended - SQLite comes from node:sqlite'
-  }
-} else {
-  Write-Note 'node_modules not present yet; checked after install by verify:package'
-}
+Write-Good 'nothing to compile - SQLite comes from node:sqlite'
+Write-Note 'whether any native binary reaches the package is checked by verify:package'
 
 # ---------------------------------------------------------------- 5. install
 
