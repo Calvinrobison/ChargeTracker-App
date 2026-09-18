@@ -2,6 +2,9 @@ node_modules/
 out/
 dist/
 release/
+.playwright-cache/
+test-results/
+playwright-report/
 coverage/
 package-lock.json
 src/database/migrations/index.ts

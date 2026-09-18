@@ -23,6 +23,14 @@ export default [
       'dist/**',
       'release/**',
       'coverage/**',
+      // The bundled Chromium payload staged by `npm run setup:browser`. It is
+      // 432 MB of Google's own code, it is gitignored, and linting it fails on
+      // browser globals the moment anyone has run the browser setup — which
+      // every packaging run does. Not ours, not source, not linted.
+      '.playwright-cache/**',
+      // Playwright's own output.
+      'test-results/**',
+      'playwright-report/**',
       'src/database/migrations/index.ts', // generated
     ],
   },
