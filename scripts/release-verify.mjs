@@ -14,10 +14,10 @@
  * Usage: node --experimental-strip-types scripts/release-verify.mjs --dir release
  *        (or: npm run release:verify -- --dir release)
  *
- * --installed-version  the version to test the upgrade path from (default
- *                      0.0.1, which exercises the oldest-copy case). Checked
- *                      against the manifest's minimumSupportedAppVersion and
- *                      requiredIntermediateVersion.
+ * --installed-version  the version to test the upgrade path from. Defaults to
+ *                      the manifest's own minimumSupportedAppVersion, which
+ *                      asks the question that matters: can the oldest copy
+ *                      this release claims to support actually take it?
  * --highest-sequence   the highest release sequence a copy has already
  *                      accepted, for the downgrade check (default 0).
  */
@@ -43,7 +43,7 @@ function arg(name, fallback = null) {
 }
 
 const releaseDir = resolve(root, arg('dir', 'release'));
-const installedVersion = arg('installed-version', '0.0.1');
+const installedVersionArg = arg('installed-version', null);
 const highestAcceptedSequence = Number(arg('highest-sequence', '0'));
 
 if (!existsSync(releaseDir)) {
@@ -190,6 +190,13 @@ if (forbidden.length > 0) {
 // (src/main/updates.ts). Without it this script accepted --installed-version and
 // ignored it, so a release that an installed copy would reject as skipping a
 // required migration still passed the gate this script is supposed to be.
+//
+// Defaulting to the manifest's own floor rather than a fixed old version: with
+// a literal default of 0.0.1 and release-prepare's default floor of 0.1.0, the
+// check asked whether a version below the supported floor could install, which
+// is false by construction. Every release would have failed its own gate. The
+// question worth asking is whether the oldest SUPPORTED copy can take it.
+const installedVersion = installedVersionArg ?? result.manifest.minimumSupportedAppVersion;
 const upgrade = isDirectUpgradePermitted(result.manifest, installedVersion);
 if (upgrade.permitted) {
   console.log(`  PASS  a copy running ${installedVersion} may install this release directly`);
