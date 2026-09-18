@@ -9,6 +9,17 @@ project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.1.0 — 2026-09-18
+
+First release. Packaged, installed and started on Windows 11; ships a catalog
+of 1083 charging locations within 50 miles of Mesa. Collection is **not**
+enabled: no source has been cleared for automated observation, so the map shows
+where the chargers are and nothing about how busy they are.
+
+The installer is unsigned, so Windows will warn on first run.
+
 ### Added
 
 - **Domain and metric engine.** Half-open interval arithmetic, carry-forward

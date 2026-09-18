@@ -24,13 +24,18 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
+// pathToFileURL, not the bare path: Node's ESM loader takes a URL, and on
+// Windows `join` produces `C:\\...`, which it reads as the scheme "c:" and
+// rejects with ERR_UNSUPPORTED_ESM_URL_SCHEME. This script could therefore
+// never run on the only platform the application ships on, which also meant
+// release:publish could never verify a release, because it runs this first.
 const { verifyArtifactBytes, verifyManifest, isDirectUpgradePermitted, UPDATE_PROTOCOL_VERSION } =
-  await import(join(root, 'src', 'shared', 'release-manifest.ts'));
+  await import(pathToFileURL(join(root, 'src', 'shared', 'release-manifest.ts')).href);
 
 function arg(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
