@@ -97,15 +97,20 @@ nsis:
   # against, and there are none. Today it buys nothing and costs a more
   # complicated installer over a ~250 MB payload.
   #
-  # An earlier revision of this comment guessed that differential packaging
-  # was behind the STATUS_HEAP_CORRUPTION (-1073740940) the first installer
-  # exited with. That guess was wrong, and the real cause is now established:
-  # electron-builder ships a 32-BIT 7za.exe, which cannot address the ~700 MB
-  # of LZMA encoder memory that -mx=9 needs on this payload. With
-  # differentialPackage off, the build path changed enough that the same
-  # failure surfaced honestly at build time -- "Can't allocate required
-  # memory!" -- instead of producing an installer that crashed on use.
-  # scripts/windows/build-all.ps1 now puts a 64-bit 7-Zip on PATH.
+  # KNOWN SIDE EFFECT. With differentialPackage ON, electron-builder forces
+  # the 7z dictionary down to 1 MB (configureDifferentialAwareArchiveOptions
+  # in app-builder-lib, so blocks stay small enough to delta). Turning it off
+  # restores the default -mx=9 dictionary of 64 MB, which needs ~700 MB of
+  # encoder memory -- and electron-builder's bundled 7za.exe is 32-bit, so it
+  # cannot allocate that. Packaging fails with "Can't allocate required
+  # memory!" until a 64-bit 7-Zip is used; scripts/windows/build-all.ps1 sets
+  # ELECTRON_BUILDER_7ZIP_PATH to one.
+  #
+  # Note what this does NOT explain. The build that produced the installer
+  # exiting with STATUS_HEAP_CORRUPTION (-1073740940) had this setting ON, so
+  # it compressed with a 1 MB dictionary and never went near that memory
+  # ceiling. The two failures are unrelated and that crash is still
+  # undiagnosed.
   #
   # So this setting is off on its own merits only: there is no previous
   # release to delta against. Turn it back on once one exists, and confirm the

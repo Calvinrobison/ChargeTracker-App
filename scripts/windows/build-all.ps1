@@ -281,41 +281,39 @@ if ($StopAfter -eq 'build') {
 
 Write-Step 'Package'
 
-# electron-builder bundles a 32-BIT 7za.exe. Compressing the payload at -mx=9
-# needs roughly 700 MB of encoder memory for the LZMA dictionary alone, which
-# a 32-bit process cannot address once the input is large. It fails with
-# "Can't allocate required memory!" -- and on one occasion got far enough to
-# emit an installer that then crashed with STATUS_HEAP_CORRUPTION.
+# electron-builder's bundled 7za.exe reports "7-Zip (a) 24.09 (x86)" -- a
+# 32-bit process. Compressing this payload at -mx=9 lets 7-Zip pick a 64 MB
+# LZMA dictionary, which needs roughly 700 MB of encoder memory: more address
+# space than a 32-bit process has, whatever the machine's RAM. It fails with
+# "Can't allocate required memory!".
 #
-# USE_SYSTEM_7ZA makes electron-builder use a `7za` from PATH instead. A
-# 64-bit one has the address space to do the job.
-if (-not $env:USE_SYSTEM_7ZA) {
+# USE_SYSTEM_7ZA was removed in electron-builder 26. The override is now
+# ELECTRON_BUILDER_7ZIP_PATH, which takes an absolute path to an EXECUTABLE
+# FILE (app-builder-lib/out/toolsets/7zip.js -> resolveEnvToolsetPath). A
+# system 7z.exe is 64-bit and accepts the same arguments.
+if (-not $env:ELECTRON_BUILDER_7ZIP_PATH) {
   $systemSevenZip = @(
     (Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe')
+    (Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\7-Zip\7z.exe')
   ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
   if ($systemSevenZip) {
-    # electron-builder looks for the name `7za`, which the standard 7-Zip
-    # install does not provide. A copy under a build-tools directory gives it
-    # that name without touching the 7-Zip installation.
-    $toolsDir = Join-Path $env:LOCALAPPDATA 'chargewatch-build-tools'
-    $sevenZa = Join-Path $toolsDir '7za.exe'
-    New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
-    if (-not (Test-Path $sevenZa) -or (Get-Item $systemSevenZip).LastWriteTime -gt (Get-Item $sevenZa).LastWriteTime) {
-      Copy-Item $systemSevenZip $sevenZa -Force
-    }
-    $env:PATH = "$toolsDir;$env:PATH"
-    $env:USE_SYSTEM_7ZA = 'true'
+    $env:ELECTRON_BUILDER_7ZIP_PATH = $systemSevenZip
     Write-Good "using 64-bit 7-Zip for compression ($systemSevenZip)"
-    Write-Note 'electron-builder ships a 32-bit 7za that runs out of memory on this payload'
+    Write-Note 'the bundled 7za is 32-bit and cannot address the memory -mx=9 needs'
   } else {
+    # Without a 64-bit compressor the only way through is a smaller dictionary.
+    # -mx=5 uses a 16 MB dictionary, which a 32-bit process can allocate. The
+    # installer comes out larger; that is the trade, and it is stated rather
+    # than made silently.
+    $env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'
     Write-Host ''
-    Write-Host '   7-Zip is not installed, so electron-builder will use its own 32-bit' -ForegroundColor Yellow
-    Write-Host '   7za. That runs out of memory compressing a payload this size:' -ForegroundColor Yellow
-    Write-Host '     ERROR: Can_t allocate required memory!' -ForegroundColor Yellow
+    Write-Host '   7-Zip is not installed. Falling back to compression level 5 so' -ForegroundColor Yellow
+    Write-Host '   the bundled 32-bit compressor can allocate its dictionary. The' -ForegroundColor Yellow
+    Write-Host '   installer will be noticeably larger than it needs to be.' -ForegroundColor Yellow
     Write-Host ''
-    Write-Host '   Install it and re-run:' -ForegroundColor Yellow
+    Write-Host '   For a properly compressed installer:' -ForegroundColor Yellow
     Write-Host '     winget install --id 7zip.7zip -e' -ForegroundColor Gray
     Write-Host ''
     Write-Host '   docs/TROUBLESHOOTING.md explains why.' -ForegroundColor Yellow

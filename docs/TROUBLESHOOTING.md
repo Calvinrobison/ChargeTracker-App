@@ -55,9 +55,14 @@ ERROR: Can't allocate required memory!
 ```
 
 **`(x86)` is the whole story.** electron-builder bundles a 32-bit `7za.exe`.
-Compressing at `-mx=9` uses a 64 MB LZMA dictionary, which needs around 700 MB
-of encoder memory — beyond what a 32-bit process can address, regardless of how
+At `-mx=9` 7-Zip picks a 64 MB LZMA dictionary, which needs around 700 MB of
+encoder memory — beyond what a 32-bit process can address, regardless of how
 much RAM the machine has. Installing more memory does not help.
+
+It appeared when `differentialPackage` was turned off. That is not a
+coincidence: with differential packaging on, electron-builder forces the
+dictionary down to 1 MB so update blocks stay small, which kept the 32-bit
+compressor well inside its limits. Turning it off restored the default.
 
 Install a 64-bit 7-Zip and re-run the build script, which picks it up
 automatically:
@@ -67,9 +72,17 @@ winget install --id 7zip.7zip -e
 .\scripts\windows\build-all.ps1
 ```
 
-Running `npm run package:win` by hand skips that wiring; set
-`$env:USE_SYSTEM_7ZA = 'true'` yourself, with a `7za` on `PATH`. `docs/BUILDING.md`
-explains why the name matters.
+Running `npm run package:win` by hand skips that wiring. Point it at the
+executable yourself — note that **`USE_SYSTEM_7ZA` no longer exists**; it was
+removed in electron-builder 26 and silently does nothing:
+
+```powershell
+$env:ELECTRON_BUILDER_7ZIP_PATH = 'C:\Program Files\7-Zip\7z.exe'
+```
+
+With no 64-bit 7-Zip available, `$env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'`
+drops the dictionary to 16 MB and gets through, at the cost of a larger
+installer. The build script falls back to this on its own.
 
 **The installer exits with code -1073740940 (0xC0000374).**
 
@@ -78,27 +91,43 @@ than reporting an error. Nothing was installed, and nothing on your machine was
 changed.
 
 Seen once, during the first packaging run of this project, on a 328 MB
-installer. **Same cause as the entry above**: the 32-bit compressor ran out of
-address space, but on that build path it got far enough to write an installer
-rather than stopping. The payload inside it was damaged; unpacking it corrupted
-the installer's heap. Rebuilding with a 64-bit 7-Zip is the fix.
+installer. **The cause is not established.** It is specifically *not* the 7-Zip
+memory failure above: that build had `differentialPackage` on, so it compressed
+with a 1 MB dictionary and never approached the limit that later broke the
+build. Work through these in order; each is cheap and eliminates a class of
+cause:
 
-That connection was not obvious at the time, and an earlier version of this
-document listed five things to try instead — antivirus, differential packaging,
-a rebuild. If a fresh build with a 64-bit 7-Zip still crashes this way, the
-useful evidence is the faulting module:
+1. **Run it interactively.** `/S` suppresses the window, including any error it
+   would have shown:
 
-```powershell
-Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'} -MaxEvents 5 |
-  Format-List TimeCreated, Message
-```
+   ```powershell
+   .\release\ChargeWatch-Setup-0.1.0.exe
+   ```
 
-and an interactive run, since `/S` suppresses any error the installer would
-have shown:
+   If the interactive run succeeds, the fault is in silent-mode extraction. If
+   it crashes the same way, the installer or its payload is the problem.
 
-```powershell
-.\release\ChargeWatch-Setup-0.1.0.exe
-```
+2. **Check what faulted.** The crash is recorded with the faulting module:
+
+   ```powershell
+   Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'} -MaxEvents 5 |
+     Format-List TimeCreated, Message
+   ```
+
+   A third-party DLL named there — a security product's hook, in particular —
+   points away from ChargeWatch.
+
+3. **Rule out real-time scanning.** Antivirus inspecting a 300 MB extraction is
+   a common source of odd installer exit codes. Add the repository's `release`
+   folder to your scanner's exclusions temporarily and retry. Put the exclusion
+   back afterwards.
+
+4. **Rebuild the package.** A partially written artifact produces exactly this
+   shape of failure.
+
+The current build differs from that one in two ways — no differential
+packaging, and a different compressor — so the first thing worth knowing is
+whether it still happens at all.
 
 **Windows SmartScreen blocks the installer.**
 

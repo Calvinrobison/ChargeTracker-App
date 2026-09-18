@@ -14,27 +14,34 @@ What you need, what each command does, and what to do when one fails.
 
 ### Packaging needs a 64-bit 7-Zip
 
-electron-builder bundles its own `7za.exe`, and that binary is **32-bit**.
-Compressing the ChargeWatch payload at `-mx=9` needs a 64 MB LZMA dictionary,
-which costs roughly 700 MB of encoder memory — more address space than a 32-bit
-process has. It fails with:
+electron-builder bundles its own `7za.exe`, and that binary reports itself as
+`7-Zip (a) 24.09 (x86)` — **32-bit**. At `-mx=9` 7-Zip picks a 64 MB LZMA
+dictionary, which costs roughly 700 MB of encoder memory: more address space
+than a 32-bit process has. It fails with:
 
 ```
 ERROR: Can't allocate required memory!
 ```
 
-`scripts/windows/build-all.ps1` works around this: it looks for a system 7-Zip,
-copies `7z.exe` to `7za.exe` under `%LOCALAPPDATA%\chargewatch-build-tools`
-(electron-builder looks for the name `7za`, which the standard install does not
-provide), prepends that to `PATH` and sets `USE_SYSTEM_7ZA=true`. If 7-Zip is
-missing it says so and prints the install command rather than letting the
-packaging step fail obscurely.
+This only surfaced when `differentialPackage` was turned off. Differential
+packaging forces the dictionary to 1 MB so update blocks stay small, which had
+been keeping the 32-bit compressor comfortably inside its limits.
+
+`scripts/windows/build-all.ps1` looks for a system 7-Zip and sets
+`ELECTRON_BUILDER_7ZIP_PATH` to it. If none is installed it falls back to
+`ELECTRON_BUILDER_COMPRESSION_LEVEL=5` — a 16 MB dictionary, a larger
+installer — and says so rather than failing obscurely.
 
 Running `npm run package:win` on its own gets none of that. Do it by hand:
 
 ```powershell
-$env:USE_SYSTEM_7ZA = 'true'   # with a 64-bit 7za on PATH
+$env:ELECTRON_BUILDER_7ZIP_PATH = 'C:\Program Files\7-Zip\7z.exe'
 ```
+
+**`USE_SYSTEM_7ZA` does not work.** It was removed in electron-builder 26 and
+is ignored silently; the replacement is `ELECTRON_BUILDER_7ZIP_PATH`, which
+takes an absolute path to the executable rather than a name on `PATH`
+(`app-builder-lib/out/toolsets/7zip.js`).
 
 ### There is no native module
 
