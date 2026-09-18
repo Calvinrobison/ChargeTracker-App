@@ -15,6 +15,7 @@ import {
   decidePermission,
   isTrustedSender,
   redactDiagnosticText,
+  rendererFileOrigin,
 } from '../../src/main/security.ts';
 import {
   DATA_DIRECTORY_NAME,
@@ -92,6 +93,72 @@ describe('content security policy', () => {
     assert.ok(
       !production.includes('unsafe-inline') || !/script-src[^;]*unsafe-inline/.test(production),
     );
+  });
+});
+
+describe('the trusted origin built from the renderer path', () => {
+  /**
+   * These exist because the rest of this file tested the CONSUMER of the app
+   * origin against a hand-written constant, and nothing tested the PRODUCER.
+   * The producer was wrong on Windows, and the consequence was total: every
+   * IPC message from the application's own window was rejected and a packaged
+   * build could not start.
+   */
+
+  test('a Windows path yields the three-slash form Electron reports', () => {
+    const origin = rendererFileOrigin(
+      'C:\\Users\\someone\\AppData\\Local\\Programs\\chargewatch\\resources\\app.asar\\out\\renderer\\index.html',
+    );
+    assert.equal(
+      origin,
+      'file:///C:/Users/someone/AppData/Local/Programs/chargewatch/resources/app.asar/out/renderer/',
+    );
+    // The precise regression: two slashes instead of three.
+    assert.ok(!origin.startsWith('file://C:'), 'a drive letter must not follow only two slashes');
+  });
+
+  test('a POSIX path keeps the form it already had', () => {
+    assert.equal(
+      rendererFileOrigin('/opt/chargewatch/resources/app.asar/out/renderer/index.html'),
+      'file:///opt/chargewatch/resources/app.asar/out/renderer/',
+    );
+  });
+
+  test('the sender URL Electron reports for a packaged Windows build is trusted', () => {
+    const origin = rendererFileOrigin(
+      'C:\\Users\\someone\\AppData\\Local\\Programs\\chargewatch\\resources\\app.asar\\out\\renderer\\index.html',
+    );
+    const verdict = isTrustedSender({
+      senderUrl:
+        'file:///C:/Users/someone/AppData/Local/Programs/chargewatch/resources/app.asar/out/renderer/index.html',
+      appOrigins: [origin],
+      knownWindowIds: [1],
+      senderWindowId: 1,
+      isMainFrame: true,
+    });
+    assert.equal(verdict.reason, null);
+    assert.equal(verdict.trusted, true);
+  });
+
+  test('a path with a space encodes the way Electron encodes it', () => {
+    assert.equal(
+      rendererFileOrigin(
+        'C:\\Program Files\\ChargeWatch\\resources\\app.asar\\out\\renderer\\index.html',
+      ),
+      'file:///C:/Program%20Files/ChargeWatch/resources/app.asar/out/renderer/',
+    );
+  });
+
+  test('a sibling directory sharing a name prefix is not trusted', () => {
+    const origin = rendererFileOrigin('/opt/app/out/renderer/index.html');
+    const verdict = isTrustedSender({
+      senderUrl: 'file:///opt/app/out/renderer-evil/index.html',
+      appOrigins: [origin],
+      knownWindowIds: [1],
+      senderWindowId: 1,
+      isMainFrame: true,
+    });
+    assert.equal(verdict.trusted, false);
   });
 });
 

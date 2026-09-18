@@ -104,6 +104,40 @@ export interface NavigationPolicyInputs {
 }
 
 /**
+ * The trusted `file:` prefix for a renderer loaded from disk.
+ *
+ * This must produce exactly the form Electron reports as the sender's URL,
+ * because `decideNavigation` matches `file:` origins by string prefix. The
+ * naive construction — `'file://' + path.replace(/\\/g, '/')` — is correct on
+ * POSIX, where the path already begins with `/` and yields `file:///home/...`,
+ * and WRONG on Windows, where the path begins with a drive letter and yields
+ * `file://C:/...` with two slashes. Electron reports `file:///C:/...` with
+ * three, so the prefix never matched, `isTrustedSender` rejected every message
+ * from the application's own window, and a packaged Windows build could not
+ * complete a single IPC call. It showed as "ChargeWatch could not start".
+ *
+ * Nothing caught it: the specs asserted against a correctly-formed constant,
+ * so the consumer was tested and the producer was not, and in development the
+ * renderer is served over http, where this code path never runs.
+ *
+ * A directory is returned with a trailing slash so that the prefix cannot
+ * match a sibling directory sharing a name prefix.
+ */
+export function rendererFileOrigin(rendererFilePath: string): string {
+  const withForwardSlashes = rendererFilePath.replace(/\\/g, '/');
+  const directory = withForwardSlashes.replace(/[^/]*$/, '');
+  const absolute = directory.startsWith('/') ? directory : `/${directory}`;
+  // Encode the characters Electron encodes in a file URL, and no others: the
+  // two strings are compared literally, so over- or under-encoding here breaks
+  // the match just as surely as the missing slash did.
+  const encoded = absolute
+    .split('/')
+    .map((segment) => encodeURIComponent(segment).replace(/%3A/gi, ':'))
+    .join('/');
+  return `file://${encoded}`;
+}
+
+/**
  * Decides what to do with an attempted navigation.
  *
  * Only the application's own origin may be navigated to in-window. A provider
