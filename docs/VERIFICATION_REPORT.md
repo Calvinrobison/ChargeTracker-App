@@ -133,7 +133,7 @@ Other manual smoke runs, not part of the suite:
 | `npm ci` | npm registry blocked (`403 host_not_allowed`) |
 | `npm run lint` | needs eslint |
 | `npm run format` | needs prettier |
-| `npm run typecheck` | needs typescript |
+| ~~`npm run typecheck`~~ | **now run on Windows — clean.** Found two real bugs; see below |
 | `npm run test` / `test:coverage` | needs vitest |
 | `npm run test:e2e` | needs Playwright and a built renderer |
 | `npm run build` / `package:win` | needs electron-vite and electron-builder; packaging needs Windows |
@@ -143,7 +143,12 @@ Other manual smoke runs, not part of the suite:
 
 ### Two things a reader should not skip
 
-**The TypeScript in this repository has never been typechecked.** The
+**UPDATE: it has now.** `npm run typecheck` was run on Windows and, after the
+fixes recorded below, reports no errors. What follows described the state
+before that and is kept because the reasoning still holds for the renderer:
+type-stripping executes code without checking types.
+
+**The TypeScript in this repository had never been typechecked.** The
 dependency-free specs execute it through Node's type-stripping, which runs code
 but does not check types. `npm run typecheck` is expected to surface real
 errors on first run — most likely in the modules listed as written-but-never-executed
@@ -197,9 +202,11 @@ without gaining evidence, which is why they did not move.
 
 ## What a reviewer should check first
 
-1. **`npm run typecheck`.** Never run, and the highest-yield check available.
-   The renderer is the most exposed part: no spec imports a `.tsx` file, so
-   type-stripping has never even parsed those modules.
+1. ~~**`npm run typecheck`**~~ — done. It found ~200 errors, of which two were
+   real bugs: a duplicate `recordUpdateEvent` that had been silently discarding
+   every update event, and an unreachable `partial_coverage` branch revealing a
+   status the renderer handles but nothing produces. The rest were a config gap
+   and `noUncheckedIndexedAccess` strictness. It now reports no errors.
 2. **`src/main/updates-backend.ts`.** The `UpdaterBackend` seam is deliberate,
    but the concrete implementation is written against electron-updater's
    documented API rather than against a running copy of it; its install surface

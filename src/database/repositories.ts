@@ -49,7 +49,9 @@ export function settingsRepository(driver: SqliteDriver): SettingsRepository {
      ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json, updated_at_ms = excluded.updated_at_ms`,
   );
 
-  const parse = (raw: SqlValue): unknown => {
+  // Takes `SqlValue | undefined` because a column the query did not select is
+  // genuinely absent, which the body already distinguishes from a stored null.
+  const parse = (raw: SqlValue | undefined): unknown => {
     if (raw === null || raw === undefined) return undefined;
     try {
       return JSON.parse(String(raw)) as unknown;
@@ -327,23 +329,28 @@ export function sitesRepository(driver: SqliteDriver): SitesRepository {
             merged[field] = existingValue;
           }
 
+          // `?? null` on every merged field: an absent key binds as SQL NULL,
+          // never as '' or 0. The columns that cannot be null are enforced by
+          // the schema, so a genuinely missing required field fails loudly at
+          // the constraint instead of being written as a plausible blank.
+          const mergedField = (name: string): SqlValue => merged[name] ?? null;
           updateSite.run(
             catalogImportId,
             row.registryStationId,
-            merged.name,
-            merged.street_address,
-            merged.city,
-            merged.state,
-            merged.postal_code,
-            merged.normalized_address,
-            merged.latitude,
-            merged.longitude,
+            mergedField('name'),
+            mergedField('street_address'),
+            mergedField('city'),
+            mergedField('state'),
+            mergedField('postal_code'),
+            mergedField('normalized_address'),
+            mergedField('latitude'),
+            mergedField('longitude'),
             row.distanceMiles,
-            merged.network,
-            merged.access_condition,
-            merged.hours_text,
-            merged.catalog_port_count,
-            merged.catalog_level,
+            mergedField('network'),
+            mergedField('access_condition'),
+            mergedField('hours_text'),
+            mergedField('catalog_port_count'),
+            mergedField('catalog_level'),
             nowMs,
             row.id,
           );

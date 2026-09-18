@@ -151,58 +151,35 @@ Invoke-Step 'npm run check:icons' 'The icon set is missing or unreadable.' @(
   'Run: npm run make:icons'
 )
 
-# --------------------------------------------- 4. native build prerequisites
+# --------------------------------------------- 4. no native module expected
 
-Write-Step 'Native module prerequisites'
+Write-Step 'Native modules'
 
-# better-sqlite3 is a native module. If a prebuilt binary exists for the exact
-# Electron ABI in use, npm install just downloads it. If not, it compiles from
-# source, and compiling needs a full C++ toolchain. Finding that out ten minutes
-# into a 500 MB install is a waste of your time, so it is checked here.
+# ChargeWatch uses node:sqlite, which ships inside Node and therefore inside
+# Electron. There is nothing to compile, so no Python and no C++ toolchain are
+# needed -- see docs/adr/0003-node-sqlite-over-better-sqlite3.md.
+#
+# This step exists to catch the reverse problem: a dependency quietly
+# reintroducing a native module, which would bring back the ABI rebuild and
+# only break on someone else's machine.
 
-$script:nativeRisk = @()
-
-# A space in the path breaks node-gyp. This is a long-standing, well-known
-# problem (nodejs/node-gyp#65), and "C:\Users\First Last\..." is the default
-# location for most people, so it bites constantly.
-if ($repoRoot -match ' ') {
-  $script:nativeRisk += "The repository path contains a space: $repoRoot"
-  $script:nativeRisk += '  node-gyp cannot reliably compile from a path with a space in it.'
-  $script:nativeRisk += '  If a source build is needed, move the repo somewhere like C:\dev\ChargeTracker-App.'
-}
-
-$python = $null
-foreach ($candidate in @('python', 'python3', 'py')) {
-  try {
-    $version = & $candidate --version 2>&1
-    if ($LASTEXITCODE -eq 0) { $python = "$candidate ($version)"; break }
-  } catch { }
-}
-if ($python) { Write-Good "python: $python" }
-else { $script:nativeRisk += 'Python is not on PATH. node-gyp requires it to compile from source.' }
-
-# Visual Studio C++ build tools, via vswhere, which ships with any modern VS.
-$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-$msvc = $null
-if (Test-Path $vswhere) {
-  $msvc = & $vswhere -latest -products '*' `
-    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-    -property displayName 2>$null
-}
-if ($msvc) { Write-Good "C++ build tools: $msvc" }
-else { $script:nativeRisk += 'Visual Studio C++ build tools were not found. node-gyp requires them to compile from source.' }
-
-if ($script:nativeRisk.Count -eq 0) {
-  Write-Good 'A source build would succeed if no prebuilt binary is available.'
+if (Test-Path 'node_modules') {
+  $nativeBinaries = @(Get-ChildItem -Path 'node_modules' -Filter '*.node' -Recurse -File -ErrorAction SilentlyContinue |
+    Select-Object -First 5)
+  if ($nativeBinaries.Count -gt 0) {
+    Write-Host ''
+    Write-Host '   A native module is present in node_modules:' -ForegroundColor Yellow
+    foreach ($binary in $nativeBinaries) {
+      Write-Host ("     {0}" -f $binary.FullName.Replace($repoRoot, '.')) -ForegroundColor Yellow
+    }
+    Write-Host '   ChargeWatch is meant to have no native dependency. Find what pulled' -ForegroundColor Yellow
+    Write-Host '   this in: npm ls --all | findstr /i gyp' -ForegroundColor Yellow
+    Write-Host '   verify:package will fail the build if it reaches the package.' -ForegroundColor Yellow
+  } else {
+    Write-Good 'none, as intended - SQLite comes from node:sqlite'
+  }
 } else {
-  Write-Host ''
-  Write-Host '   No C++ toolchain, so better-sqlite3 must come from a PREBUILT binary.' -ForegroundColor Yellow
-  Write-Host '   That works only if one exists for this exact Electron version.' -ForegroundColor Yellow
-  Write-Host ''
-  foreach ($line in $script:nativeRisk) { Write-Host "   $line" -ForegroundColor Yellow }
-  Write-Host ''
-  Write-Host '   Continuing. If the install fails on better-sqlite3, see the guidance' -ForegroundColor Yellow
-  Write-Host '   printed at that point and in docs/BUILDING.md.' -ForegroundColor Yellow
+  Write-Note 'node_modules not present yet; checked after install by verify:package'
 }
 
 # ---------------------------------------------------------------- 5. install
@@ -224,32 +201,14 @@ if ($Force -or -not (Test-Path 'node_modules')) {
     & cmd /c 'npm install 2>&1' | ForEach-Object { Write-Host "   $_" }
     if ($LASTEXITCODE -ne 0) {
       $detail = @(
-        'If the failure names better-sqlite3 and node-gyp, then no PREBUILT binary',
-        'exists for the Electron version in package.json, so npm tried to COMPILE it,',
-        'and compiling needs a toolchain this machine does not have.',
+        'ChargeWatch has no native dependencies, so this should not be a compile',
+        'failure. If the output mentions node-gyp or Python, something in the tree',
+        'pulled a native module back in. Find it with:',
+        '    npm ls --all | findstr /i gyp',
+        'and deal with the cause -- do not install a compiler to work around it.',
         '',
-        'Three ways out, cheapest first:',
-        '',
-        '  1. Pin Electron down to a version better-sqlite3 publishes a prebuild for.',
-        '     Nothing needs installing. Find the candidates with:',
-        '       npm view better-sqlite3 dist-tags',
-        '       npm view better-sqlite3@12 --json | findstr /i electron',
-        '     Then set that version in package.json and re-run.',
-        '',
-        '  2. Install the compiler toolchain (several GB, ~20 minutes):',
-        '       winget install --id Python.Python.3.12 -e',
-        '       winget install --id Microsoft.VisualStudio.2022.BuildTools -e ' +
-          '--override "--quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"',
-        '     Then MOVE THE REPO somewhere without a space in the path, e.g.',
-        '     C:\dev\ChargeTracker-App, and re-run. node-gyp cannot reliably',
-        '     compile from "C:\Users\First Last\...".',
-        '',
-        '  3. Drop the native module entirely and use Node built-in node:sqlite,',
-        '     which Electron already bundles. The repository already has that driver',
-        '     and every spec runs against it. See docs/BUILDING.md for the caveat.',
-        '',
-        'If it failed on a NETWORK error instead, set ELECTRON_BUILDER_BINARIES_MIRROR',
-        'if you are behind a proxy. Never disable TLS verification to get past it.'
+        'If it failed on a NETWORK error, set ELECTRON_BUILDER_BINARIES_MIRROR if',
+        'you are behind a proxy. Never disable TLS verification to get past it.'
       )
       Stop-With 'npm install failed.' $detail
     }
