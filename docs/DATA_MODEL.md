@@ -47,7 +47,7 @@ the import was filtered to, and an `outcome` of `succeeded` / `partial` /
 re-importing the identical file a no-op rather than a duplicate.
 
 `site_conflicts` is the honesty mechanism for refreshes. When a catalog import
-disagrees with a field the user corrected, the disagreement is *recorded* —
+disagrees with a field the user corrected, the disagreement is _recorded_ —
 `field`, `existing_value`, `incoming_value`, `resolution` defaulting to
 `'pending'` — instead of the import silently overwriting the user's edit. The
 comment above the table says exactly that.
@@ -66,8 +66,8 @@ and stop an occupied count from being described as charging.
 Eligibility is separate from verification and both default to the cautious
 value: `eligibility_state` defaults to `'needs_review'` and
 `verification_state` to `'unverified'`. The comment above them states the rule
-they encode: *visible public content alone is never recorded as affirmative
-permission.* `terms_urls_json`, `terms_reviewed_at_ms`, `terms_review_scope`
+they encode: _visible public content alone is never recorded as affirmative
+permission._ `terms_urls_json`, `terms_reviewed_at_ms`, `terms_review_scope`
 and `eligibility_basis` exist so that enabling a source requires a recorded
 reason, not a checkbox. `min_interval_ms` and `min_navigation_interval_ms` are
 both `CHECK (>= 1000)`.
@@ -113,7 +113,7 @@ earlier coverage. `ux_capacity_scope_from` on `(scope_key,
 effective_from_ms)` keeps the history single-valued.
 
 `ports` is per-port identity, and its comment states the constraint: ports
-exist *only* where the source genuinely provides durable identity.
+exist _only_ where the source genuinely provides durable identity.
 `ux_ports_scope_source` on `(scope_key, source_port_id)` is the identity.
 `connectors` records plug types separately, with the comment "a connector is a
 plug type; two plugs on one unit may not be two spaces" — which is the
@@ -136,7 +136,7 @@ durable-identity source was enabled, and no test covers it.
 This pair is the heart of the "missing data is not zero" guarantee.
 
 `monitoring_intervals` records the periods during which a scope was
-*intentionally* being monitored: `scope_key`, `binding_id`, `started_ms`,
+_intentionally_ being monitored: `scope_key`, `binding_id`, `started_ms`,
 `ended_ms` (nullable = still monitored) and `interval_ms`, the scheduled
 interval in force. `interval_ms` is what bounds what can be claimed: it is
 persisted alongside the window, so a period monitored at fifteen-minute
@@ -156,7 +156,7 @@ started_ms)` makes a zero-length gap unrepresentable, and
 `DatabaseWorker.recordGap` returns early rather than writing one.
 
 The consumer is `buildScopeIntervals()` in `src/domain/intervals.ts`, which
-computes monitored time as the monitoring union *minus* the gap union
+computes monitored time as the monitoring union _minus_ the gap union
 (`monitoredMinusGaps`) and then clips every observation's carry-forward to the
 containing monitored span. An observation that falls outside monitored time is
 excluded with reason `outside_monitoring` rather than being stretched to cover
@@ -177,7 +177,7 @@ that includes `in_progress` as well as every failure mode, plus
 `cycle_duration_ms` and `warnings_json`.
 
 `collection_attempts` is the per-binding outcome, and its comment carries the
-rule: *a failure lives here and never becomes a zero-usage observation.* Its
+rule: _a failure lives here and never becomes a zero-usage observation._ Its
 `outcome` enum is the same set minus `in_progress`. This is the table that
 makes "we tried and could not read it" a recorded fact distinct from both "we
 read it and nothing was in use" and "we never looked."
@@ -189,8 +189,8 @@ honesty rather than for display.
 are `available_count`, `occupied_count`, `reserved_count`,
 `out_of_service_count` and `unknown_count`, each independently nullable and
 each bounded 0–10000. `reported_total` is the provider's own total, stored
-separately again. The comment above them is the whole rule: *NULL means the
-source did not report the dimension; 0 means it reported 0.* There is no single
+separately again. The comment above them is the whole rule: _NULL means the
+source did not report the dimension; 0 means it reported 0._ There is no single
 "status" column that would force a reading into one bucket.
 
 **A residual is never assigned to occupied.** This is enforced in
@@ -208,7 +208,7 @@ if (residual > 0) { unknown = explicitUnknown + residual; hasResidualUnknown = t
 
 `knownStateCount` sums only the dimensions the source explicitly named and is
 `null` when it named none — so it is never a zero that looks like full
-knowledge. `supportsOccupancy` is true only when *both* `available` and
+knowledge. `supportsOccupancy` is true only when _both_ `available` and
 `occupied` were explicitly reported, and `computeScopeMetrics()` in
 `src/domain/metrics.ts` admits an interval to the occupancy numerator and
 denominator only under that flag. An "available only" source therefore reports
@@ -219,8 +219,8 @@ explicit states summing above the reported total — is rejected as
 **The freshness policy is persisted per observation.** Three columns carry the
 policy that was in force at the moment of the reading:
 `scheduled_interval_ms`, `max_carry_forward_cap_ms` and
-`source_freshness_limit_ms`. The comment above them states why: *so a later
-settings change cannot rewrite historical assumptions.* `carryForwardBudgetMs()`
+`source_freshness_limit_ms`. The comment above them states why: _so a later
+settings change cannot rewrite historical assumptions._ `carryForwardBudgetMs()`
 in `src/domain/types.ts` derives the budget as the minimum of twice the
 scheduled interval, the product cap, and the provider limit where one exists —
 and it reads those values from the observation row, not from current settings.
@@ -250,7 +250,7 @@ is its primary key). `quality` is `reliable` / `provisional` / `stale_source` /
 `unknown_source_clock`. `buildScopeIntervals()` excludes `invalid` and
 `ambiguous_scope` from metrics by default (`DEFAULT_EXCLUDED_QUALITIES`) and
 excludes stale readings unless `includeStaleSourceReadings` is set — and in
-every case the exclusion is *recorded* in the returned `excluded` array with a
+every case the exclusion is _recorded_ in the returned `excluded` array with a
 reason, rather than the observation vanishing.
 
 `corrected`, `superseded_by`, `correction_note` and `corrected_at_ms` let a
@@ -273,8 +273,8 @@ inference produces a new row rather than mutating an old conclusion.
 
 `src/domain/episodes.ts` keeps three outputs permanently distinct, and its
 header is worth quoting in effect: "recorded charging sessions" come only from
-an authorized transaction dataset with distinct session records, and *this
-module does not synthesise them and there is no code path that can*; "detected
+an authorized transaction dataset with distinct session records, and _this
+module does not synthesise them and there is no code path that can_; "detected
 occupancy starts" are estimates from reliable per-port transitions with
 censoring preserved; "observed increases in occupied ports" is an aggregate
 count-change metric that is never described as arrivals.
@@ -285,8 +285,8 @@ computed and tested but never persisted.
 ### Metrics cache
 
 `hourly_metrics` is a cache of time-weighted aggregates per `(scope_key,
-local_date, local_hour)`, and its comment states its status: *never the sole
-raw record; always recomputable.* It stores port-minutes rather than
+local_date, local_hour)`, and its comment states its status: _never the sole
+raw record; always recomputable._ It stores port-minutes rather than
 percentages — `occupied_port_minutes`, `operational_port_minutes`,
 `known_state_port_minutes`, `out_of_service_port_minutes` and a nullable
 `expected_installed_port_minutes` — which is what allows correct aggregation
@@ -294,7 +294,7 @@ across sites. Averaging site-level percentages would weight a two-port site the
 same as a twenty-port one; summing port-minutes and dividing at the end does
 not. `expected_installed_port_minutes` is nullable because coverage against an
 unknown denominator is reported as unknown, not as a number:
-`expectedPortMinutes()` in `src/domain/intervals.ts` returns `null` if *any*
+`expectedPortMinutes()` in `src/domain/intervals.ts` returns `null` if _any_
 monitored moment lacks a known capacity.
 
 `local_date`, `local_hour`, `local_weekday` and `timezone` are stored together
@@ -351,7 +351,7 @@ reassuring timestamp.
 indexed by `ix_queue_due` on `(paused, next_due_ms)`. Without it, every restart
 would reset backoff and the app would hammer a source that had asked it to wait.
 
-`app_sessions` is the heartbeat described under *Monitoring and gaps*.
+`app_sessions` is the heartbeat described under _Monitoring and gaps_.
 `backups` records each backup with `file_sha256`, `byte_size`, `verified` and a
 `manifest_json`. `app_settings` is a key/value store of JSON values with an
 `updated_at_ms`.
@@ -374,9 +374,9 @@ CREATE UNIQUE INDEX ux_observations_run_binding_scope
   ON observations (run_id, binding_id, scope_key);
 ```
 
-Its comment states both halves of the requirement: *idempotent ingestion —
+Its comment states both halves of the requirement: _idempotent ingestion —
 retrying the same attempt cannot double-write, while a repeated identical
-status at a NEW scheduled time is still a new observation.*
+status at a NEW scheduled time is still a new observation._
 
 The key is `(run_id, binding_id, scope_key)`, and `run_id` is freshly generated
 per cycle by `randomUUID()` in `CollectorService.collectFromSource`. So:
@@ -393,7 +393,7 @@ per cycle by `randomUUID()` in `CollectorService.collectFromSource`. So:
   observations are four pieces of evidence that the state did not change, and
   discarding three of them would make coverage look worse than it was. The
   `evidence_fingerprint` exists for provenance and diagnostics and is
-  explicitly *not* used for deduplication — the comment on `fingerprint()` in
+  explicitly _not_ used for deduplication — the comment on `fingerprint()` in
   `src/collector/service.ts` says so.
 
 The same pattern is applied at every level of the run so the whole thing is
@@ -431,10 +431,9 @@ on runs.
 The millisecond-instant range check is `BETWEEN 0 AND 4102444800000` (the upper
 bound is 2100-01-01T00:00:00Z) and it appears on every instant column in the
 schema. Its purpose is stated in the migration header: a seconds/milliseconds
-mix-up fails at the boundary *instead of silently shifting history by five
-decades*. A Unix timestamp in seconds — say `1_760_000_000` — is a perfectly
-valid integer, and stored in a milliseconds column it places a 2025 reading in
-1970. Nothing downstream would flag it; it would just quietly poison every
+mix-up fails at the boundary _instead of silently shifting history by five
+decades_. A Unix timestamp in seconds — say `1_760_000_000` — is a perfectly
+valid integer, and stored in a milliseconds column it places a 2025 reading in 1970. Nothing downstream would flag it; it would just quietly poison every
 window query and coverage figure. The same bound is enforced at the IPC
 boundary by `v.instant()` in `src/shared/validate.ts`, and in the domain layer
 `FAR_FUTURE` in `src/domain/intervals.ts` uses the identical constant, so the
@@ -461,7 +460,7 @@ line-ending change is not treated as a schema change.
 
 Two outcomes refuse without touching the database, and both matter:
 
-`checksum_mismatch` means migration *N* no longer matches the checksum recorded
+`checksum_mismatch` means migration _N_ no longer matches the checksum recorded
 when it was applied. The detail explicitly states "the database has not been
 modified." This is a provenance failure: if the text of a historical migration
 has changed, we no longer know what shape the existing data is actually in, and
@@ -481,9 +480,9 @@ schema, but they are not what ships. `scripts/generate-migrations.mjs` embeds
 them into `src/database/migrations/index.ts` as a generated module, and
 `npm run check:migrations` fails the build if that module is stale.
 
-The reason is stated in both the generator and the config: *embedding avoids
+The reason is stated in both the generator and the config: _embedding avoids
 resolving file paths inside `app.asar` at runtime, which is a common packaging
-failure.* Inside a packaged Electron app the migrations directory is not a
+failure._ Inside a packaged Electron app the migrations directory is not a
 directory on disk — it is a region of an archive. `readdirSync` against it
 either fails or returns nothing depending on how the path was resolved, and the
 failure appears only in the packaged build, at first launch, on a user's
@@ -496,8 +495,12 @@ It also means the checksums travel with the code that applies them.
 `src/database/migrator.ts` exposes two different bounds:
 
 ```ts
-export function canRead(schemaVersion: number): boolean  { return schemaVersion <= TARGET_SCHEMA_VERSION; }
-export function canWrite(schemaVersion: number): boolean { return schemaVersion === TARGET_SCHEMA_VERSION; }
+export function canRead(schemaVersion: number): boolean {
+  return schemaVersion <= TARGET_SCHEMA_VERSION;
+}
+export function canWrite(schemaVersion: number): boolean {
+  return schemaVersion === TARGET_SCHEMA_VERSION;
+}
 ```
 
 Reading is backward-compatible; writing is exact. An older file is migrated up
@@ -603,10 +606,10 @@ declared on `port_observations.observation_id` and
 `observation_quality.observation_id`, the dependent rows go with it and no
 orphans are left.
 
-Note what deletion does *not* remove: `collection_gaps`,
+Note what deletion does _not_ remove: `collection_gaps`,
 `monitoring_intervals` and `collection_attempts` survive. That is the right
 behaviour for this product — after deleting old observations, the record that
-those periods *were* monitored and where coverage was missing remains intact,
+those periods _were_ monitored and where coverage was missing remains intact,
 so the remaining history is not silently reinterpreted as though the deleted
 period had never been watched.
 

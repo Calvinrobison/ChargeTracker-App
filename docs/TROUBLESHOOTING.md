@@ -92,7 +92,7 @@ than reporting an error. Nothing was installed, and nothing on your machine was
 changed.
 
 Seen once, during the first packaging run of this project, on a 328 MB
-installer. **The cause is not established.** It is specifically *not* the 7-Zip
+installer. **The cause is not established.** It is specifically _not_ the 7-Zip
 memory failure above: that build had `differentialPackage` on, so it compressed
 with a 1 MB dictionary and never approached the limit that later broke the
 build. Work through these in order; each is cheap and eliminates a class of
@@ -140,11 +140,11 @@ check, which is unaffected. See `docs/UPDATES_AND_RECOVERY.md`.
 
 Two distinct cases, and the dialog says which:
 
-*"This history file was written by a newer version."* Install that newer
+_"This history file was written by a newer version."_ Install that newer
 version. The file is fine; this copy is too old to read it, and it refuses to
 downgrade rather than losing data.
 
-*"ChargeWatch could not upgrade its history file."* A migration failed. Your
+_"ChargeWatch could not upgrade its history file."_ A migration failed. Your
 data is left at the last successfully applied version, intact, and a
 pre-migration backup was taken before the attempt. Restore that backup from
 Settings → Data and backups, or export diagnostics and report it.
@@ -228,17 +228,17 @@ activity panel. No public source reports sessions.
 
 The preview lists each rejected row with its reason. The common ones:
 
-*Period mismatch.* ChargeWatch will not prorate. A calendar month cannot be
+_Period mismatch._ ChargeWatch will not prorate. A calendar month cannot be
 stretched to fit a 23-day window; the overlap is used, or the comparison is not
 made.
 
-*Overlapping dataset.* Another dataset already covers that site and period.
+_Overlapping dataset._ Another dataset already covers that site and period.
 Remove or replace it rather than having two answers to the same question.
 
-*Different count definition.* "Property entries" and "unique visitors" are
+_Different count definition._ "Property entries" and "unique visitors" are
 different measurements. Averaging them produces a number meaning nothing.
 
-*Unparseable timestamp.* Timestamps need an explicit UTC offset. A bare local
+_Unparseable timestamp._ Timestamps need an explicit UTC offset. A bare local
 time is ambiguous and is rejected rather than guessed at.
 
 **A station name in my CSV starts with an apostrophe.**

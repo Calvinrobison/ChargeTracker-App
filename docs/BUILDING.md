@@ -4,18 +4,18 @@ What you need, what each command does, and what to do when one fails.
 
 ## Requirements
 
-| | |
-| --- | --- |
-| OS | Windows 11 x64 for packaging. Linux and macOS can run the specs and the renderer build, but not produce an installer. |
-| Node | 22.12 or newer. The specs need 22.6+ for `--experimental-strip-types` and `node:sqlite`; the build is pinned to 22.12 in CI. |
-| Disk | ~1 GB free — the bundled Chromium payload is around 200 MB before packaging and again inside the installer. |
-| Network | The npm registry and the Playwright CDN, once. After that the build is offline. |
-| 7-Zip | Optional but preferred: `winget install --id 7zip.7zip -e`. See below. |
+|         |                                                                                                                              |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| OS      | Windows 11 x64 for packaging. Linux and macOS can run the specs and the renderer build, but not produce an installer.        |
+| Node    | 22.12 or newer. The specs need 22.6+ for `--experimental-strip-types` and `node:sqlite`; the build is pinned to 22.12 in CI. |
+| Disk    | ~1 GB free — the bundled Chromium payload is around 200 MB before packaging and again inside the installer.                  |
+| Network | The npm registry and the Playwright CDN, once. After that the build is offline.                                              |
+| 7-Zip   | Optional but preferred: `winget install --id 7zip.7zip -e`. See below.                                                       |
 
 ### Packaging is compressed at level 5, not 9
 
 electron-builder invokes 7-Zip with `-mx=9` and no other tuning. At that level
-7-Zip picks a 64 MB LZMA2 dictionary *and* compresses blocks in parallel across
+7-Zip picks a 64 MB LZMA2 dictionary _and_ compresses blocks in parallel across
 every logical processor, each thread holding its own encoder state of roughly
 10.5× the dictionary — about 675 MB each. On a many-core machine that is well
 past 8 GB for one archive, and it fails:
@@ -83,7 +83,7 @@ npm run test:nodeps
 npm run check:migrations
 ```
 
-`test:nodeps` runs 380 specs on Node's built-in test runner. It executes the
+`test:nodeps` runs 413 specs on Node's built-in test runner. It executes the
 TypeScript directly through type-stripping and opens real SQLite databases
 through `node:sqlite`. This is not a mock layer — the schema under test is the
 same `001_initial.sql` that ships.
@@ -107,13 +107,10 @@ unless you pass `-Force`. `-StopAfter build` stops before packaging;
 `-SkipTypecheck` gets you to a build while you work through the first
 typecheck.
 
-Expect the typecheck step to fail the first time. That is not a broken setup —
-see below.
-
 ## The full sequence
 
 ```powershell
-npm install
+npm ci
 npm run typecheck
 npm run verify
 npm run setup:browser
@@ -123,11 +120,12 @@ npm run verify:package
 .\scripts\windows\test-installed.ps1
 ```
 
-### `npm install`
+### `npm ci`
 
-Writes `package-lock.json`. **The lockfile is not in the repository yet** — see
-`docs/IMPLEMENTATION_STATUS.md` blocker B1 — so the first person to run this
-creates it and should commit it on its own.
+Installs exactly what `package-lock.json` pins. **The lockfile is in the
+repository**, so use `npm ci` rather than `npm install`: `npm install` is free
+to resolve something newer and silently rewrite the lockfile, which is the one
+thing a reproducible build must not do.
 
 A release must be built from a locked tree. `scripts/release-prepare.mjs`
 refuses to prepare a release without the lockfile, and the CI `checks` job runs
@@ -149,9 +147,9 @@ same reason, and ignores their majors outright.
 Two projects: `tsconfig.node.json` (main, preload, workers, collector, database,
 domain, shared, tests, configs) and `tsconfig.web.json` (renderer, UI tests).
 
-**This has never been run.** Expect errors the first time, concentrated in the
-renderer — no spec imports a `.tsx` file, so type-stripping has never parsed
-those modules.
+**This now runs clean** on Linux with Node 22.22.2. `src/workers/*.ts` were
+previously in neither project, so they were never typechecked and eslint could
+not parse them; they are in `tsconfig.node.json` now and are clean too.
 
 One constraint worth knowing about: `tsconfig.base.json` sets
 `erasableSyntaxOnly`. That bans TypeScript syntax which cannot be removed by
@@ -252,7 +250,7 @@ npx asar list release\win-unpacked\resources\app.asar | findstr out/workers
 Run this in a **normal, non-elevated** window. The per-user install is supposed
 to need no administrator rights, and an install that succeeds while elevated
 establishes nothing about that. The script refuses to run elevated unless you
-pass `-AllowElevated`, and then reports that particular claim as *not proven*
+pass `-AllowElevated`, and then reports that particular claim as _not proven_
 rather than passing it. CI passes the flag, because a hosted runner's default
 account is an administrator.
 
@@ -281,7 +279,7 @@ endings Windows expects regardless of the platform they were committed from.
 
 ## When something fails
 
-**`npm install` fails while compiling a native module.** It should not: there
+**`npm ci` fails while compiling a native module.** It should not: there
 are no native dependencies. If one has appeared, something in the tree pulled it
 in. Find it with `npm ls --all | findstr /i gyp` and deal with the cause rather
 than installing a compiler — `verify-package.mjs` will fail the build anyway if

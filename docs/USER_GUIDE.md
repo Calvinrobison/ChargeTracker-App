@@ -15,13 +15,13 @@ area it will watch, runs its startup checks, and asks two questions.
 **The startup checks** are real, not decorative. Each one either passes or tells
 you exactly what to do:
 
-| Check | What it means |
-| --- | --- |
-| Data folder is writable | Where your history will live |
-| History file is ready | The database opened and migrated |
-| Bundled browser starts | The browser that reads status pages works |
-| A charger status source is enabled | Whether anything can be collected |
-| Station catalog is loaded | Whether ChargeWatch knows which stations exist |
+| Check                              | What it means                                  |
+| ---------------------------------- | ---------------------------------------------- |
+| Data folder is writable            | Where your history will live                   |
+| History file is ready              | The database opened and migrated               |
+| Bundled browser starts             | The browser that reads status pages works      |
+| A charger status source is enabled | Whether anything can be collected              |
+| Station catalog is loaded          | Whether ChargeWatch knows which stations exist |
 
 **Today, the source check fails.** No charger network has been cleared for
 automated collection yet, so ChargeWatch cannot record observations. It says so
@@ -167,15 +167,15 @@ profile or update-cache directories.
 
 ## Settings
 
-| Panel | What is there |
-| --- | --- |
-| Collection | Target interval, pause and resume, per-source health |
-| Study area | Centre, radius and label |
-| Data and backups | Data folder, back up now, restore, delete a date range |
-| Visit data | Template, import, imported datasets |
-| Updates | Automatic checking, downloading and installing, and the current state |
-| Diagnostics | Log folder, export diagnostics |
-| About | Version, schema version, third-party notices |
+| Panel            | What is there                                                         |
+| ---------------- | --------------------------------------------------------------------- |
+| Collection       | Target interval, pause and resume, per-source health                  |
+| Study area       | Centre, radius and label                                              |
+| Data and backups | Data folder, back up now, restore, delete a date range                |
+| Visit data       | Template, import, imported datasets                                   |
+| Updates          | Automatic checking, downloading and installing, and the current state |
+| Diagnostics      | Log folder, export diagnostics                                        |
+| About            | Version, schema version, third-party notices                          |
 
 ## Getting help
 

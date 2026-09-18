@@ -48,18 +48,18 @@ against a resolved tree; see the notice at the top.
 
 ### Runtime
 
-| Package | Purpose | Declared licence |
-| --- | --- | --- |
-| `electron-updater` | Update discovery and installation, behind ChargeWatch's own verification | MIT |
-| `playwright-core` | Driving the bundled Chromium | Apache-2.0 |
+| Package            | Purpose                                                                  | Declared licence |
+| ------------------ | ------------------------------------------------------------------------ | ---------------- |
+| `electron-updater` | Update discovery and installation, behind ChargeWatch's own verification | MIT              |
+| `playwright-core`  | Driving the bundled Chromium                                             | Apache-2.0       |
 
 ### Bundled into the renderer
 
-| Package | Purpose | Declared licence |
-| --- | --- | --- |
-| `react`, `react-dom` | The user interface | MIT |
-| `leaflet` | The map | BSD-2-Clause |
-| `recharts` | Charts | MIT |
+| Package              | Purpose            | Declared licence |
+| -------------------- | ------------------ | ---------------- |
+| `react`, `react-dom` | The user interface | MIT              |
+| `leaflet`            | The map            | BSD-2-Clause     |
+| `recharts`           | Charts             | MIT              |
 
 ### Build and development only
 

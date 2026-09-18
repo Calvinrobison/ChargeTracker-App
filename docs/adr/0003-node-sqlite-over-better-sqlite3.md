@@ -54,7 +54,7 @@ no `asarUnpack` configuration, no compiler toolchain on a build machine, and no
 no native step at all.
 
 **The specs test the shipping driver.** This is the more important consequence.
-The database specs were always good; they are now also *about the right thing*.
+The database specs were always good; they are now also _about the right thing_.
 
 **Online backup is tested for the first time.** `node:sqlite` exposes SQLite's
 online backup API as a module-level `backup()` function. That was verified
@@ -63,7 +63,7 @@ directly — a 5,000-row WAL-mode database backed up and restored with
 `tests/nodeps/online-backup.test.ts` now covers the success path, the WAL
 capture, the database record, and both refusal paths. Previously the backup path
 had exactly one piece of evidence: a manual smoke run showing that a driver
-*without* the capability was refused.
+_without_ the capability was refused.
 
 **The capability is detected, not assumed.** `ONLINE_BACKUP_AVAILABLE` in the
 driver is computed by inspecting the module, because `backup()` arrived in a
@@ -74,8 +74,8 @@ opens cleanly and is missing every transaction still in the log, and a backup
 nobody can restore is worse than an honest refusal to make one.
 
 **The package check inverted.** `verify-package.mjs` and `after-pack.mjs`
-previously *required* `better_sqlite3.node` to be present and unpacked. They now
-*fail the build if any `.node` binary appears at all*, because a native module
+previously _required_ `better_sqlite3.node` to be present and unpacked. They now
+_fail the build if any `.node` binary appears at all_, because a native module
 reappearing means a dependency has quietly reintroduced the ABI rebuild this
 decision removed — and it would only break on someone else's machine.
 

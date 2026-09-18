@@ -5,23 +5,23 @@ What each suite covers, what none of them cover, and how to run them.
 The organising idea: the parts of ChargeWatch that must not be wrong — the
 metric contract, the SQL schema, the scheduler budget, the source parser, the
 update verifier and the display formatters — are testable **with nothing
-installed**. That was not a convenience; it is why 380 specs exist for a project
-whose dependency tree has never been resolved.
+installed**. That was not a convenience; it is why 413 specs exist for a project
+whose dependency tree went unresolved for most of its life.
 
 ---
 
 ## The suites
 
-| Suite | Command | Needs | Status |
-| --- | --- | --- | --- |
-| No-dependency specs | `npm run test:nodeps` | Node 22.12+ | **380 passing** |
-| Same specs under Vitest | `npm test` | the dependency tree | never run |
-| Integration specs | `npm test` | the dependency tree | **directory is empty** |
-| UI specs | `npm run test:e2e` | Playwright, a built renderer | **never run** |
-| Installed-build check | `.\scripts\windows\test-installed.ps1` | Windows, a packaged build | never run |
-| Upgrade check | `.\scripts\windows\test-update.ps1` | Windows, two installers | never run |
+| Suite                   | Command                                | Needs                        | Status           |
+| ----------------------- | -------------------------------------- | ---------------------------- | ---------------- |
+| No-dependency specs     | `npm run test:nodeps`                  | Node 22.12+                  | **413 passing**  |
+| Same specs under Vitest | `npm test`                             | the dependency tree          | **413 passing**  |
+| Integration specs       | `npm test`                             | the dependency tree          | **none written** |
+| UI specs                | `npm run test:e2e`                     | Playwright, a built renderer | **42 passing**   |
+| Installed-build check   | `.\scripts\windows\test-installed.ps1` | Windows, a packaged build    | never run        |
+| Upgrade check           | `.\scripts\windows\test-update.ps1`    | Windows, two installers      | never run        |
 
-### `npm run test:nodeps` — 380 specs
+### `npm run test:nodeps` — 413 specs
 
 Runs on Node's built-in test runner using `--experimental-strip-types` and
 `node:sqlite`. No install, no network, no mock database: the schema under test
@@ -32,17 +32,17 @@ npm run test:nodeps
 npm run test:nodeps -- --filter metrics    # one file
 ```
 
-| Area | Specs | What it establishes |
-| --- | --- | --- |
-| Domain and metrics | 77 | Half-open intervals, bounded carry-forward, port-minute weighting, all five §15 acceptance examples, Phoenix-local attribution independent of machine timezone |
-| Database | 25 | Idempotent ingestion, migration refusal on checksum mismatch and newer schema, savepoint transactions, close/reopen with history intact, unclean-exit recovery |
-| View models | 28 | Every screen's data built from one shared window |
-| Collector | 51 | Token-bucket budget, jittered backoff capped at 6h, `Retry-After` honoured and never shortened, circuit breaker, source pause vs retry, ChargePoint extraction, URL safety |
-| Security, paths, contracts | 72 | CSP, navigation and permission denial, sender identity, diagnostic redaction, data-path placement, the IPC registry, the hand-written validator |
-| Update authenticity | 35 | Signature, claim, sequence, schema, artifact digest and traversal checks |
-| CSV | 31 | Formula-injection neutralisation on untrusted text only, missing values exported empty, strict instant parsing |
-| Display formatting | 31 | `null` never becomes a number; a measured zero stays distinguishable from an absent measurement |
-| Episodes and visits | 26 | Censoring, continuity breaks, refused proration, undefined ratios |
+| Area                       | Specs | What it establishes                                                                                                                                                        |
+| -------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain and metrics         | 77    | Half-open intervals, bounded carry-forward, port-minute weighting, all five §15 acceptance examples, Phoenix-local attribution independent of machine timezone             |
+| Database                   | 25    | Idempotent ingestion, migration refusal on checksum mismatch and newer schema, savepoint transactions, close/reopen with history intact, unclean-exit recovery             |
+| View models                | 28    | Every screen's data built from one shared window                                                                                                                           |
+| Collector                  | 51    | Token-bucket budget, jittered backoff capped at 6h, `Retry-After` honoured and never shortened, circuit breaker, source pause vs retry, ChargePoint extraction, URL safety |
+| Security, paths, contracts | 72    | CSP, navigation and permission denial, sender identity, diagnostic redaction, data-path placement, the IPC registry, the hand-written validator                            |
+| Update authenticity        | 35    | Signature, claim, sequence, schema, artifact digest and traversal checks                                                                                                   |
+| CSV                        | 31    | Formula-injection neutralisation on untrusted text only, missing values exported empty, strict instant parsing                                                             |
+| Display formatting         | 31    | `null` never becomes a number; a measured zero stays distinguishable from an absent measurement                                                                            |
+| Episodes and visits        | 26    | Censoring, continuity breaks, refused proration, undefined ratios                                                                                                          |
 
 ### `npm test` — Vitest
 
@@ -50,15 +50,20 @@ Runs the same no-dependency specs **plus** anything under
 `tests/integration/`. Running them under both runners is deliberate: a change
 that breaks them under one but not the other is caught rather than hidden.
 
-`tests/integration/` is empty. `passWithNoTests` is deliberately off, because a
-green run over zero tests is the most misleading result a suite can produce — so
-until integration specs exist, that project fails, which is the honest state.
+Vitest used to collect **zero** of those specs and fail: they register with
+`node:test`, which Vitest cannot see. `vitest.config.ts` now aliases `node:test`
+to `tests/support/node-test-shim.ts`, which re-exports the same names from
+Vitest, so one set of spec files satisfies both runners. `npm test` runs the
+same 413 specs and passes.
+
+No integration specs exist yet. `passWithNoTests` is deliberately off, because a
+green run over zero tests is the most misleading result a suite can produce.
 
 What belongs there: anything needing `better-sqlite3` under the Electron ABI,
 `electron-updater`, or the real Playwright browser API. Those are precisely the
 modules `docs/VERIFICATION_REPORT.md` lists as written-but-never-executed.
 
-### `npm run test:e2e` — UI specs
+### `npm run test:e2e` — 42 UI specs
 
 Loads the **built** renderer bundle in Chromium with a stub preload bridge that
 answers from `tests/ui/fixtures.ts`. No Electron, no database, no network.
@@ -67,15 +72,26 @@ This is the only automated check on the last step of the honesty chain: a
 missing measurement can survive every domain and database guarantee and still be
 printed as `0%`.
 
+A build must come first — the specs load `out/renderer/`, not source.
+
 ```powershell
 npm run build
 npm run test:e2e
 npm run test:e2e:ui    # interactive
 ```
 
-**These specs have never been executed.** Their selectors were written against
-the source rather than against a running page, so expect corrections on first
-run. Correct the selector, not the assertion.
+**All 42 pass**, across three projects (`desktop-dark`, `desktop-light`,
+`narrow`), in Chromium on Linux. `playwright.config.ts` takes an optional
+`CHARGEWATCH_CHROMIUM` environment variable pointing at a preinstalled Chromium
+if you do not want Playwright to download one.
+
+Their selectors had been written against the source rather than against a
+running page, and the first run needed three corrections — a locator that
+matched a hidden `<select>` option, an assertion that basemap tiles are not
+requested on the opening view when the map is the default tab, and a second
+`installBridge` call trying to redefine the already-frozen bridge. All three
+were faults in the specs; the application was correct in each case. That is the
+rule to keep applying: correct the selector, not the assertion.
 
 Two properties of the harness are worth preserving if you extend it:
 
@@ -83,7 +99,7 @@ Two properties of the harness are worth preserving if you extend it:
   error. A stub that answered `{}` would let a test pass because the renderer
   tolerated a response nobody wrote.
 - **Every invocation is recorded**, so a test can assert what the renderer asked
-  for — including that it did *not* ask for something.
+  for — including that it did _not_ ask for something.
 
 Every value in `tests/ui/fixtures.ts` is synthetic and labelled as such in the
 file header. `scripts/verify-package.mjs` fails a package that contains anything

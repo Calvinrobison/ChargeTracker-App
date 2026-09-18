@@ -35,8 +35,9 @@ git push -u origin chargewatch-v1
 Then open a pull request. The pull request template will prompt you through the
 data-honesty checklist; it applies to this change like any other.
 
-**Do not merge to `main` before running the checks in section 2.** Nothing in
-this branch has been typechecked or built.
+**Do not merge to `main` before running the checks in section 2.** The two open
+failures in section 1a are unresolved: the installer built from this branch
+still crashes on install.
 
 ---
 
@@ -112,29 +113,24 @@ Run these in order. Each one is expected to find something.
 npm run test:nodeps
 ```
 
-Expect `# pass 380`, `# fail 0`. This needs Node 22.12+ and nothing else — no
+Expect `# pass 413`, `# fail 0`. This needs Node 22.12+ and nothing else — no
 install, no network. If it fails here, something is wrong with your Node
 version before anything else is worth investigating.
 
 ### 2.2 Resolve the dependency tree
 
 ```powershell
-npm install
+npm ci
 ```
 
-This writes `package-lock.json`, which does not exist yet and which every other
-step depends on. Commit it on its own:
+`package-lock.json` is committed, so use `npm ci` rather than `npm install`:
+`npm ci` installs exactly what the lockfile pins, where `npm install` may
+resolve something newer and rewrite it.
 
-```powershell
-git add package-lock.json
-git commit -m "chore: pin dependency versions"
-```
-
-The versions in `package.json` are the ones the code was written against. If npm
-resolves something materially newer for Electron, better-sqlite3 or
-playwright-core, read `docs/adr/0001-stack-and-version-pinning.md` before
-accepting it — those three are the ones that can change behaviour rather than
-just surface.
+The versions in the lockfile are the ones the code was written against. If you
+deliberately bump Electron, better-sqlite3 or playwright-core, read
+`docs/adr/0001-stack-and-version-pinning.md` first — those three are the ones
+that can change behaviour rather than just surface.
 
 ### 2.3 Typecheck
 
@@ -142,31 +138,35 @@ just surface.
 npm run typecheck
 ```
 
-**This has never been run.** It is the highest-yield check available and it is
-expected to report real errors. The two most exposed areas:
+**This now runs clean**, on Linux with Node 22.22.2. So do `npm run lint` and
+`npm run format` — `eslint.config.js` was renamed to `eslint.config.mjs` and
+given a globals configuration (it had been producing 416 bogus `no-undef`
+errors), and the tree was run through prettier for the first time.
+`src/workers/*.ts` were in neither tsconfig project, so nothing typechecked them
+and eslint could not parse them; they are in `tsconfig.node.json` now.
 
-- **The renderer.** No spec imports a `.tsx` file, so type-stripping has never
-  even parsed those modules. Errors here are likely and mostly mechanical.
+A clean typecheck is not a clean bill of health for one module in particular:
+
 - **`src/main/updates-backend.ts`.** Written against electron-updater's
   documented API rather than against a running copy of it. Its install surface
   differs across versions; the `UpdaterBackend` interface in
   `src/main/updates.ts` is the seam to adjust, and the `UpdateService` above it
   should not need to change.
 
-Fix what it finds, re-run `npm run test:nodeps`, and commit.
-
-### 2.4 Build and see the interface for the first time
+### 2.4 Build and see the interface
 
 ```powershell
 npm run build
 npm run test:e2e
 ```
 
-The UI specs in `tests/ui/honesty.spec.ts` have never been executed. Their
-selectors were written against the source rather than against a running page, so
-expect some of them to need correcting. **Correct the selector, not the
-assertion** — the assertions are the point, and each one guards a specific way
-the interface could mislead someone.
+`npm run build` succeeds on Linux: main, preload, renderer and both worker
+bundles (`out/workers/database.js`, `out/workers/collector.js`). The 42 UI specs
+in `tests/ui/honesty.spec.ts` now pass, across three Playwright projects, in
+plain Chromium against the built renderer — **not** under Electron. The first
+run needed three corrections, all in the specs rather than the application.
+**Correct the selector, not the assertion** — the assertions are the point, and
+each one guards a specific way the interface could mislead someone.
 
 If you want to look at it rather than test it:
 
@@ -194,8 +194,8 @@ under the Electron ABI and whether the bundled browser starts from
 runs it.
 
 The script installs the build, runs it with `--self-check` against a throwaway
-data directory, reads the JSON report, and uninstalls. It separates *integrity*
-(data folder, database, bundled browser — must pass) from *readiness* (an
+data directory, reads the JSON report, and uninstalls. It separates _integrity_
+(data folder, database, bundled browser — must pass) from _readiness_ (an
 eligible source, a loaded catalog — expected to be unmet today, reported rather
 than failed).
 
@@ -247,8 +247,9 @@ place.
 
 ### No screenshots
 
-`docs/` has no images, because nothing has rendered the interface. Take real
-ones after step 2.4 rather than mocking any up.
+`docs/` has no images. The renderer has only ever been rendered headlessly by
+the UI specs, against synthetic fixtures. Take real ones from a real run rather
+than mocking any up.
 
 ---
 
@@ -289,14 +290,14 @@ the update.
 
 ## 5. Where to look when something is wrong
 
-| Symptom | Start here |
-| --- | --- |
-| A number looks wrong | `docs/METRICS.md`, then the coverage indicator for that window |
-| Collection is not happening | The source health banner; `docs/SOURCES.md` |
-| The app will not start | `%LOCALAPPDATA%\ChargeWatch\logs\`; run the installed exe with `--self-check` |
-| A history file looks damaged | `npm run db:probe -- --file <path>` — read-only, safe |
-| An update was refused | `docs/UPDATES_AND_RECOVERY.md`; the rejection code names the exact check |
-| Packaging produced something odd | `npm run verify:package` names the fault and the fix |
+| Symptom                          | Start here                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------- |
+| A number looks wrong             | `docs/METRICS.md`, then the coverage indicator for that window                |
+| Collection is not happening      | The source health banner; `docs/SOURCES.md`                                   |
+| The app will not start           | `%LOCALAPPDATA%\ChargeWatch\logs\`; run the installed exe with `--self-check` |
+| A history file looks damaged     | `npm run db:probe -- --file <path>` — read-only, safe                         |
+| An update was refused            | `docs/UPDATES_AND_RECOVERY.md`; the rejection code names the exact check      |
+| Packaging produced something odd | `npm run verify:package` names the fault and the fix                          |
 
 ---
 

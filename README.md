@@ -12,22 +12,22 @@ browser and its own database.
 
 ## ⚠ Current status: not installable yet
 
-**There is no download.** No release has been published, and the installer has
-never been built, because the work was done in an environment with no Windows
-host and no access to the npm registry.
+**There is no download.** No release has been published. The application itself
+runs — `release\win-unpacked\ChargeWatch.exe` launches — but the one installer
+ever produced crashes on install, and that is the blocker. `docs/HANDOFF.md`
+section 1a states both open failures without varnish.
 
-What exists today is the complete source, 380 passing specs that run with
-nothing installed, and a build and release pipeline that has not yet been
-executed on Windows.
-
-| | |
-| --- | --- |
-| Specs passing | 380, via `npm run test:nodeps` — no install required |
-| Typechecked | **No.** `npm run typecheck` has never run |
-| Built | **No** |
-| Packaged | **No** — but every prerequisite is now in place; see below |
-| Collecting data | **No** — no source has been cleared for automated collection |
-| Station catalog | **Not bundled** — inventing station rows was not an option |
+|                 |                                                                     |
+| --------------- | ------------------------------------------------------------------- |
+| Specs passing   | 413, via `npm run test:nodeps` (no install) and `npm test` (Vitest) |
+| UI specs        | 42 passing, via `npm run test:e2e` against the built renderer       |
+| Typechecked     | **Yes**, `npm run typecheck` is clean                               |
+| Linted          | **Yes**, `npm run lint` and `npm run format` are clean              |
+| Built           | **Yes** — bundles on Linux; `win-unpacked` runs on Windows          |
+| Packaged        | **Once** — 328 MB installer, passes `verify:package`                |
+| Installs        | **No** — exits `STATUS_HEAP_CORRUPTION`; cause not established      |
+| Collecting data | **No** — no source has been cleared for automated collection        |
+| Station catalog | **Not bundled** — inventing station rows was not an option          |
 
 `docs/VERIFICATION_REPORT.md` has the item-by-item scorecard, including what was
 tested, what was not, and why. `docs/IMPLEMENTATION_STATUS.md` is the resume
@@ -64,7 +64,7 @@ This is the part worth reading before you decide whether it is useful to you.
 
 **It cannot report charging sessions.** No public status page says who plugged
 in, for how long, or how much energy was delivered. ChargeWatch sees counts of
-ports in each state, at the moments it looked. From that it can *infer*
+ports in each state, at the moments it looked. From that it can _infer_
 occupancy episodes, and it labels them as inferred, with the uncertainty at both
 ends. It will never describe an inferred episode as a recorded session.
 
@@ -96,7 +96,7 @@ for the bundled browser.
 From a clean clone, with nothing installed:
 
 ```powershell
-npm run test:nodeps      # 380 specs, no dependencies needed
+npm run test:nodeps      # 413 specs, no dependencies needed
 npm run check:migrations # confirms the embedded schema matches the SQL files
 ```
 
@@ -115,19 +115,19 @@ Runs the whole chain — toolchain checks, specs, icons, install, typecheck,
 browser payload, build, package, verify, install and self-check — stopping at
 the first real failure with an explanation of what it means. Safe to re-run.
 
-**Expect the typecheck step to fail the first time.** It has never been run on
-this codebase, and the renderer has never been parsed by anything. That is the
-most valuable output the script produces, not a sign of a broken setup. Pass
-`-SkipTypecheck` to reach a build while you work through it.
+The typecheck step is clean, on Windows and on Linux. Pass `-SkipTypecheck` only
+if you are deliberately racing to a build.
 
 ### Or step by step
 
 ```powershell
-npm install              # writes package-lock.json; commit it
-npm run typecheck        # NEVER RUN — expect real errors on first attempt
-npm run verify           # migrations, specs, format, lint, types
+npm ci                   # package-lock.json is committed; use ci, not install
+npm run typecheck        # clean
+npm run verify           # migrations, icons, specs, format, lint, types
+npm test                 # the same specs under Vitest
 npm run setup:browser    # downloads and stages the Chromium payload (~200 MB)
 npm run build
+npm run test:e2e         # 42 UI specs; needs the renderer built by the line above
 npm run package:win      # produces release\ChargeWatch-Setup-<version>.exe
 npm run verify:package   # checks the package for the faults that only show up on a user's machine
 ```
@@ -163,11 +163,11 @@ Everything is under your local application data folder — never inside the
 install directory, so an update or an uninstall cannot take it with it.
 Uninstalling **keeps** your history; removing it is a separate, explicit action.
 
-| | |
-| --- | --- |
+|         |                                                          |
+| ------- | -------------------------------------------------------- |
 | History | `%LOCALAPPDATA%\ChargeWatch\database\chargewatch.sqlite` |
-| Backups | `%LOCALAPPDATA%\ChargeWatch\backups\` |
-| Logs | `%LOCALAPPDATA%\ChargeWatch\logs\` |
+| Backups | `%LOCALAPPDATA%\ChargeWatch\backups\`                    |
+| Logs    | `%LOCALAPPDATA%\ChargeWatch\logs\`                       |
 
 Open the folder from **Settings → Data and backups → Open data folder**.
 
@@ -199,22 +199,22 @@ own signature check. `docs/UPDATES_AND_RECOVERY.md` explains both.
 
 ## Documentation
 
-| | |
-| --- | --- |
-| [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) | What is done, what is blocked, what is next |
-| [VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md) | What was actually tested, item by item |
-| [HANDOFF.md](docs/HANDOFF.md) | Picking this up from here |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Processes, workers, IPC, security, build topology |
-| [DATA_MODEL.md](docs/DATA_MODEL.md) | The schema, and which columns exist to make dishonesty impossible |
-| [METRICS.md](docs/METRICS.md) | How every number is computed, and what each one does not mean |
-| [SOURCES.md](docs/SOURCES.md) | Which sources exist and the eligibility basis for each |
-| [SOURCE_VERIFICATION.md](docs/SOURCE_VERIFICATION.md) | The process for clearing a source for collection |
-| [BUILDING.md](docs/BUILDING.md) | Full build instructions and failure modes |
-| [TESTING.md](docs/TESTING.md) | What each suite covers and what none of them cover |
-| [RELEASING.md](docs/RELEASING.md) | Signing, verification, and the manual steps that stay manual |
-| [UPDATES_AND_RECOVERY.md](docs/UPDATES_AND_RECOVERY.md) | Update verification, backups, restore, recovery |
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | Using the application, and how to read what it shows |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Symptoms, causes, fixes |
+|                                                           |                                                                   |
+| --------------------------------------------------------- | ----------------------------------------------------------------- |
+| [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) | What is done, what is blocked, what is next                       |
+| [VERIFICATION_REPORT.md](docs/VERIFICATION_REPORT.md)     | What was actually tested, item by item                            |
+| [HANDOFF.md](docs/HANDOFF.md)                             | Picking this up from here                                         |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)                   | Processes, workers, IPC, security, build topology                 |
+| [DATA_MODEL.md](docs/DATA_MODEL.md)                       | The schema, and which columns exist to make dishonesty impossible |
+| [METRICS.md](docs/METRICS.md)                             | How every number is computed, and what each one does not mean     |
+| [SOURCES.md](docs/SOURCES.md)                             | Which sources exist and the eligibility basis for each            |
+| [SOURCE_VERIFICATION.md](docs/SOURCE_VERIFICATION.md)     | The process for clearing a source for collection                  |
+| [BUILDING.md](docs/BUILDING.md)                           | Full build instructions and failure modes                         |
+| [TESTING.md](docs/TESTING.md)                             | What each suite covers and what none of them cover                |
+| [RELEASING.md](docs/RELEASING.md)                         | Signing, verification, and the manual steps that stay manual      |
+| [UPDATES_AND_RECOVERY.md](docs/UPDATES_AND_RECOVERY.md)   | Update verification, backups, restore, recovery                   |
+| [USER_GUIDE.md](docs/USER_GUIDE.md)                       | Using the application, and how to read what it shows              |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)             | Symptoms, causes, fixes                                           |
 
 ---
 

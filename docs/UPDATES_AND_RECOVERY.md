@@ -13,8 +13,8 @@ leaves your installation and your history exactly as they were.
 
 **The manifest signature.** Each release carries `release-manifest.json` and a
 detached Ed25519 signature over the **exact bytes of that file**. It is verified
-against a public key embedded in your installed copy, *before the manifest is
-parsed*. An attacker who can modify the release cannot produce a valid
+against a public key embedded in your installed copy, _before the manifest is
+parsed_. An attacker who can modify the release cannot produce a valid
 signature without the private key, which never leaves the maintainer's machine.
 
 **What the manifest claims.** The application id, platform, architecture and
@@ -48,8 +48,8 @@ Never while you are in the middle of something.
 Installation waits for the window to have been hidden for a while, no
 maintenance operation to be running (a backup, a restore, an export, an import),
 and the OS not to be shutting down or signing you out. If any of those does not
-hold, the update stays ready and is offered from the tray instead: *Restart to
-update to …*.
+hold, the update stays ready and is offered from the tray instead: _Restart to
+update to …_.
 
 Before installing, ChargeWatch stops the collector cleanly, records a gap for
 the installation period — that time genuinely was not observed — and takes a
@@ -66,7 +66,7 @@ the source of the download.
 
 This is separate from, and weaker than, ChargeWatch's own signature check. Code
 signing certifies who built the installer to Windows; ChargeWatch's Ed25519
-check certifies to your *installed copy* that an update came from the same
+check certifies to your _installed copy_ that an update came from the same
 maintainer as the version you already trust. The second is the one that protects
 your history.
 
@@ -75,13 +75,13 @@ your history.
 The refusal names the specific check that failed, in **Settings → Updates**.
 The common ones:
 
-| What you see | What it means | What to do |
-| --- | --- | --- |
-| Signature could not be verified | The manifest was not signed by a key your copy trusts | Do not install it manually. Report it. |
-| This release is older than one already installed | Sequence replay | Nothing. You already have something newer. |
-| Your history file is newer than this version can read | You previously ran a newer version | Install the newer version instead |
-| An intermediate version is required first | The upgrade path skips a data migration | Install the named version, then update again |
-| Download did not match the expected file | Truncated or substituted download | Retry. If it persists, report it. |
+| What you see                                          | What it means                                         | What to do                                   |
+| ----------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------- |
+| Signature could not be verified                       | The manifest was not signed by a key your copy trusts | Do not install it manually. Report it.       |
+| This release is older than one already installed      | Sequence replay                                       | Nothing. You already have something newer.   |
+| Your history file is newer than this version can read | You previously ran a newer version                    | Install the newer version instead            |
+| An intermediate version is required first             | The upgrade path skips a data migration               | Install the named version, then update again |
+| Download did not match the expected file              | Truncated or substituted download                     | Retry. If it persists, report it.            |
 
 A refused update is a working safety mechanism. The right response is never to
 bypass it.
@@ -164,11 +164,11 @@ are the last check.
 
 ## Where your data is, and what removes it
 
-| | |
-| --- | --- |
+|         |                                                          |
+| ------- | -------------------------------------------------------- |
 | History | `%LOCALAPPDATA%\ChargeWatch\database\chargewatch.sqlite` |
-| Backups | `%LOCALAPPDATA%\ChargeWatch\backups\` |
-| Logs | `%LOCALAPPDATA%\ChargeWatch\logs\` |
+| Backups | `%LOCALAPPDATA%\ChargeWatch\backups\`                    |
+| Logs    | `%LOCALAPPDATA%\ChargeWatch\logs\`                       |
 
 All of it lives outside the install directory, so updating or uninstalling
 cannot take it with it.
