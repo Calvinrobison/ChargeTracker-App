@@ -1,4 +1,11 @@
 {
   "formatVersion": 1,
-  "keys": []
+  "keys": [
+    {
+      "keyId": "cw-2026-09",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA4JcdCyYhj8QEjQHgP2kC2LHWwxt7vHrTL/mUnr3Ma9g=\n-----END PUBLIC KEY-----\n",
+      "retired": false,
+      "createdAt": "2026-09-18T20:08:25.786Z"
+    }
+  ]
 }
