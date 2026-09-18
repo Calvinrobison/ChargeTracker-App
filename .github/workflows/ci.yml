@@ -51,8 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
-      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+      - uses: actions/checkout@v7 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v7 # TODO: pin to a commit SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -71,8 +71,8 @@ jobs:
     timeout-minutes: 20
     needs: specs-no-install
     steps:
-      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
-      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+      - uses: actions/checkout@v7 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v7 # TODO: pin to a commit SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -97,8 +97,8 @@ jobs:
     timeout-minutes: 45
     needs: checks
     steps:
-      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
-      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+      - uses: actions/checkout@v7 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v7 # TODO: pin to a commit SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -109,7 +109,7 @@ jobs:
       # The Chromium payload is cached by its resolved Playwright version, so
       # ordinary pushes do not re-download 200 MB.
       - name: Cache the bundled browser
-        uses: actions/cache@v4 # TODO: pin to a commit SHA
+        uses: actions/cache@v6 # TODO: pin to a commit SHA
         with:
           path: .playwright-cache
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -138,7 +138,7 @@ jobs:
 
       - name: Upload the package report
         if: always()
-        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        uses: actions/upload-artifact@v7 # TODO: pin to a commit SHA
         with:
           name: package-report
           path: |
@@ -149,7 +149,7 @@ jobs:
 
       - name: Upload failure diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        uses: actions/upload-artifact@v7 # TODO: pin to a commit SHA
         with:
           name: failure-diagnostics
           path: |
@@ -168,8 +168,8 @@ jobs:
     timeout-minutes: 25
     needs: checks
     steps:
-      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
-      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+      - uses: actions/checkout@v7 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v7 # TODO: pin to a commit SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload failure screenshots
         if: failure()
-        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        uses: actions/upload-artifact@v7 # TODO: pin to a commit SHA
         with:
           name: ui-failures
           path: |
