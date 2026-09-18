@@ -16,7 +16,7 @@
  *    challenge pauses the source; it is never worked around.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { Browser, BrowserContext, Page } from 'playwright-core';
@@ -54,21 +54,75 @@ export function resolveBundledChromium(options: {
   readonly developmentBrowserDir: string;
   readonly platform: NodeJS.Platform;
 }): { path: string; found: boolean; searched: readonly string[] } {
-  const executable = options.platform === 'win32' ? 'chrome.exe' : 'chrome';
-  const candidates = options.isPackaged
-    ? [
-        join(options.resourcesPath, 'browser', 'chrome-win', executable),
-        join(options.resourcesPath, 'browser', executable),
-      ]
-    : [
-        join(options.developmentBrowserDir, 'chrome-win', executable),
-        join(options.developmentBrowserDir, executable),
-      ];
+  const root = options.isPackaged
+    ? join(options.resourcesPath, 'browser')
+    : options.developmentBrowserDir;
+  const candidates = chromiumCandidates(root, options.platform);
 
   for (const candidate of candidates) {
     if (existsSync(candidate)) return { path: candidate, found: true, searched: candidates };
   }
   return { path: candidates[0] as string, found: false, searched: candidates };
+}
+
+/**
+ * The paths a Chromium payload may occupy under `root`, in the order they are
+ * tried.
+ *
+ * Playwright writes `chromium-<revision>/chrome-win64/chrome.exe`, and the
+ * revision changes with every Playwright upgrade, so the layout cannot be a
+ * pair of constants. An earlier version of this function hard-coded
+ * `chrome-win/chrome.exe` and `chrome.exe`; the package contained
+ * `chromium-1243/chrome-win64/chrome.exe` and the application could not find a
+ * browser it was shipping.
+ *
+ * Both build-time checks missed it because both searched RECURSIVELY for a
+ * file named chrome.exe. They answered "a browser is in the package", which
+ * was true and useless — the question that matters is whether it is where the
+ * application looks. `scripts/lib/browser-layout.mjs` mirrors this list so
+ * those checks now ask that instead.
+ *
+ * Revision directories are tried newest-first by sorting descending, so a
+ * stale payload left beside a current one cannot win.
+ */
+export function chromiumCandidates(
+  root: string,
+  platform: NodeJS.Platform,
+): readonly string[] {
+  const executable = platform === 'win32' ? 'chrome.exe' : 'chrome';
+  // Windows x64 builds use chrome-win64; older and 32-bit ones use chrome-win.
+  // macOS nests the binary inside the app bundle.
+  const subdirectories =
+    platform === 'darwin'
+      ? [join('chrome-mac', 'Chromium.app', 'Contents', 'MacOS'), 'chrome-mac']
+      : platform === 'win32'
+        ? ['chrome-win64', 'chrome-win']
+        : ['chrome-linux64', 'chrome-linux'];
+
+  const direct = [
+    ...subdirectories.map((sub) => join(root, sub, executable)),
+    join(root, executable),
+  ];
+
+  let revisions: string[] = [];
+  try {
+    revisions = readdirSync(root, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith('chromium'))
+      .map((entry) => entry.name)
+      .sort()
+      .reverse();
+  } catch {
+    // The root may not exist yet. The direct candidates are still worth
+    // reporting, so the caller can say what it looked for.
+    revisions = [];
+  }
+
+  const nested = revisions.flatMap((revision) => [
+    ...subdirectories.map((sub) => join(root, revision, sub, executable)),
+    join(root, revision, executable),
+  ]);
+
+  return [...direct, ...nested];
 }
 
 export type PageHealth = 'healthy' | 'recycle';

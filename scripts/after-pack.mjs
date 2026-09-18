@@ -10,20 +10,36 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { chromiumCandidates } from './lib/browser-layout.mjs';
+
 /** @param {{appOutDir: string, electronPlatformName: string}} context */
 export default async function afterPack(context) {
   const resources = join(context.appOutDir, 'resources');
   const problems = [];
 
-  // 1. The bundled browser, outside app.asar.
+  // 1. The bundled browser, outside app.asar, AT A PATH THE APP LOOKS IN.
+  //
+  // This used to search the tree for any file named chrome.exe. It passed on a
+  // package whose browser the application could not find, because the payload
+  // sat at chromium-1243/chrome-win64/ and the resolver looked at chrome-win/.
+  // Asking the same question the app asks is the only version of this check
+  // that is worth running.
   const executable = context.electronPlatformName === 'win32' ? 'chrome.exe' : 'chrome';
   const browserRoot = join(resources, 'browser');
-  const found = existsSync(browserRoot) ? findFile(browserRoot, executable, 0) : null;
+  const candidates = chromiumCandidates(browserRoot, context.electronPlatformName);
+  const found = candidates.find((candidate) => existsSync(candidate)) ?? null;
   if (!found) {
+    const strayCopy = existsSync(browserRoot) ? findFile(browserRoot, executable, 0) : null;
     problems.push(
-      `The bundled browser is missing: no ${executable} under ${browserRoot}.\n` +
-        '    Run "npm run setup:browser" and package again. The app must not download a\n' +
-        '    browser at first run.',
+      strayCopy
+        ? `The bundled browser is in the package but NOT where the application looks.\n` +
+          `    Found:   ${strayCopy}\n` +
+          `    Wanted:  ${candidates.slice(0, 3).join('\n             ')}\n` +
+          '    Either the payload layout or chromiumCandidates() in\n' +
+          '    src/collector/browser.ts needs to change - they have diverged.'
+        : `The bundled browser is missing: no ${executable} under ${browserRoot}.\n` +
+          '    Run "npm run setup:browser" and package again. The app must not download a\n' +
+          '    browser at first run.',
     );
   }
 

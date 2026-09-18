@@ -40,6 +40,68 @@ this branch has been typechecked or built.
 
 ---
 
+## 1a. Read this before anything else: the two open failures
+
+The application **runs**. `release\win-unpacked\ChargeWatch.exe` launches. What
+is not resolved is packaging it and installing it, and two attempts to explain
+the packaging failure were wrong before the third one was accepted as unknown.
+The honest state:
+
+### Open A - the installer crashes on install (`I0`)
+
+`ChargeWatch-Setup-0.1.0.exe` built once, at 328 MB, passed
+`npm run verify:package` 10/10, and then exited **-1073740940**
+(`STATUS_HEAP_CORRUPTION`) on a silent install. Nothing was installed.
+
+**Cause not established.** It has been wrongly attributed twice: to
+differential packaging, and to a 32-bit 7-Zip. Neither survives its own
+evidence, and both retractions are recorded in `VERIFICATION_REPORT.md`
+criterion 14. The single most useful next step is an **interactive** run - `/S`
+suppressed whatever the installer wanted to say - and the faulting module from
+the Windows Application log. `docs/TROUBLESHOOTING.md` has the sequence.
+
+### Open B - packaging fails to compress (`I0b`)
+
+With `differentialPackage: false`, 7-Zip dies on `Can't allocate required
+memory!`. Observed at `-mx=9` and `-mx=5`, with the bundled 32-bit compressor
+and with a 64-bit 7-Zip 26.03, on a machine with 12 logical processors, 15.8 GB
+RAM and 5.9 GB free. **A 16 MB dictionary failing with 5.9 GB free is not
+explained by any theory offered so far.**
+
+`differentialPackage` is now `true`, which pins the dictionary to 1 MB and is
+the only configuration that has ever produced an installer here. That is a
+workaround standing on one observation, not a fix.
+`scripts\windows\diagnose-7z.ps1` measures the question properly - commit
+limit, page file, then a ladder of settings run directly against
+`release\win-unpacked` - and changes nothing.
+
+### The thing under both of them (`I0c`)
+
+432 MB of the 814 MiB payload is a complete second Chromium, shipped beside the
+one already inside Electron, for a collector that **cannot currently run** -
+no source is cleared for collection (`docs/SOURCES.md`). It is most of the
+installer's size and the reason there is so much to compress. Whether to keep
+bundling it, drive collection through Electron's own browser, or fetch it on
+first use is a product decision nobody has made. It is written down rather than
+quietly carried.
+
+### A caution about this repository's checks
+
+The browser-path defect is worth understanding before trusting any green
+result here. The application shipped a 432 MB browser and could not find it:
+the resolver looked at `resources/browser/chrome-win/chrome.exe`, the payload
+was at `resources/browser/chromium-1243/chrome-win64/chrome.exe`. Both
+build-time checks passed, because both searched the tree recursively for a
+file named `chrome.exe` instead of asking whether it was where the application
+looks. `verify:package` reported "Package looks releasable" on a package whose
+first line of output was `the bundled browser was not found`.
+
+Both checks now use `scripts/lib/browser-layout.mjs`, the same candidate list
+the app walks, and a spec asserts the two agree. Apply the same suspicion to
+the rest: a check that cannot fail the way the product fails is decoration.
+
+---
+
 ## 2. The first hour
 
 Run these in order. Each one is expected to find something.

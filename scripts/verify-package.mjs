@@ -26,6 +26,8 @@ import { closeSync, existsSync, openSync, readSync, readdirSync, readFileSync, s
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { chromiumCandidates } from './lib/browser-layout.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
@@ -114,10 +116,18 @@ if (!unpacked) {
 
   const resources = join(unpacked, 'resources');
 
-  // 1. Bundled Chromium, outside app.asar.
+  // 1. Bundled Chromium, outside app.asar, at a path the application looks in.
+  //
+  // Finding a chrome.exe anywhere under resources/browser is not the question.
+  // A package once passed that test and then reported "the bundled browser was
+  // not found" as its first line of output. chromiumCandidates() is the list
+  // the app itself walks.
   const chromeName = process.platform === 'win32' ? 'chrome.exe' : 'chrome';
-  const browserFiles = walk(join(resources, 'browser'), 0, 4);
-  const chromium = browserFiles.find((file) => file.endsWith(chromeName));
+  const browserRoot = join(resources, 'browser');
+  const browserFiles = walk(browserRoot, 0, 4);
+  const candidates = chromiumCandidates(browserRoot, process.platform);
+  const chromium = candidates.find((candidate) => existsSync(candidate));
+  const strayChromium = chromium ? null : browserFiles.find((file) => file.endsWith(chromeName));
   if (chromium) {
     const bytes = browserFiles.reduce((sum, file) => {
       try {
@@ -131,11 +141,18 @@ if (!unpacked) {
       'PASS',
       `${chromium} (${(bytes / (1024 * 1024)).toFixed(0)} MB)`,
     );
+  } else if (strayChromium) {
+    record(
+      'bundled Chromium present outside app.asar',
+      'FAIL',
+      `${strayChromium} exists, but the application looks at ${candidates[0]}. ` +
+        'The payload layout and chromiumCandidates() in src/collector/browser.ts have diverged.',
+    );
   } else {
     record(
       'bundled Chromium present outside app.asar',
       'FAIL',
-      `no ${chromeName} under ${join(resources, 'browser')}. Run npm run setup:browser and repackage.`,
+      `no ${chromeName} under ${browserRoot}. Run npm run setup:browser and repackage.`,
     );
   }
 
