@@ -100,11 +100,11 @@ nsis:
   # KNOWN SIDE EFFECT. With differentialPackage ON, electron-builder forces
   # the 7z dictionary down to 1 MB (configureDifferentialAwareArchiveOptions
   # in app-builder-lib, so blocks stay small enough to delta). Turning it off
-  # restores the default -mx=9 dictionary of 64 MB, which needs ~700 MB of
-  # encoder memory -- and electron-builder's bundled 7za.exe is 32-bit, so it
-  # cannot allocate that. Packaging fails with "Can't allocate required
-  # memory!" until a 64-bit 7-Zip is used; scripts/windows/build-all.ps1 sets
-  # ELECTRON_BUILDER_7ZIP_PATH to one.
+  # restores the -mx=9 default of 64 MB per encoder thread, which this payload
+  # cannot allocate: packaging fails with "Can't allocate required memory!".
+  # scripts/windows/build-all.ps1 compensates with
+  # ELECTRON_BUILDER_COMPRESSION_LEVEL=5. The 1 MB dictionary was masking how
+  # large the payload has become; it did not make it acceptable.
   #
   # Note what this does NOT explain. The build that produced the installer
   # exiting with STATUS_HEAP_CORRUPTION (-1073740940) had this setting ON, so

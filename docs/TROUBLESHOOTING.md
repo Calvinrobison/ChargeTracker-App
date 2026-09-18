@@ -54,35 +54,36 @@ Add new data to archive: 16 folders, 391 files, 852798390 bytes (814 MiB)
 ERROR: Can't allocate required memory!
 ```
 
-**`(x86)` is the whole story.** electron-builder bundles a 32-bit `7za.exe`.
-At `-mx=9` 7-Zip picks a 64 MB LZMA dictionary, which needs around 700 MB of
-encoder memory — beyond what a 32-bit process can address, regardless of how
-much RAM the machine has. Installing more memory does not help.
+It means what it says: 7-Zip could not get the memory it wanted. `-mx=9` picks
+a 64 MB LZMA2 dictionary and runs one encoder per logical processor, each
+holding roughly 10.5× the dictionary — about 675 MB per thread. Twelve cores is
+around 8 GB for a single archive.
 
-It appeared when `differentialPackage` was turned off. That is not a
-coincidence: with differential packaging on, electron-builder forces the
-dictionary down to 1 MB so update blocks stay small, which kept the 32-bit
-compressor well inside its limits. Turning it off restored the default.
-
-Install a 64-bit 7-Zip and re-run the build script, which picks it up
-automatically:
+Lower the dictionary:
 
 ```powershell
-winget install --id 7zip.7zip -e
-.\scripts\windows\build-all.ps1
+$env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'
+npm run package:win
 ```
 
-Running `npm run package:win` by hand skips that wiring. Point it at the
-executable yourself — note that **`USE_SYSTEM_7ZA` no longer exists**; it was
-removed in electron-builder 26 and silently does nothing:
+`scripts/windows/build-all.ps1` does this for you, and prints the machine's
+core count and free memory beside it so a recurrence arrives with evidence.
 
-```powershell
-$env:ELECTRON_BUILDER_7ZIP_PATH = 'C:\Program Files\7-Zip\7z.exe'
-```
+**The `(x86)` in the banner is a red herring.** The bundled `7za.exe` is indeed
+32-bit, and it was blamed for this first. A 64-bit 7-Zip 26.03 fails at exactly
+the same point on the same payload. A 64-bit compressor is still preferable —
+the 32-bit one adds a 2 GB ceiling on top of the real constraint — but it does
+not fix this on its own. Note also that `USE_SYSTEM_7ZA` was removed in
+electron-builder 26 and is ignored silently; the replacement is
+`ELECTRON_BUILDER_7ZIP_PATH`, an absolute path to an executable.
 
-With no 64-bit 7-Zip available, `$env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'`
-drops the dictionary to 16 MB and gets through, at the cost of a larger
-installer. The build script falls back to this on its own.
+This appeared when `differentialPackage` was turned off, because differential
+packaging pins the dictionary to 1 MB so update blocks stay small. That had
+been masking the problem, not preventing it.
+
+The underlying reason there is so much to compress is that the payload carries
+a complete second Chromium — 432 MB of the 814 MiB — beside the one already
+inside Electron.
 
 **The installer exits with code -1073740940 (0xC0000374).**
 

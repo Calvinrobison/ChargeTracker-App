@@ -10,38 +10,44 @@ What you need, what each command does, and what to do when one fails.
 | Node | 22.12 or newer. The specs need 22.6+ for `--experimental-strip-types` and `node:sqlite`; the build is pinned to 22.12 in CI. |
 | Disk | ~1 GB free — the bundled Chromium payload is around 200 MB before packaging and again inside the installer. |
 | Network | The npm registry and the Playwright CDN, once. After that the build is offline. |
-| 7-Zip | **Required for packaging.** `winget install --id 7zip.7zip -e`. See below. |
+| 7-Zip | Optional but preferred: `winget install --id 7zip.7zip -e`. See below. |
 
-### Packaging needs a 64-bit 7-Zip
+### Packaging is compressed at level 5, not 9
 
-electron-builder bundles its own `7za.exe`, and that binary reports itself as
-`7-Zip (a) 24.09 (x86)` — **32-bit**. At `-mx=9` 7-Zip picks a 64 MB LZMA
-dictionary, which costs roughly 700 MB of encoder memory: more address space
-than a 32-bit process has. It fails with:
+electron-builder invokes 7-Zip with `-mx=9` and no other tuning. At that level
+7-Zip picks a 64 MB LZMA2 dictionary *and* compresses blocks in parallel across
+every logical processor, each thread holding its own encoder state of roughly
+10.5× the dictionary — about 675 MB each. On a many-core machine that is well
+past 8 GB for one archive, and it fails:
 
 ```
 ERROR: Can't allocate required memory!
 ```
 
-This only surfaced when `differentialPackage` was turned off. Differential
-packaging forces the dictionary to 1 MB so update blocks stay small, which had
-been keeping the 32-bit compressor comfortably inside its limits.
+`scripts/windows/build-all.ps1` sets `ELECTRON_BUILDER_COMPRESSION_LEVEL=5`,
+a 16 MB dictionary and roughly 170 MB per thread. The installer is larger than
+it would be at level 9. It also prints the machine's core count and free memory
+at the packaging step, so a future failure here arrives with its own evidence.
 
-`scripts/windows/build-all.ps1` looks for a system 7-Zip and sets
-`ELECTRON_BUILDER_7ZIP_PATH` to it. If none is installed it falls back to
-`ELECTRON_BUILDER_COMPRESSION_LEVEL=5` — a 16 MB dictionary, a larger
-installer — and says so rather than failing obscurely.
-
-Running `npm run package:win` on its own gets none of that. Do it by hand:
+To package by hand:
 
 ```powershell
-$env:ELECTRON_BUILDER_7ZIP_PATH = 'C:\Program Files\7-Zip\7z.exe'
+$env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'
+npm run package:win
 ```
 
-**`USE_SYSTEM_7ZA` does not work.** It was removed in electron-builder 26 and
-is ignored silently; the replacement is `ELECTRON_BUILDER_7ZIP_PATH`, which
-takes an absolute path to the executable rather than a name on `PATH`
+**The bundled 7-Zip is 32-bit**, which caps it at 2 GB across all threads, so
+the script also points `ELECTRON_BUILDER_7ZIP_PATH` at a system 7-Zip when one
+is installed. That is a precaution, not the fix: a 64-bit 7-Zip 26.03 failed at
+`-mx=9` in exactly the same place. Note that `USE_SYSTEM_7ZA` was removed in
+electron-builder 26 and is now ignored silently; the replacement takes an
+absolute path to an executable rather than a name on `PATH`
 (`app-builder-lib/out/toolsets/7zip.js`).
+
+**This is a symptom.** The payload is 814 MiB, of which 432 MB is a complete
+second Chromium shipped beside the one already inside Electron. Nothing else in
+the build is remotely that size. Lowering the compression level makes the build
+complete; it does not make that reasonable.
 
 ### There is no native module
 

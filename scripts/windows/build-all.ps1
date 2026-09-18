@@ -281,16 +281,44 @@ if ($StopAfter -eq 'build') {
 
 Write-Step 'Package'
 
-# electron-builder's bundled 7za.exe reports "7-Zip (a) 24.09 (x86)" -- a
-# 32-bit process. Compressing this payload at -mx=9 lets 7-Zip pick a 64 MB
-# LZMA dictionary, which needs roughly 700 MB of encoder memory: more address
-# space than a 32-bit process has, whatever the machine's RAM. It fails with
-# "Can't allocate required memory!".
+# MEMORY, NOT ARCHITECTURE.
 #
-# USE_SYSTEM_7ZA was removed in electron-builder 26. The override is now
-# ELECTRON_BUILDER_7ZIP_PATH, which takes an absolute path to an EXECUTABLE
-# FILE (app-builder-lib/out/toolsets/7zip.js -> resolveEnvToolsetPath). A
-# system 7z.exe is 64-bit and accepts the same arguments.
+# electron-builder invokes 7-Zip with "-mx=9" and nothing else. At that level
+# 7-Zip chooses a 64 MB LZMA2 dictionary AND compresses blocks in parallel on
+# every logical processor, and each of those threads wants its own encoder
+# state of roughly 10.5x the dictionary -- about 675 MB apiece. On a machine
+# with a dozen or more cores that is well over 8 GB for a single archive
+# operation, and 7-Zip gives up with:
+#
+#     ERROR: Can't allocate required memory!
+#
+# The bundled 7za.exe is 32-bit, which also caps it at 2 GB, so it was the
+# first suspect. It was wrong: a 64-bit 7-Zip 26.03 fails in exactly the same
+# place on the same payload. Architecture was never the binding constraint.
+#
+# -mx=5 uses a 16 MB dictionary -- about 170 MB per thread -- which fits. The
+# installer comes out larger. The real fix is not compressing 814 MiB in the
+# first place: 432 MB of that is a second Chromium shipped beside Electron's
+# own. See docs/BUILDING.md.
+$cpuInfo = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+$osInfo = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
+if ($cpuInfo -and $osInfo) {
+  $totalGb = [math]::Round($cpuInfo.TotalPhysicalMemory / 1GB, 1)
+  $freeGb = [math]::Round($osInfo.FreePhysicalMemory / 1MB, 1)
+  $cores = $cpuInfo.NumberOfLogicalProcessors
+  Write-Note "machine: $cores logical processors, $totalGb GB RAM, $freeGb GB free"
+}
+
+if (-not $env:ELECTRON_BUILDER_COMPRESSION_LEVEL) {
+  $env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'
+  Write-Good 'compressing at level 5 (16 MB dictionary) so the archive fits in memory'
+  Write-Note 'level 9 wants a 64 MB dictionary per thread and cannot allocate it'
+}
+
+# A 64-bit 7-Zip is still preferable at any level: the bundled one is 32-bit
+# and shares a 2 GB address space across all its threads. USE_SYSTEM_7ZA was
+# removed in electron-builder 26; the override is ELECTRON_BUILDER_7ZIP_PATH,
+# an absolute path to an executable file.
 if (-not $env:ELECTRON_BUILDER_7ZIP_PATH) {
   $systemSevenZip = @(
     (Join-Path $env:ProgramFiles '7-Zip\7z.exe'),
@@ -300,23 +328,7 @@ if (-not $env:ELECTRON_BUILDER_7ZIP_PATH) {
 
   if ($systemSevenZip) {
     $env:ELECTRON_BUILDER_7ZIP_PATH = $systemSevenZip
-    Write-Good "using 64-bit 7-Zip for compression ($systemSevenZip)"
-    Write-Note 'the bundled 7za is 32-bit and cannot address the memory -mx=9 needs'
-  } else {
-    # Without a 64-bit compressor the only way through is a smaller dictionary.
-    # -mx=5 uses a 16 MB dictionary, which a 32-bit process can allocate. The
-    # installer comes out larger; that is the trade, and it is stated rather
-    # than made silently.
-    $env:ELECTRON_BUILDER_COMPRESSION_LEVEL = '5'
-    Write-Host ''
-    Write-Host '   7-Zip is not installed. Falling back to compression level 5 so' -ForegroundColor Yellow
-    Write-Host '   the bundled 32-bit compressor can allocate its dictionary. The' -ForegroundColor Yellow
-    Write-Host '   installer will be noticeably larger than it needs to be.' -ForegroundColor Yellow
-    Write-Host ''
-    Write-Host '   For a properly compressed installer:' -ForegroundColor Yellow
-    Write-Host '     winget install --id 7zip.7zip -e' -ForegroundColor Gray
-    Write-Host ''
-    Write-Host '   docs/TROUBLESHOOTING.md explains why.' -ForegroundColor Yellow
+    Write-Good "using 64-bit 7-Zip ($systemSevenZip)"
   }
 }
 
