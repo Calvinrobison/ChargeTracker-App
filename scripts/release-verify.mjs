@@ -13,6 +13,13 @@
  *
  * Usage: node --experimental-strip-types scripts/release-verify.mjs --dir release
  *        (or: npm run release:verify -- --dir release)
+ *
+ * --installed-version  the version to test the upgrade path from (default
+ *                      0.0.1, which exercises the oldest-copy case). Checked
+ *                      against the manifest's minimumSupportedAppVersion and
+ *                      requiredIntermediateVersion.
+ * --highest-sequence   the highest release sequence a copy has already
+ *                      accepted, for the downgrade check (default 0).
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -22,9 +29,8 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
-const { verifyArtifactBytes, verifyManifest, UPDATE_PROTOCOL_VERSION } = await import(
-  join(root, 'src', 'shared', 'release-manifest.ts')
-);
+const { verifyArtifactBytes, verifyManifest, isDirectUpgradePermitted, UPDATE_PROTOCOL_VERSION } =
+  await import(join(root, 'src', 'shared', 'release-manifest.ts'));
 
 function arg(name, fallback = null) {
   const index = process.argv.indexOf(`--${name}`);
@@ -119,7 +125,9 @@ if (!result.ok) {
 }
 
 console.log(`  PASS  manifest signature verified with key ${result.keyId}`);
-console.log(`  PASS  release ${result.manifest.releaseVersion} (${result.manifest.tag}), sequence ${result.manifest.releaseSequence}`);
+console.log(
+  `  PASS  release ${result.manifest.releaseVersion} (${result.manifest.tag}), sequence ${result.manifest.releaseSequence}`,
+);
 
 let failed = false;
 for (const artifact of result.manifest.artifacts) {
@@ -161,14 +169,28 @@ if (!existsSync(metadataPath)) {
 }
 
 // Nothing dangerous in the upload set.
-const forbidden = availableArtifactNames.filter((name) =>
-  /(\.pem$|private|secret|\.env$|\.sqlite$)/i.test(name) && !/\.pub\.pem$/i.test(name),
+const forbidden = availableArtifactNames.filter(
+  (name) => /(\.pem$|private|secret|\.env$|\.sqlite$)/i.test(name) && !/\.pub\.pem$/i.test(name),
 );
 if (forbidden.length > 0) {
-  console.error(`  FAIL  the release directory contains files that must not be uploaded: ${forbidden.join(', ')}`);
+  console.error(
+    `  FAIL  the release directory contains files that must not be uploaded: ${forbidden.join(', ')}`,
+  );
   failed = true;
 } else {
   console.log('  PASS  no keys, credentials or databases in the upload set');
+}
+
+// The upgrade-path check the installed updater runs on exactly this manifest
+// (src/main/updates.ts). Without it this script accepted --installed-version and
+// ignored it, so a release that an installed copy would reject as skipping a
+// required migration still passed the gate this script is supposed to be.
+const upgrade = isDirectUpgradePermitted(result.manifest, installedVersion);
+if (upgrade.permitted) {
+  console.log(`  PASS  a copy running ${installedVersion} may install this release directly`);
+} else {
+  console.error(`  FAIL  upgrade path from ${installedVersion}: ${upgrade.reason}`);
+  failed = true;
 }
 
 console.log(
@@ -189,7 +211,9 @@ if (failed) {
 }
 
 console.log('\nThis release would be accepted by an installed ChargeWatch.');
-console.log('Remaining step:  npm run release:publish -- --tag ' + result.manifest.tag + ' --dry-run');
+console.log(
+  'Remaining step:  npm run release:publish -- --tag ' + result.manifest.tag + ' --dry-run',
+);
 console.log(
   '\nNote: this proves the release is internally consistent and correctly signed. It does NOT\n' +
     'prove GitHub permissions or asset availability — only an actual publish and a real client\n' +
