@@ -10,14 +10,17 @@ browser and its own database.
 
 ---
 
-## Current status: installs and runs, but has no data yet
+## Current status: installs and runs; collection not yet enabled
 
-**There is no download yet.** No release has been published. The application
-builds, installs and starts on Windows: as of 2026-09-18 a packaged installer
-exited 0, and the installed copy passes its own integrity self-check. What it
-does not yet have is data — no station catalog is bundled and no source is
-cleared for collection — so a fresh install shows an empty map.
-`docs/IMPLEMENTATION_STATUS.md` has the ordered roadmap.
+**No release has been published yet.** The application builds, installs and
+starts on Windows: as of 2026-09-18 a packaged installer exited 0 and the
+installed copy passes its own integrity self-check, and it now ships a catalog
+of 1083 charging locations within 50 miles of Mesa.
+
+What it still cannot do is **collect**. No source has been cleared for
+automated observation, so the map shows where the chargers are and nothing
+about how busy they are. `docs/IMPLEMENTATION_STATUS.md` has the ordered
+roadmap.
 
 |                 |                                                                     |
 | --------------- | ------------------------------------------------------------------- |
@@ -26,10 +29,10 @@ cleared for collection — so a fresh install shows an empty map.
 | Typechecked     | **Yes**, `npm run typecheck` is clean                               |
 | Linted          | **Yes**, `npm run lint` and `npm run format` are clean              |
 | Built           | **Yes** — on Linux and on Windows                                   |
-| Packaged        | **Yes** — 247 MB installer, `verify:package` 9/10                   |
+| Packaged        | **Yes** — 247 MB installer; `verify:package` 10/10 once keys exist  |
 | Installs        | **Yes** — exit 0; self-check passes from the installed copy         |
 | Signed          | **No** — unsigned, so Windows SmartScreen warns on download         |
-| Station catalog | **Not bundled** — inventing station rows was not an option          |
+| Station catalog | **Bundled** — 1083 locations within 50 miles of Mesa, from AFDC     |
 
 `docs/VERIFICATION_REPORT.md` has the item-by-item scorecard, including what was
 tested, what was not, and why. `docs/IMPLEMENTATION_STATUS.md` is the resume

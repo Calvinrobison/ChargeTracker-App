@@ -110,6 +110,13 @@ project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   worker produced roughly ten silent minutes and no report. The run now has a
   90 s ceiling and exits non-zero when it expires.
 
+- **A bundled station catalog.** 1083 charging locations within 50 miles of
+  Mesa, built from the AFDC Arizona export and shipped in `resources/catalog`
+  with a `provenance.json` recording the retrieval date, origin, licence,
+  attribution, file hash and field mapping. The first run of that mapping
+  against a genuine AFDC file accepted 1083 of 1652 rows with zero bad
+  coordinates and zero duplicates.
+
 ### Known limitations
 
 No release has been published. Live collection, the bundled station catalog and

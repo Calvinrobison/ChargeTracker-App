@@ -246,26 +246,17 @@ Ordered by what unblocks the most.
 Updated 2026-09-18, after the first successful Windows package, install and
 launch. Each step says what it unblocks and how you know it worked.
 
-### 1. Bundle a station catalog (`I2b`, `I7`)
+### 1. ~~Bundle a station catalog~~ — done (`I2b`, `I7`)
 
-**Without this the app is empty on first run.** It installs, starts and passes
-every integrity check, and shows zero stations, because `resources/catalog` has
-no data and the catalog ships as `extraResources`.
+Done on 2026-09-18. `resources/catalog` holds 1083 locations within 50 miles of
+Mesa, built by `catalog-refresh.mjs` from the AFDC Arizona export
+(sha256 `876f47f9…`, recorded in `provenance.json`).
 
-Download the AFDC export for Arizona from https://afdc.energy.gov/data_download,
-then:
-
-```powershell
-node scripts/catalog-refresh.mjs --file <path>\alt_fuel_stations.csv --dry-run
-node scripts/catalog-refresh.mjs --file <path>\alt_fuel_stations.csv
-```
-
-Run `--dry-run` first and read the output. The field mapping has **never seen a
-real AFDC file**; it is covered by 11 specs against synthetic input, which is
-not the same thing. Commit `resources/catalog/` including `provenance.json`.
-
-This is the single highest-value remaining step. It is the difference between
-"the package works" and "the application is useful".
+The first run of that mapping against a real file, after 11 specs against
+synthetic input: 1652 rows considered, 1083 accepted, 99 skipped as non-public,
+470 outside the radius, **0 with bad coordinates** and 0 duplicate ids. The
+coordinate columns mapped and the radius filter works — neither had ever been
+demonstrated against genuine data before.
 
 ### 2. Decide the collection question (`I8`)
 
