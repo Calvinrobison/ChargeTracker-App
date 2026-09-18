@@ -316,7 +316,10 @@ export class QueryService {
     const query = filters.query.trim().toLowerCase();
     return stations.filter((station) => {
       if (filters.savedOnly && !station.saved) return false;
-      if (filters.monitoringStates.length > 0 && !filters.monitoringStates.includes(station.monitoring)) {
+      if (
+        filters.monitoringStates.length > 0 &&
+        !filters.monitoringStates.includes(station.monitoring)
+      ) {
         return false;
       }
       if (filters.networks.length > 0) {
@@ -378,6 +381,10 @@ export class QueryService {
       })
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
+    // The IPC contract types `cohort` more loosely than rankScopes accepts;
+    // dropping the assertion fails typecheck even though eslint reads it as
+    // redundant under its own program.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const ranking = rankScopes(entries, input.filters.cohort as CohortMode, input.sort, window);
     const scopeToStation = new Map<string, StationView>();
     for (const row of rows) {
@@ -385,7 +392,9 @@ export class QueryService {
       if (station) scopeToStation.set(row.scopeKey, station);
     }
     const mapEntries = (list: readonly { scopeKey: string }[]): StationView[] =>
-      list.map((e) => scopeToStation.get(e.scopeKey)).filter((s): s is StationView => s !== undefined);
+      list
+        .map((e) => scopeToStation.get(e.scopeKey))
+        .filter((s): s is StationView => s !== undefined);
 
     const eligibleMetrics = ranking.primary.map((e) => e.metrics);
     const aggregate = aggregateScopeMetrics(eligibleMetrics);
@@ -433,11 +442,7 @@ export class QueryService {
 
     // Always include catalog-only and provisional locations; the map shows them
     // grey unless the user explicitly filters them out.
-    const stations = [
-      ...overview.ranked,
-      ...overview.provisional,
-      ...overview.excludedAmbiguous,
-    ];
+    const stations = [...overview.ranked, ...overview.provisional, ...overview.excludedAmbiguous];
     const seen = new Set(stations.map((s) => s.id));
     const resolved = this.resolveSharedWindow(input.window);
     const rows = this.loadScopeRows();
@@ -501,13 +506,17 @@ export class QueryService {
       const hasData = operational !== undefined && operational > 0;
       points.push({
         isoDate,
-        occupancyPct: hasData ? (100 * (occupied ?? 0)) / (operational as number) : null,
+        occupancyPct: hasData ? (100 * (occupied ?? 0)) / operational : null,
         hasData,
       });
     }
 
     const gapSpans = sets.flatMap((set) =>
-      set.gapSpans.map((span) => ({ startMs: span.startMs, endMs: span.endMs, reason: 'collection gap' })),
+      set.gapSpans.map((span) => ({
+        startMs: span.startMs,
+        endMs: span.endMs,
+        reason: 'collection gap',
+      })),
     );
 
     return {
@@ -537,12 +546,14 @@ export class QueryService {
       ? `${heat.peak.weekdayGroup === 'weekdays' ? 'Weekdays' : 'Weekends'} ${formatHour(heat.peak.startHour)}–${formatHour(heat.peak.endHour)}`
       : null;
 
-    const portSnapshots = row.identityReliability === 'durable'
-      ? this.observations.portSnapshotsFor([row.scopeKey], window.startMs, window.endMs)
-      : [];
-    const episodes = portSnapshots.length > 0
-      ? detectPortEpisodes(portSnapshots, { continuityBreaks: set?.gapSpans ?? [] })
-      : null;
+    const portSnapshots =
+      row.identityReliability === 'durable'
+        ? this.observations.portSnapshotsFor([row.scopeKey], window.startMs, window.endMs)
+        : [];
+    const episodes =
+      portSnapshots.length > 0
+        ? detectPortEpisodes(portSnapshots, { continuityBreaks: set?.gapSpans ?? [] })
+        : null;
 
     const capability = activityCapability({
       hasAuthorizedTransactionData: false,
@@ -585,7 +596,9 @@ export class QueryService {
         latestObservation: station.observed,
         scope: station.scopeNote ?? row.physicalScope ?? 'Scope not recorded',
       },
-      trend: set ? this.buildTrend([set], window) : { points: [], gaps: [], note: 'No observations yet.' },
+      trend: set
+        ? this.buildTrend([set], window)
+        : { points: [], gaps: [], note: 'No observations yet.' },
       heatmap,
       activity: {
         capability,
@@ -625,14 +638,17 @@ export class QueryService {
         parserVersion: row.bindingId
           ? str(
               this.driver
-                .prepare('SELECT parser_version FROM observations WHERE scope_key = ? ORDER BY observed_at_ms DESC LIMIT 1')
+                .prepare(
+                  'SELECT parser_version FROM observations WHERE scope_key = ? ORDER BY observed_at_ms DESC LIMIT 1',
+                )
                 .get(row.scopeKey)?.parser_version ?? null,
             )
           : null,
         adapterVersion: row.sourceId
           ? str(
-              this.driver.prepare('SELECT adapter_version FROM sources WHERE id = ?').get(row.sourceId)
-                ?.adapter_version ?? null,
+              this.driver
+                .prepare('SELECT adapter_version FROM sources WHERE id = ?')
+                .get(row.sourceId)?.adapter_version ?? null,
             )
           : null,
         metricAlgorithmVersion: METRIC_ALGORITHM_VERSION,
@@ -676,7 +692,8 @@ export class QueryService {
 
     // Whole matching periods only; the domain module decides, not this query.
     const inWindow = rows.filter(
-      (row) => Number(row.period_start_ms) >= window.startMs && Number(row.period_end_ms) <= window.endMs,
+      (row) =>
+        Number(row.period_start_ms) >= window.startMs && Number(row.period_end_ms) <= window.endMs,
     );
     if (inWindow.length === 0) {
       return {

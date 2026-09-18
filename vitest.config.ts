@@ -31,6 +31,13 @@ export default defineConfig({
       '@shared': resolve('src/shared'),
       '@domain': resolve('src/domain'),
       '@renderer': resolve('src/renderer/src'),
+      // The specs under tests/nodeps register with `node:test`, because they
+      // must also run on Node's built-in runner with nothing installed. Vitest
+      // cannot see those registrations — it collects the file, finds no suite
+      // of its own, and fails. This alias points `node:test` at a shim that
+      // re-exports the same four names from Vitest, so one set of spec files
+      // satisfies both runners. See tests/support/node-test-shim.ts.
+      'node:test': resolve('tests/support/node-test-shim.ts'),
     },
   },
   test: {

@@ -137,7 +137,10 @@ export class CollectorService {
   private readonly scheduler: Scheduler;
   private readonly adapters = new Map<string, SourceAdapter>();
   private readonly budgets = new Map<string, NavigationBudget>();
-  private readonly bindings = new Map<string, BindingDescriptor & { sourceId: string; siteId: string }>();
+  private readonly bindings = new Map<
+    string,
+    BindingDescriptor & { sourceId: string; siteId: string }
+  >();
   private readonly nowMs: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
 
@@ -317,7 +320,11 @@ export class CollectorService {
    * Queues a manual refresh. It is planned through the same source budget as
    * scheduled work, so it cannot exceed the provider's allowed rate.
    */
-  requestManualRefresh(bindingIds: readonly string[]): { queued: number; earliestStartMs: number | null; budgetNote: string | null } {
+  requestManualRefresh(bindingIds: readonly string[]): {
+    queued: number;
+    earliestStartMs: number | null;
+    budgetNote: string | null;
+  } {
     for (const id of bindingIds) if (this.bindings.has(id)) this.manualQueue.add(id);
     const plan = this.scheduler.plan({
       nowMs: this.nowMs(),
@@ -341,9 +348,12 @@ export class CollectorService {
 
   private scheduleNextCycle(delayMs: number): void {
     if (this.cycleTimer) clearTimeout(this.cycleTimer);
-    this.cycleTimer = setTimeout(() => {
-      void this.runCycle();
-    }, Math.max(0, delayMs));
+    this.cycleTimer = setTimeout(
+      () => {
+        void this.runCycle();
+      },
+      Math.max(0, delayMs),
+    );
     this.cycleTimer.unref?.();
   }
 
@@ -409,7 +419,10 @@ export class CollectorService {
     const budget = this.budgets.get(sourceId);
 
     const freshnessPolicy: FreshnessPolicy = {
-      scheduledIntervalMs: Math.max(capabilities.minIntervalMs, COLLECTION_DEFAULTS.targetIntervalMs),
+      scheduledIntervalMs: Math.max(
+        capabilities.minIntervalMs,
+        COLLECTION_DEFAULTS.targetIntervalMs,
+      ),
       maxCarryForwardCapMs: 30 * 60_000,
       sourceFreshnessLimitMs: capabilities.sourceFreshnessLimitMs,
     };
@@ -446,6 +459,9 @@ export class CollectorService {
         scopeKey: binding.scopeKey,
         startedMs: cycleStartedMs,
         finishedMs,
+        // Keeps the literal from widening to `string` in the inferred object
+        // type, which the readonly AttemptOutcome field will not accept.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
         outcome: 'timeout' as AttemptOutcome,
         errorDetail: detail,
         navigationCount: 0,
@@ -503,9 +519,7 @@ export class CollectorService {
         backoffUntilMs: runtime.holdUntilMs,
         lastAttemptMs: this.nowMs(),
         lastSuccessMs:
-          observations.length > 0
-            ? Math.max(...observations.map((o) => o.observedAtUtcMs))
-            : null,
+          observations.length > 0 ? Math.max(...observations.map((o) => o.observedAtUtcMs)) : null,
         userActionRequired: runtime.userActionRequired,
       });
     }
@@ -576,7 +590,10 @@ export class CollectorService {
       sanitizedSourceText: observation.sanitizedSourceText,
       quality: observation.quality,
       sourceFreshness: observation.sourceFreshness,
-      validation: { warnings: observation.warnings, capabilityVersion: capabilities.capabilityVersion },
+      validation: {
+        warnings: observation.warnings,
+        capabilityVersion: capabilities.capabilityVersion,
+      },
       ports: identityDurable
         ? observation.ports.map((port) => ({
             portId: `${binding.scopeKey}:${port.sourcePortId}`,
@@ -619,7 +636,14 @@ export class CollectorService {
     };
   }
 
-  sourceHealth(): Array<{ sourceId: string; capabilities: SourceCapabilities; state: string; detail: string | null; userAction: string | null; backoffUntilMs: number | null }> {
+  sourceHealth(): Array<{
+    sourceId: string;
+    capabilities: SourceCapabilities;
+    state: string;
+    detail: string | null;
+    userAction: string | null;
+    backoffUntilMs: number | null;
+  }> {
     const out: Array<{
       sourceId: string;
       capabilities: SourceCapabilities;
