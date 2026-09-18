@@ -97,12 +97,18 @@ nsis:
   # against, and there are none. Today it buys nothing and costs a more
   # complicated installer over a ~250 MB payload.
   #
-  # It is also a plausible contributor to the STATUS_HEAP_CORRUPTION
-  # (-1073740940) seen when the first built installer was run silently, which
-  # is why it is off now rather than later. That is a hypothesis, not a
-  # diagnosis: nobody has established the cause.
+  # An earlier revision of this comment guessed that differential packaging
+  # was behind the STATUS_HEAP_CORRUPTION (-1073740940) the first installer
+  # exited with. That guess was wrong, and the real cause is now established:
+  # electron-builder ships a 32-BIT 7za.exe, which cannot address the ~700 MB
+  # of LZMA encoder memory that -mx=9 needs on this payload. With
+  # differentialPackage off, the build path changed enough that the same
+  # failure surfaced honestly at build time -- "Can't allocate required
+  # memory!" -- instead of producing an installer that crashed on use.
+  # scripts/windows/build-all.ps1 now puts a 64-bit 7-Zip on PATH.
   #
-  # Turn it back on once a release exists to delta against, and confirm the
+  # So this setting is off on its own merits only: there is no previous
+  # release to delta against. Turn it back on once one exists, and confirm the
   # installer still runs when you do.
   differentialPackage: false
 

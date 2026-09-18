@@ -45,6 +45,32 @@ cadence — the history stays correct either way, just coarser.
 
 ## The application will not start, or starts wrong
 
+**Packaging fails with "ERROR: Can't allocate required memory!"**
+
+The build log shows this shortly after `7-Zip (a) 24.09 (x86)`:
+
+```
+Add new data to archive: 16 folders, 391 files, 852798390 bytes (814 MiB)
+ERROR: Can't allocate required memory!
+```
+
+**`(x86)` is the whole story.** electron-builder bundles a 32-bit `7za.exe`.
+Compressing at `-mx=9` uses a 64 MB LZMA dictionary, which needs around 700 MB
+of encoder memory — beyond what a 32-bit process can address, regardless of how
+much RAM the machine has. Installing more memory does not help.
+
+Install a 64-bit 7-Zip and re-run the build script, which picks it up
+automatically:
+
+```powershell
+winget install --id 7zip.7zip -e
+.\scripts\windows\build-all.ps1
+```
+
+Running `npm run package:win` by hand skips that wiring; set
+`$env:USE_SYSTEM_7ZA = 'true'` yourself, with a `7za` on `PATH`. `docs/BUILDING.md`
+explains why the name matters.
+
 **The installer exits with code -1073740940 (0xC0000374).**
 
 That is `STATUS_HEAP_CORRUPTION` — the NSIS installer process crashed rather
@@ -52,48 +78,27 @@ than reporting an error. Nothing was installed, and nothing on your machine was
 changed.
 
 Seen once, during the first packaging run of this project, on a 328 MB
-installer. The cause was not established. Work through these in order; each one
-is cheap and eliminates a class of cause:
+installer. **Same cause as the entry above**: the 32-bit compressor ran out of
+address space, but on that build path it got far enough to write an installer
+rather than stopping. The payload inside it was damaged; unpacking it corrupted
+the installer's heap. Rebuilding with a 64-bit 7-Zip is the fix.
 
-1. **Run it interactively.** `/S` suppresses the window, including any error it
-   would have shown:
+That connection was not obvious at the time, and an earlier version of this
+document listed five things to try instead — antivirus, differential packaging,
+a rebuild. If a fresh build with a 64-bit 7-Zip still crashes this way, the
+useful evidence is the faulting module:
 
-   ```powershell
-   .\release\ChargeWatch-Setup-0.1.0.exe
-   ```
+```powershell
+Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'} -MaxEvents 5 |
+  Format-List TimeCreated, Message
+```
 
-   If the interactive run succeeds, the fault is in silent-mode extraction. If
-   it crashes the same way, the installer or its payload is the problem.
+and an interactive run, since `/S` suppresses any error the installer would
+have shown:
 
-2. **Check what faulted.** The crash is recorded with the faulting module:
-
-   ```powershell
-   Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='Application Error'} -MaxEvents 5 |
-     Format-List TimeCreated, Message
-   ```
-
-   A third-party DLL named there — a security product's hook, in particular —
-   points away from ChargeWatch.
-
-3. **Rule out real-time scanning.** Antivirus inspecting a 300 MB extraction is
-   a common source of odd installer exit codes. Add the repository's `release`
-   folder to your scanner's exclusions temporarily and retry. Put the exclusion
-   back afterwards.
-
-4. **Rebuild the package.** A partially written artifact produces exactly this
-   shape of failure:
-
-   ```powershell
-   Remove-Item -Recurse -Force .\release
-   npm run package:win
-   npm run verify:package
-   ```
-
-5. **Try without differential packaging.** `differentialPackage: true` in
-   `electron-builder.yml` adds blockmap machinery to the installer. Setting it
-   to `false` produces a simpler installer; the cost is that updates download
-   in full rather than as a delta. If this is what fixes it, record that in the
-   file rather than leaving the reason unexplained.
+```powershell
+.\release\ChargeWatch-Setup-0.1.0.exe
+```
 
 **Windows SmartScreen blocks the installer.**
 

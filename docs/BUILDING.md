@@ -10,6 +10,31 @@ What you need, what each command does, and what to do when one fails.
 | Node | 22.12 or newer. The specs need 22.6+ for `--experimental-strip-types` and `node:sqlite`; the build is pinned to 22.12 in CI. |
 | Disk | ~1 GB free — the bundled Chromium payload is around 200 MB before packaging and again inside the installer. |
 | Network | The npm registry and the Playwright CDN, once. After that the build is offline. |
+| 7-Zip | **Required for packaging.** `winget install --id 7zip.7zip -e`. See below. |
+
+### Packaging needs a 64-bit 7-Zip
+
+electron-builder bundles its own `7za.exe`, and that binary is **32-bit**.
+Compressing the ChargeWatch payload at `-mx=9` needs a 64 MB LZMA dictionary,
+which costs roughly 700 MB of encoder memory — more address space than a 32-bit
+process has. It fails with:
+
+```
+ERROR: Can't allocate required memory!
+```
+
+`scripts/windows/build-all.ps1` works around this: it looks for a system 7-Zip,
+copies `7z.exe` to `7za.exe` under `%LOCALAPPDATA%\chargewatch-build-tools`
+(electron-builder looks for the name `7za`, which the standard install does not
+provide), prepends that to `PATH` and sets `USE_SYSTEM_7ZA=true`. If 7-Zip is
+missing it says so and prints the install command rather than letting the
+packaging step fail obscurely.
+
+Running `npm run package:win` on its own gets none of that. Do it by hand:
+
+```powershell
+$env:USE_SYSTEM_7ZA = 'true'   # with a 64-bit 7za on PATH
+```
 
 ### There is no native module
 
