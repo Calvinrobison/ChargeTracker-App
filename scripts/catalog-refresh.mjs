@@ -313,7 +313,9 @@ for (const row of rows.slice(1)) {
   sites.push({
     // A stable id derived from the registry id where one exists, so a refresh
     // matches existing rows instead of creating duplicates.
-    id: registryStationId ? `afdc-${registryStationId}` : `afdc-geo-${latitude.toFixed(5)}-${longitude.toFixed(5)}`,
+    id: registryStationId
+      ? `afdc-${registryStationId}`
+      : `afdc-geo-${latitude.toFixed(5)}-${longitude.toFixed(5)}`,
     registryStationId,
     name: cell(row, 'name') || 'Unnamed station',
     streetAddress,

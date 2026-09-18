@@ -18,7 +18,12 @@
  * JSON canonicalisation scheme to get subtly wrong.
  */
 
-import { createHash, createPublicKey, sign as cryptoSign, verify as cryptoVerify } from 'node:crypto';
+import {
+  createHash,
+  createPublicKey,
+  sign as cryptoSign,
+  verify as cryptoVerify,
+} from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
 
 import { type Infer, v } from './validate.ts';
@@ -188,7 +193,11 @@ export function verifyManifest(
     };
   }
   if (candidates.every((key) => key.retired)) {
-    return { ok: false, code: 'retired_key', detail: `key ${String(declaredKeyId)} has been retired` };
+    return {
+      ok: false,
+      code: 'retired_key',
+      detail: `key ${String(declaredKeyId)} has been retired`,
+    };
   }
 
   let verifiedKeyId: string | null = null;
@@ -331,10 +340,7 @@ export function verifyManifest(
 }
 
 export type ArtifactCheckFailure =
-  | 'not_in_manifest'
-  | 'size_mismatch'
-  | 'sha256_mismatch'
-  | 'sha512_mismatch';
+  'not_in_manifest' | 'size_mismatch' | 'sha256_mismatch' | 'sha512_mismatch';
 
 export interface ArtifactCheckResult {
   readonly ok: boolean;
@@ -356,7 +362,11 @@ export function verifyArtifactBytes(
 ): ArtifactCheckResult {
   const artifact = manifest.artifacts.find((entry) => entry.fileName === fileName);
   if (!artifact) {
-    return { ok: false, code: 'not_in_manifest', detail: `${fileName} is not named in the manifest` };
+    return {
+      ok: false,
+      code: 'not_in_manifest',
+      detail: `${fileName} is not named in the manifest`,
+    };
   }
   if (bytes.byteLength !== artifact.byteSize) {
     return {
@@ -397,7 +407,10 @@ export function isPermittedDownloadUrl(
     return url.pathname.startsWith(`/repos/${configured.owner}/${configured.repo}/releases`);
   }
   // GitHub redirects release asset downloads to its object storage.
-  if (url.host === 'objects.githubusercontent.com' || url.host === 'release-assets.githubusercontent.com') {
+  if (
+    url.host === 'objects.githubusercontent.com' ||
+    url.host === 'release-assets.githubusercontent.com'
+  ) {
     return true;
   }
   return false;

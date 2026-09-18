@@ -63,10 +63,10 @@ export function openNodeSqlite(path = ':memory:', options: NodeSqliteOptions = {
           };
         },
         get(...params) {
-          return stmt.get(...(params as SqlValue[])) as Record<string, SqlValue> | undefined;
+          return stmt.get(...(params as SqlValue[]));
         },
         all(...params) {
-          return stmt.all(...(params as SqlValue[])) as Array<Record<string, SqlValue>>;
+          return stmt.all(...(params as SqlValue[]));
         },
       };
     },

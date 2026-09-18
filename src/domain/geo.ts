@@ -31,7 +31,9 @@ export function isValidCoordinate(value: unknown): value is Coordinate {
 
 export function assertValidCoordinate(value: unknown, label = 'coordinate'): Coordinate {
   if (!isValidCoordinate(value)) {
-    throw new RangeError(`${label} is not a valid latitude/longitude pair: ${JSON.stringify(value)}`);
+    throw new RangeError(
+      `${label} is not a valid latitude/longitude pair: ${JSON.stringify(value)}`,
+    );
   }
   return value;
 }
@@ -62,11 +64,7 @@ export function milesToMeters(miles: number): number {
  * A station exactly on the boundary is inside the study area; the comparison
  * is documented so a catalog refresh cannot silently change membership.
  */
-export function withinRadius(
-  center: Coordinate,
-  point: Coordinate,
-  radiusMiles: number,
-): boolean {
+export function withinRadius(center: Coordinate, point: Coordinate, radiusMiles: number): boolean {
   if (!Number.isFinite(radiusMiles) || radiusMiles <= 0) return false;
   return distanceMiles(center, point) <= radiusMiles;
 }

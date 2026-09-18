@@ -40,7 +40,10 @@ describe('CSV quoting', () => {
   });
 
   test('a row joins cells with commas', () => {
-    assert.equal(renderRow([text('Mesa'), number(50), trusted('2026-09-17T00:00:00Z')]), 'Mesa,50,2026-09-17T00:00:00Z');
+    assert.equal(
+      renderRow([text('Mesa'), number(50), trusted('2026-09-17T00:00:00Z')]),
+      'Mesa,50,2026-09-17T00:00:00Z',
+    );
   });
 });
 

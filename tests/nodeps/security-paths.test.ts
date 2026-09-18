@@ -89,7 +89,9 @@ describe('content security policy', () => {
     assert.ok(development.includes('http://localhost:5173'));
     assert.ok(development.includes('ws://localhost:5173'));
     assert.ok(!production.includes('localhost'));
-    assert.ok(!production.includes('unsafe-inline') || !/script-src[^;]*unsafe-inline/.test(production));
+    assert.ok(
+      !production.includes('unsafe-inline') || !/script-src[^;]*unsafe-inline/.test(production),
+    );
   });
 });
 
@@ -307,7 +309,11 @@ describe('write destinations', () => {
       `${paths.browserProfilesDir}\\chargepoint\\Cookies`,
       `${paths.updateCacheDir}\\installer.exe`,
     ]) {
-      const result = isPermittedWriteDestination(destination, paths, 'C:\\Program Files\\ChargeWatch');
+      const result = isPermittedWriteDestination(
+        destination,
+        paths,
+        'C:\\Program Files\\ChargeWatch',
+      );
       assert.equal(result.permitted, false, `${destination} must be refused`);
     }
   });
@@ -325,7 +331,13 @@ describe('diagnostic redaction', () => {
       ].join('\n'),
       null,
     );
-    for (const secret of ['abc123def456', 'deadbeef', 'sk-live-1234567890', 'ghp_abcdefghijklmnopqrst', 'driver@example.com']) {
+    for (const secret of [
+      'abc123def456',
+      'deadbeef',
+      'sk-live-1234567890',
+      'ghp_abcdefghijklmnopqrst',
+      'driver@example.com',
+    ]) {
       assert.ok(!redacted.includes(secret), `${secret} must not survive redaction`);
     }
     assert.ok(redacted.includes('[redacted]'));
@@ -366,7 +378,14 @@ describe('documented outbound connections', () => {
 
   test('there is no analytics or crash-reporting destination', () => {
     const all = DOCUMENTED_OUTBOUND_CONNECTIONS.flatMap((e) => e.origins).join(' ');
-    for (const forbidden of ['sentry', 'analytics', 'telemetry', 'segment', 'mixpanel', 'datadog']) {
+    for (const forbidden of [
+      'sentry',
+      'analytics',
+      'telemetry',
+      'segment',
+      'mixpanel',
+      'datadog',
+    ]) {
       assert.ok(!all.toLowerCase().includes(forbidden), `${forbidden} must not be contacted`);
     }
   });

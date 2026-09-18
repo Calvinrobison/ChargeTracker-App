@@ -9,7 +9,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 
-import { parseRetryAfter, resolveBundledChromium, safeHttpUrl } from '../../src/collector/browser.ts';
+import {
+  parseRetryAfter,
+  resolveBundledChromium,
+  safeHttpUrl,
+} from '../../src/collector/browser.ts';
 import {
   ALLOWED_ORIGINS,
   CAPABILITIES,

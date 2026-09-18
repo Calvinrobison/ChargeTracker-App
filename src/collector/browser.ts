@@ -85,10 +85,7 @@ export function resolveBundledChromium(options: {
  * Revision directories are tried newest-first by sorting descending, so a
  * stale payload left beside a current one cannot win.
  */
-export function chromiumCandidates(
-  root: string,
-  platform: NodeJS.Platform,
-): readonly string[] {
+export function chromiumCandidates(root: string, platform: NodeJS.Platform): readonly string[] {
   const executable = platform === 'win32' ? 'chrome.exe' : 'chrome';
   // Windows x64 builds use chrome-win64; older and 32-bit ones use chrome-win.
   // macOS nests the binary inside the app bundle.
@@ -292,7 +289,13 @@ export class BrowserRuntime {
    */
   async navigate(page: Page, url: string, abortSignal: AbortSignal): Promise<NavigationResult> {
     if (abortSignal.aborted) {
-      return { ok: false, status: null, retryAfterMs: null, finalUrl: url, detail: 'aborted before navigation' };
+      return {
+        ok: false,
+        status: null,
+        retryAfterMs: null,
+        finalUrl: url,
+        detail: 'aborted before navigation',
+      };
     }
 
     const parsed = safeHttpUrl(url);

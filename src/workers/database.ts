@@ -128,7 +128,9 @@ async function dispatch(op: string, payload: unknown): Promise<unknown> {
       worker.recordGap(payload as Parameters<DatabaseWorker['recordGap']>[0]);
       return { recorded: true };
     case 'exportCurrentView':
-      return worker.exportCurrentView(payload as Parameters<DatabaseWorker['exportCurrentView']>[0]);
+      return worker.exportCurrentView(
+        payload as Parameters<DatabaseWorker['exportCurrentView']>[0],
+      );
     case 'exportRawObservations':
       return worker.exportRawObservations(
         payload as Parameters<DatabaseWorker['exportRawObservations']>[0],

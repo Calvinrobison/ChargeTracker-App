@@ -30,11 +30,11 @@ export class ValidationError extends Error {
   constructor(issues: readonly Issue[]) {
     const summary = issues
       .slice(0, 5)
-      .map((issue) => `${issue.path.length === 0 ? '<root>' : issue.path.join('.')}: ${issue.message}`)
+      .map(
+        (issue) => `${issue.path.length === 0 ? '<root>' : issue.path.join('.')}: ${issue.message}`,
+      )
       .join('; ');
-    super(
-      issues.length <= 5 ? summary : `${summary} (and ${issues.length - 5} more)`,
-    );
+    super(issues.length <= 5 ? summary : `${summary} (and ${issues.length - 5} more)`);
     this.name = 'ValidationError';
     this.issues = issues;
   }
@@ -166,7 +166,8 @@ class StringSchema extends Schema<string> {
     this.opts = opts;
   }
   check(value: unknown, context: Context): ParseResult<string> {
-    if (typeof value !== 'string') return fail(context, `expected a string, received ${describe(value)}`);
+    if (typeof value !== 'string')
+      return fail(context, `expected a string, received ${describe(value)}`);
     if (this.opts.min !== undefined && value.length < this.opts.min) {
       return fail(context, `expected at least ${this.opts.min} characters`);
     }
@@ -193,7 +194,8 @@ class NumberSchema extends Schema<number> {
     this.opts = opts;
   }
   check(value: unknown, context: Context): ParseResult<number> {
-    if (typeof value !== 'number') return fail(context, `expected a number, received ${describe(value)}`);
+    if (typeof value !== 'number')
+      return fail(context, `expected a number, received ${describe(value)}`);
     if (!Number.isFinite(value)) return fail(context, 'expected a finite number');
     if (this.opts.integer && !Number.isInteger(value)) {
       return fail(context, `expected an integer, received ${value}`);
@@ -210,7 +212,8 @@ class NumberSchema extends Schema<number> {
 
 class BooleanSchema extends Schema<boolean> {
   check(value: unknown, context: Context): ParseResult<boolean> {
-    if (typeof value !== 'boolean') return fail(context, `expected a boolean, received ${describe(value)}`);
+    if (typeof value !== 'boolean')
+      return fail(context, `expected a boolean, received ${describe(value)}`);
     return { ok: true, value };
   }
 }
@@ -223,7 +226,10 @@ class LiteralSchema<T extends string | number | boolean> extends Schema<T> {
   }
   check(value: unknown, context: Context): ParseResult<T> {
     if (value !== this.expected) {
-      return fail(context, `expected ${JSON.stringify(this.expected)}, received ${describe(value)}`);
+      return fail(
+        context,
+        `expected ${JSON.stringify(this.expected)}, received ${describe(value)}`,
+      );
     }
     return { ok: true, value: this.expected };
   }
@@ -265,7 +271,8 @@ class ArraySchema<T> extends Schema<T[]> {
     this.opts = opts;
   }
   check(value: unknown, context: Context): ParseResult<T[]> {
-    if (!Array.isArray(value)) return fail(context, `expected an array, received ${describe(value)}`);
+    if (!Array.isArray(value))
+      return fail(context, `expected an array, received ${describe(value)}`);
     if (this.opts.min !== undefined && value.length < this.opts.min) {
       return fail(context, `expected at least ${this.opts.min} items`);
     }

@@ -12,7 +12,10 @@
  */
 
 export interface SqliteStatement {
-  run(...params: readonly SqlValue[]): { changes: number | bigint; lastInsertRowid: number | bigint };
+  run(...params: readonly SqlValue[]): {
+    changes: number | bigint;
+    lastInsertRowid: number | bigint;
+  };
   get(...params: readonly SqlValue[]): Record<string, SqlValue> | undefined;
   all(...params: readonly SqlValue[]): Array<Record<string, SqlValue>>;
 }

@@ -161,7 +161,10 @@ export function SettingsDrawer(props: SettingsDrawerProps): ReactNode {
             <div className="settings-row">
               <span>Collecting</span>
               <Toggle
-                checked={bootstrap.collection.kind !== 'paused' && bootstrap.collection.kind !== 'not_started'}
+                checked={
+                  bootstrap.collection.kind !== 'paused' &&
+                  bootstrap.collection.kind !== 'not_started'
+                }
                 label="Collecting"
                 onChange={(next) => props.onSetSetting('collection.running', next)}
               />

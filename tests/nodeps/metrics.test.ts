@@ -45,9 +45,7 @@ describe('section 15 calculation acceptance examples', () => {
     const m = metricsFor({
       scopeKey: 'scope-1',
       window: { startMs: T0, endMs: T0 + 15 * MIN },
-      snapshots: [
-        snapshot({ observedAtUtcMs: T0, available: 1, occupied: 1, outOfService: 8 }),
-      ],
+      snapshots: [snapshot({ observedAtUtcMs: T0, available: 1, occupied: 1, outOfService: 8 })],
       monitoringWindows: [monitoring(T0 - DAY)],
       gaps: [],
       capacity: [capacity(10)],

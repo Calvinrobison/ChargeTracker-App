@@ -24,7 +24,8 @@ export function count(value: number | null): string {
 
 export function hours(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return EM_DASH;
-  if (value >= 100) return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
+  if (value >= 100)
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
 }
 
@@ -166,9 +167,11 @@ export function shortDate(instantMs: number | null, timeZone: string): string {
 export function isoDateToShort(isoDate: string): string {
   const [year, month, day] = isoDate.split('-').map(Number);
   if (!year || !month || !day) return isoDate;
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(year, month - 1, day)),
-  );
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 export function hourLabel(hour: number): string {

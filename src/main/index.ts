@@ -13,15 +13,7 @@
  *   5. once startup has settled, begin update checks.
  */
 
-import {
-  BrowserWindow,
-  app,
-  dialog,
-  ipcMain,
-  nativeTheme,
-  powerMonitor,
-  shell,
-} from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, nativeTheme, powerMonitor, shell } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -293,7 +285,10 @@ async function refreshSourceHealth(): Promise<SourceHealthView[]> {
 function onCollectorNotification(notification: { notify: string; payload: unknown }): void {
   switch (notification.notify) {
     case 'log': {
-      const entry = notification.payload as { level: 'debug' | 'info' | 'warn' | 'error'; message: string };
+      const entry = notification.payload as {
+        level: 'debug' | 'info' | 'warn' | 'error';
+        message: string;
+      };
       logger.log(entry.level, `[collector] ${entry.message}`);
       break;
     }
@@ -385,7 +380,13 @@ async function runHealthChecks(): Promise<void> {
       null,
     );
   } else if (databaseState?.status === 'schema_too_new') {
-    push('database', 'History file is ready', 'fail', databaseState.detail, 'Install the newer version of ChargeWatch that created this history file.');
+    push(
+      'database',
+      'History file is ready',
+      'fail',
+      databaseState.detail,
+      'Install the newer version of ChargeWatch that created this history file.',
+    );
   } else {
     push(
       'database',
@@ -398,7 +399,11 @@ async function runHealthChecks(): Promise<void> {
 
   // Bundled browser.
   try {
-    const browser = await collector<{ ok: boolean; detail: string | null }>('healthCheck', {}, 60_000);
+    const browser = await collector<{ ok: boolean; detail: string | null }>(
+      'healthCheck',
+      {},
+      60_000,
+    );
     push(
       'browser',
       'Bundled browser starts',
@@ -422,7 +427,13 @@ async function runHealthChecks(): Promise<void> {
   const health = await refreshSourceHealth().catch(() => [] as SourceHealthView[]);
   const enabled = health.filter((source) => source.eligibilityState === 'enabled');
   if (enabled.length > 0) {
-    push('sources', 'A charger status source is enabled', 'pass', enabled.map((s) => s.displayName).join(', '), null);
+    push(
+      'sources',
+      'A charger status source is enabled',
+      'pass',
+      enabled.map((s) => s.displayName).join(', '),
+      null,
+    );
   } else {
     push(
       'sources',
@@ -468,9 +479,11 @@ async function runHealthChecks(): Promise<void> {
 function registerHandlers(): void {
   router.register('app.getBootstrap', async () => {
     settingsCache = await db<Record<string, unknown>>('getSettings');
-    const counts = await db<{ catalogSites: number; monitoredScopes: number; observations: number }>(
-      'counts',
-    );
+    const counts = await db<{
+      catalogSites: number;
+      monitoredScopes: number;
+      observations: number;
+    }>('counts');
     const status = collectionStatus ?? (await refreshCollectionStatus());
 
     const bootstrap: BootstrapView = {
@@ -514,9 +527,7 @@ function registerHandlers(): void {
     return { applied };
   });
 
-  router.register('overview.get', async (payload) =>
-    db('overview', payload, 30_000),
-  );
+  router.register('overview.get', async (payload) => db('overview', payload, 30_000));
 
   router.register('map.getMarkers', async (payload) => db('mapMarkers', payload, 30_000));
 
@@ -575,7 +586,8 @@ function registerHandlers(): void {
 
   router.register('source.openWindow', async (payload) => {
     const detail = await db<{ url: string | null }>('sourceUrlForSite', { siteId: payload.siteId });
-    if (!detail.url) throw new OperationError('invalid_payload', 'that location has no source link');
+    if (!detail.url)
+      throw new OperationError('invalid_payload', 'that location has no source link');
     await collector('openSourceWindow', { url: detail.url }, 60_000);
     return { opened: true };
   });
@@ -654,7 +666,11 @@ function registerHandlers(): void {
   router.register('backup.createNow', async () => {
     maintenanceActive = true;
     try {
-      const result = await db<{ manifest: { fileName: string } }>('createBackup', { kind: 'manual' }, 300_000);
+      const result = await db<{ manifest: { fileName: string } }>(
+        'createBackup',
+        { kind: 'manual' },
+        300_000,
+      );
       return { ok: true, fileName: result.manifest.fileName, detail: null };
     } catch (error) {
       return {
@@ -751,7 +767,14 @@ function registerHandlers(): void {
       written: true,
       path: destination,
       byteSize: Buffer.byteLength(body, 'utf8'),
-      contents: ['version and environment', 'database state', 'collection and source state', 'health checks', 'settings', 'recent log (redacted)'],
+      contents: [
+        'version and environment',
+        'database state',
+        'collection and source state',
+        'health checks',
+        'settings',
+        'recent log (redacted)',
+      ],
     };
   });
 
@@ -887,22 +910,24 @@ async function startDatabase(): Promise<void> {
         : databaseState.status === 'migration_failed'
           ? databaseState.detail
           : 'unknown';
-    await dialog.showMessageBox({
-      type: 'error',
-      title: 'ChargeWatch could not open its history file',
-      message:
-        databaseState.status === 'schema_too_new'
-          ? 'This history file was written by a newer version of ChargeWatch.'
-          : 'ChargeWatch could not upgrade its history file.',
-      detail:
-        `${detail}\n\nYour existing data has NOT been changed. ` +
-        `A backup was preserved where one could be made. ` +
-        `Collection is stopped until this is resolved. See docs/UPDATES_AND_RECOVERY.md.`,
-      buttons: ['Open data folder', 'Close'],
-      defaultId: 0,
-    }).then(async (choice) => {
-      if (choice.response === 0) await shell.openPath(paths.root);
-    });
+    await dialog
+      .showMessageBox({
+        type: 'error',
+        title: 'ChargeWatch could not open its history file',
+        message:
+          databaseState.status === 'schema_too_new'
+            ? 'This history file was written by a newer version of ChargeWatch.'
+            : 'ChargeWatch could not upgrade its history file.',
+        detail:
+          `${detail}\n\nYour existing data has NOT been changed. ` +
+          `A backup was preserved where one could be made. ` +
+          `Collection is stopped until this is resolved. See docs/UPDATES_AND_RECOVERY.md.`,
+        buttons: ['Open data folder', 'Close'],
+        defaultId: 0,
+      })
+      .then(async (choice) => {
+        if (choice.response === 0) await shell.openPath(paths.root);
+      });
     return;
   }
 
@@ -969,8 +994,12 @@ function startUpdates(): void {
         with: { type: 'json' },
       }).catch(() => ({ default: { keys: [] } }));
 
-      const trustedKeys = (keys.default as { keys?: Array<{ keyId: string; publicKeyPem: string; retired?: boolean }> })
-        .keys?.map((key) => ({
+      const trustedKeys =
+        (
+          keys.default as {
+            keys?: Array<{ keyId: string; publicKeyPem: string; retired?: boolean }>;
+          }
+        ).keys?.map((key) => ({
           keyId: key.keyId,
           publicKeyPem: key.publicKeyPem,
           retired: key.retired ?? false,
@@ -989,11 +1018,16 @@ function startUpdates(): void {
         repo: BRANDING.releaseRepo,
         channel: 'stable',
         logger,
-        autoUpdater: (module as unknown as { autoUpdater: Parameters<typeof createUpdaterBackend>[0]['autoUpdater'] }).autoUpdater,
+        autoUpdater: (
+          module as unknown as {
+            autoUpdater: Parameters<typeof createUpdaterBackend>[0]['autoUpdater'];
+          }
+        ).autoUpdater,
         fetchReleaseAsset: async (name) => {
           const url = `https://github.com/${BRANDING.releaseOwner}/${BRANDING.releaseRepo}/releases/latest/download/${encodeURIComponent(name)}`;
           const response = await fetch(url, { redirect: 'follow' });
-          if (!response.ok) throw new Error(`${name} could not be fetched (HTTP ${response.status})`);
+          if (!response.ok)
+            throw new Error(`${name} could not be fetched (HTTP ${response.status})`);
           return new Uint8Array(await response.arrayBuffer());
         },
       });
@@ -1017,7 +1051,10 @@ function startUpdates(): void {
                 reason: 'update_install',
                 detail: 'update installation',
               }).catch(() => undefined);
-              return { ok: true, detail: result.clean ? null : 'the collector did not stop cleanly' };
+              return {
+                ok: true,
+                detail: result.clean ? null : 'the collector did not stop cleanly',
+              };
             } catch (error) {
               return {
                 ok: false,
@@ -1118,7 +1155,9 @@ async function runSelfCheck(): Promise<void> {
   try {
     await startDatabase();
   } catch (error) {
-    fatal.push(`the database worker did not start: ${error instanceof Error ? error.message : String(error)}`);
+    fatal.push(
+      `the database worker did not start: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   if (databaseState?.status === 'ready') {
@@ -1141,8 +1180,12 @@ async function runSelfCheck(): Promise<void> {
 
   const byId = (id: string) => healthChecks.find((check) => check.id === id) ?? null;
   /** A check that did not run is reported as not_run, never as a pass. */
-  const notRun = (id: string) =>
-    ({ label: id, status: 'not_run' as const, detail: 'the check did not run', recoveryAction: null });
+  const notRun = (id: string) => ({
+    label: id,
+    status: 'not_run' as const,
+    detail: 'the check did not run',
+    recoveryAction: null,
+  });
   // `id` goes last: the spread carries its own, and a trailing key is the one
   // that wins. Putting it first made it dead.
   const integrity = SELF_CHECK_INTEGRITY_IDS.map((id) => ({ ...(byId(id) ?? notRun(id)), id }));
@@ -1273,7 +1316,8 @@ async function bootstrap(): Promise<void> {
     logger,
     onOpen: () => windows.activate(),
     onTogglePause: () => {
-      const running = collectionStatus?.kind !== 'paused' && collectionStatus?.kind !== 'not_started';
+      const running =
+        collectionStatus?.kind !== 'paused' && collectionStatus?.kind !== 'not_started';
       // The tray is part of the main process, not a renderer, so it calls the
       // services directly rather than round-tripping through the IPC router —
       // which would (correctly) reject it as an untrusted sender.
@@ -1385,8 +1429,10 @@ app.whenReady().then(
     if (selfCheckRequested) {
       void runSelfCheck().catch((error: unknown) => {
         // A crash in the check is a failure of the check, not a pass.
-        // eslint-disable-next-line no-console
-        console.error(`self-check crashed: ${error instanceof Error ? error.message : String(error)}`);
+
+        console.error(
+          `self-check crashed: ${error instanceof Error ? error.message : String(error)}`,
+        );
         app.exit(1);
       });
       return;
@@ -1421,9 +1467,11 @@ app.on('before-quit', (event) => {
 // session end must not be ignored: it is the one moment an update installer
 // must never start. Subscribed through a widened handle rather than dropped,
 // with the reason recorded here so it does not look like a stray cast.
-(powerMonitor as unknown as {
-  on(event: 'shutdown', listener: (event?: { preventDefault: () => void }) => void): void;
-}).on('shutdown', (event?: { preventDefault: () => void }) => {
+(
+  powerMonitor as unknown as {
+    on(event: 'shutdown', listener: (event?: { preventDefault: () => void }) => void): void;
+  }
+).on('shutdown', (event?: { preventDefault: () => void }) => {
   sessionEnding = true;
   logger?.log('info', 'the OS is ending the session');
   event?.preventDefault?.();

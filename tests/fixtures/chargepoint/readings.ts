@@ -5,7 +5,10 @@
  * evidence that the live source can be collected from.
  */
 
-import type { PageReading, PortRowReading } from '../../../src/collector/adapters/chargepoint/parse.ts';
+import type {
+  PageReading,
+  PortRowReading,
+} from '../../../src/collector/adapters/chargepoint/parse.ts';
 
 export const SYNTHETIC = true as const;
 
@@ -70,7 +73,12 @@ export const dcFastWithOutage = reading({
   portRows: [
     row({ label: 'Port 1', statusText: 'Available', connectorText: 'CCS', powerText: '62.5 kW' }),
     row({ label: 'Port 2', statusText: 'In use', connectorText: 'CCS', powerText: '62.5 kW' }),
-    row({ label: 'Port 3', statusText: 'Out of service', connectorText: 'CHAdeMO', powerText: '50 kW' }),
+    row({
+      label: 'Port 3',
+      statusText: 'Out of service',
+      connectorText: 'CHAdeMO',
+      powerText: '50 kW',
+    }),
   ],
 });
 

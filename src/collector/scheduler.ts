@@ -37,7 +37,8 @@ export interface QueueEntry {
   paused: boolean;
 }
 
-export type SourceState = 'healthy' | 'degraded' | 'paused' | 'blocked' | 'circuit_open' | 'unverified';
+export type SourceState =
+  'healthy' | 'degraded' | 'paused' | 'blocked' | 'circuit_open' | 'unverified';
 
 export interface SourceRuntime {
   readonly sourceId: string;
@@ -286,7 +287,8 @@ export class Scheduler {
         continue;
       }
 
-      const concurrent = (plannedPerSource.get(entry.sourceId) ?? 0) + (this.inFlight.get(entry.sourceId) ?? 0);
+      const concurrent =
+        (plannedPerSource.get(entry.sourceId) ?? 0) + (this.inFlight.get(entry.sourceId) ?? 0);
       if (concurrent >= limits.maxConcurrentNavigations && plannedPerSource.has(entry.sourceId)) {
         // Still schedulable, just later in this cycle via the navigation slot.
       }
@@ -301,14 +303,19 @@ export class Scheduler {
           : (runtime.lastNavigationMs as number) + limits.minNavigationIntervalMs;
       const slot = Math.max(nextSlot.get(entry.sourceId) ?? cursorDefault, nowMs);
 
-      const cycleHorizon = nowMs + Math.max(limits.minIntervalMs, COLLECTION_DEFAULTS.targetIntervalMs);
+      const cycleHorizon =
+        nowMs + Math.max(limits.minIntervalMs, COLLECTION_DEFAULTS.targetIntervalMs);
       if (slot >= cycleHorizon && !manual.has(entry.bindingId)) {
         queueLag += 1;
         skipped.push({ bindingId: entry.bindingId, reason: 'navigation_budget' });
         continue;
       }
 
-      dispatch.push({ bindingId: entry.bindingId, sourceId: entry.sourceId, earliestStartMs: slot });
+      dispatch.push({
+        bindingId: entry.bindingId,
+        sourceId: entry.sourceId,
+        earliestStartMs: slot,
+      });
       nextSlot.set(entry.sourceId, slot + limits.minNavigationIntervalMs);
       plannedPerSource.set(entry.sourceId, (plannedPerSource.get(entry.sourceId) ?? 0) + 1);
     }
@@ -326,7 +333,8 @@ export class Scheduler {
       let reason: SkipReason;
       if (!limits?.eligible || !runtime) reason = 'source_not_eligible';
       else if (runtime.state === 'blocked') reason = 'source_blocked';
-      else if (runtime.state === 'paused' || runtime.state === 'unverified') reason = 'source_paused';
+      else if (runtime.state === 'paused' || runtime.state === 'unverified')
+        reason = 'source_paused';
       else if (
         runtime.state === 'circuit_open' &&
         runtime.holdUntilMs !== null &&
@@ -398,14 +406,17 @@ export class Scheduler {
 
     entry.lastAttemptMs = nowMs;
     const threshold =
-      this.deps.circuitBreakerFailureThreshold ?? COLLECTION_DEFAULTS.circuitBreakerFailureThreshold;
+      this.deps.circuitBreakerFailureThreshold ??
+      COLLECTION_DEFAULTS.circuitBreakerFailureThreshold;
 
     if (isSuccessfulOutcome(input.outcome)) {
       entry.lastSuccessMs = nowMs;
       entry.consecutiveFailures = 0;
       entry.backoffMs = 0;
       const jitter =
-        1 + (this.deps.random() * 2 - 1) * (this.deps.jitterFraction ?? COLLECTION_DEFAULTS.jitterFraction);
+        1 +
+        (this.deps.random() * 2 - 1) *
+          (this.deps.jitterFraction ?? COLLECTION_DEFAULTS.jitterFraction);
       entry.nextDueMs = nowMs + Math.round(entry.intervalMs * jitter);
       runtime.consecutiveFailures = 0;
       if (runtime.state === 'degraded' || runtime.state === 'circuit_open') {
@@ -418,7 +429,10 @@ export class Scheduler {
 
     if (input.outcome === 'cancelled') {
       // A cancelled attempt is not a failure; it is retried at its normal time.
-      entry.nextDueMs = Math.max(entry.nextDueMs, nowMs + (this.limits.get(entry.sourceId)?.minNavigationIntervalMs ?? 0));
+      entry.nextDueMs = Math.max(
+        entry.nextDueMs,
+        nowMs + (this.limits.get(entry.sourceId)?.minNavigationIntervalMs ?? 0),
+      );
       return { nextDueMs: entry.nextDueMs, sourceState: runtime.state };
     }
 

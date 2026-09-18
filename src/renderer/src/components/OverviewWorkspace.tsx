@@ -373,11 +373,7 @@ function RankingRow({
   return (
     <button type="button" className="ranking-row ranking-grid" onClick={onSelect}>
       <span className="cell ellipsize" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span
-          className="dot"
-          style={{ background: statusDotColor(station) }}
-          aria-hidden="true"
-        />
+        <span className="dot" style={{ background: statusDotColor(station) }} aria-hidden="true" />
         <span className="ellipsize">{station.name}</span>
         {badge ? <span className="state-badge">{badge}</span> : null}
         <span className="visually-hidden">{statusDotLabel(station)}</span>

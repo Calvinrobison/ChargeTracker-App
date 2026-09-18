@@ -84,7 +84,9 @@ if (process.argv.includes('--check')) {
   try {
     existing = readFileSync(outputPath, 'utf8');
   } catch {
-    console.error('src/database/migrations/index.ts is missing. Run: node scripts/generate-migrations.mjs');
+    console.error(
+      'src/database/migrations/index.ts is missing. Run: node scripts/generate-migrations.mjs',
+    );
     process.exit(1);
   }
   if (existing.replace(/\r\n/g, '\n') !== output) {

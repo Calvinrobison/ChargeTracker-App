@@ -18,7 +18,12 @@ interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {
   readonly title?: string;
 }
 
-function Icon({ size = 14, title, children, ...rest }: IconProps & { children: ReactNode }): ReactNode {
+function Icon({
+  size = 14,
+  title,
+  children,
+  ...rest
+}: IconProps & { children: ReactNode }): ReactNode {
   return (
     <svg
       width={size}
@@ -112,7 +117,10 @@ export function ExpandIcon(props: IconProps): ReactNode {
   );
 }
 
-export function BookmarkIcon({ filled = false, ...props }: IconProps & { filled?: boolean }): ReactNode {
+export function BookmarkIcon({
+  filled = false,
+  ...props
+}: IconProps & { filled?: boolean }): ReactNode {
   return (
     <Icon {...props} fill={filled ? 'currentColor' : 'none'}>
       <path d="M7 4h10v16l-5-4-5 4z" />

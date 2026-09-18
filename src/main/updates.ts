@@ -60,7 +60,9 @@ export interface UpdaterBackend {
   /** Disables the library's own automatic download and install paths. */
   configureManualControl(): void;
   checkForUpdates(): Promise<UpdateCandidate | null>;
-  downloadUpdate(onProgress: (percent: number) => void): Promise<{ filePath: string; fileName: string }>;
+  downloadUpdate(
+    onProgress: (percent: number) => void,
+  ): Promise<{ filePath: string; fileName: string }>;
   /** Fetches a small release asset, used for the manifest and signature. */
   fetchAsset(name: string): Promise<Uint8Array>;
   readAsset(filePath: string): Promise<Uint8Array>;
@@ -174,7 +176,9 @@ export class UpdateService {
       autoInstallEnabled: this.host.settings.autoInstall(),
       consecutiveFailures: this.consecutiveFailures,
       manualDownloadUrl:
-        this.consecutiveFailures >= PERSISTENT_FAILURE_THRESHOLD ? this.backend.manualDownloadUrl : null,
+        this.consecutiveFailures >= PERSISTENT_FAILURE_THRESHOLD
+          ? this.backend.manualDownloadUrl
+          : null,
     };
   }
 
@@ -240,7 +244,10 @@ export class UpdateService {
       const detail = error instanceof Error ? error.message : String(error);
       await this.host.recordEvent('check_failed', detail);
       // A failed check never interrupts normal use.
-      this.setState('failed', 'The update check could not reach GitHub. ChargeWatch keeps collecting.');
+      this.setState(
+        'failed',
+        'The update check could not reach GitHub. ChargeWatch keeps collecting.',
+      );
       this.host.log('warn', `update check failed: ${detail}`);
       return;
     }
@@ -253,9 +260,15 @@ export class UpdateService {
     }
 
     // Drafts and prereleases are ignored by default.
-    if (candidate.isDraft || (candidate.isPrerelease && !this.config.acceptedChannels.includes('beta'))) {
+    if (
+      candidate.isDraft ||
+      (candidate.isPrerelease && !this.config.acceptedChannels.includes('beta'))
+    ) {
       this.consecutiveFailures = 0;
-      this.setState('up_to_date', 'A prerelease is available but this installation only accepts stable releases.');
+      this.setState(
+        'up_to_date',
+        'A prerelease is available but this installation only accepts stable releases.',
+      );
       return;
     }
     if (compareSemver(candidate.version, this.config.installedVersion) <= 0) {
@@ -271,7 +284,10 @@ export class UpdateService {
     if (!verified) return;
 
     if (!this.host.settings.autoDownload() && !manual) {
-      this.setState('idle', `Version ${candidate.version} is available. Download it from Settings.`);
+      this.setState(
+        'idle',
+        `Version ${candidate.version} is available. Download it from Settings.`,
+      );
       return;
     }
     await this.download();
@@ -333,7 +349,10 @@ export class UpdateService {
     }
 
     this.verifiedManifest = result.manifest;
-    await this.host.recordEvent('manifest_verified', `${result.manifest.releaseVersion} via key ${result.keyId}`);
+    await this.host.recordEvent(
+      'manifest_verified',
+      `${result.manifest.releaseVersion} via key ${result.keyId}`,
+    );
     return true;
   }
 
@@ -365,7 +384,12 @@ export class UpdateService {
       return;
     }
 
-    if (!isPermittedDownloadUrl(`https://github.com/${this.backend.configuredRepo.owner}/${this.backend.configuredRepo.repo}/releases/`, this.backend.configuredRepo)) {
+    if (
+      !isPermittedDownloadUrl(
+        `https://github.com/${this.backend.configuredRepo.owner}/${this.backend.configuredRepo.repo}/releases/`,
+        this.backend.configuredRepo,
+      )
+    ) {
       // Defence in depth; the digest check below is authoritative.
       this.host.log('warn', 'the configured release source failed its own sanity check');
     }
@@ -481,7 +505,9 @@ export class UpdateService {
    * Order: revalidate the cached artifact, stop collection and flush, create
    * the mandatory backup, persist relaunch state, then install.
    */
-  private async performInstall(options: { userInitiated: boolean }): Promise<{ installed: boolean; detail: string | null }> {
+  private async performInstall(options: {
+    userInitiated: boolean;
+  }): Promise<{ installed: boolean; detail: string | null }> {
     const manifest = this.verifiedManifest;
     const staged = this.stagedArtifact;
     if (!manifest || !staged) return { installed: false, detail: 'no verified update is ready' };
@@ -497,7 +523,10 @@ export class UpdateService {
       const stillValid = await this.verifyStagedArtifact(staged, manifest);
       if (!stillValid) {
         this.installing = false;
-        return { installed: false, detail: 'the cached update failed re-verification and was discarded' };
+        return {
+          installed: false,
+          detail: 'the cached update failed re-verification and was discarded',
+        };
       }
 
       const prepared = await this.host.prepareForInstall();
@@ -513,9 +542,13 @@ export class UpdateService {
 
       const backup = await this.host.createPreUpdateBackup();
       if (!backup.ok) {
-        await this.host.recordEvent('install_failed', `pre-update backup failed: ${backup.detail}`, {
-          attemptId,
-        });
+        await this.host.recordEvent(
+          'install_failed',
+          `pre-update backup failed: ${backup.detail}`,
+          {
+            attemptId,
+          },
+        );
         this.installing = false;
         this.setState(
           'deferred',
@@ -536,7 +569,10 @@ export class UpdateService {
       const detail = error instanceof Error ? error.message : String(error);
       await this.host.recordEvent('install_failed', detail, { attemptId });
       this.installing = false;
-      this.setState('failed', 'The update could not be installed. ChargeWatch is unchanged and still collecting.');
+      this.setState(
+        'failed',
+        'The update could not be installed. ChargeWatch is unchanged and still collecting.',
+      );
       return { installed: false, detail };
     }
   }

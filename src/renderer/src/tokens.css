@@ -96,8 +96,8 @@
    * Variable, which is what Windows 11 ships and is close in proportion.
    */
   --font-sans:
-    Inter, 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue',
-    Arial, sans-serif;
+    Inter, 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial,
+    sans-serif;
   --font-mono: 'Cascadia Mono', Consolas, 'Courier New', monospace;
 }
 

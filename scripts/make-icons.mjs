@@ -253,7 +253,8 @@ if (check) {
     } else {
       const count = bytes.readUInt16LE(4);
       if (count < 1) problems.push('icon.ico declares no images.');
-      else console.log(`icon.ico carries ${count} image(s), ${(bytes.length / 1024).toFixed(1)} KB`);
+      else
+        console.log(`icon.ico carries ${count} image(s), ${(bytes.length / 1024).toFixed(1)} KB`);
     }
   }
 

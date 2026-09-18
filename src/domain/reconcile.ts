@@ -56,10 +56,7 @@ export type ReconcileResult = ReconcileSuccess | ReconcileFailure;
 
 const MAX_PORTS = 10_000;
 
-function checkDimension(
-  name: string,
-  value: number | null,
-): ReconcileFailure | null {
+function checkDimension(name: string, value: number | null): ReconcileFailure | null {
   if (value === null) return null;
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return { ok: false, code: 'non_integer_count', detail: `${name} is not a finite number` };
@@ -110,12 +107,7 @@ export function reconcileCounts(
     return { ok: false, code: 'no_counts_reported', detail: 'no state dimension was reported' };
   }
 
-  const explicitStates = [
-    counts.available,
-    counts.occupied,
-    counts.reserved,
-    counts.outOfService,
-  ];
+  const explicitStates = [counts.available, counts.occupied, counts.reserved, counts.outOfService];
   const explicitKnownSum = explicitStates.reduce<number>((sum, v) => sum + (v ?? 0), 0);
   const explicitUnknown = counts.unknown ?? 0;
   const explicitAllSum = explicitKnownSum + explicitUnknown;
@@ -163,9 +155,7 @@ export function reconcileCounts(
   const knownStateCount = anyExplicitKnown ? explicitKnownSum : null;
 
   const supportsOccupancy = counts.available !== null && counts.occupied !== null;
-  const operationalCount = supportsOccupancy
-    ? (counts.available as number) + (counts.occupied as number)
-    : null;
+  const operationalCount = supportsOccupancy ? counts.available + counts.occupied : null;
 
   if (total === null && anyExplicitKnown) {
     // Derive a scope total only from what was actually reported.

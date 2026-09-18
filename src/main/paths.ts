@@ -77,10 +77,7 @@ const DEFAULT_ROAMING_HINTS: readonly string[] = [
   'appdata/roaming',
 ];
 
-export type PathWarningCode =
-  | 'inside_install_dir'
-  | 'cloud_roaming_directory'
-  | 'not_absolute';
+export type PathWarningCode = 'inside_install_dir' | 'cloud_roaming_directory' | 'not_absolute';
 
 export interface PathResolution {
   readonly paths: ResolvedPaths;
@@ -118,7 +115,10 @@ export function resolveDataPaths(inputs: PathInputs): PathResolution {
   if (inputs.installDir) {
     const normalizedRoot = normalizeForComparison(root);
     const normalizedInstall = normalizeForComparison(inputs.installDir);
-    if (normalizedRoot === normalizedInstall || normalizedRoot.startsWith(`${normalizedInstall}/`)) {
+    if (
+      normalizedRoot === normalizedInstall ||
+      normalizedRoot.startsWith(`${normalizedInstall}/`)
+    ) {
       warnings.push({
         code: 'inside_install_dir',
         detail:
@@ -197,7 +197,8 @@ export function isPermittedWriteDestination(
     [normalizeForComparison(paths.updateCacheDir), 'the update cache'],
     [normalizeForComparison(paths.browserProfilesDir), 'the browser profile directory'],
   ];
-  if (installDir) forbidden.push([normalizeForComparison(installDir), 'the installation directory']);
+  if (installDir)
+    forbidden.push([normalizeForComparison(installDir), 'the installation directory']);
 
   for (const [prefix, label] of forbidden) {
     if (prefix.length > 0 && (normalized === prefix || normalized.startsWith(`${prefix}/`))) {

@@ -6,10 +6,7 @@
  * Units and worked examples live in docs/METRICS.md.
  */
 
-import {
-  type ChargingLevel,
-  type StatusSnapshot,
-} from './types.ts';
+import { type ChargingLevel, type StatusSnapshot } from './types.ts';
 import type { ScopeIntervalSet, ValidInterval } from './intervals.ts';
 import { type Interval, elapsedDays, splitByLocalHour, STUDY_TIME_ZONE } from './time.ts';
 
@@ -244,7 +241,12 @@ export interface Heatmap {
   readonly bins: readonly HeatmapBin[];
   readonly binsWithData: number;
   /** Highest-occupancy contiguous local-hour band, when enough data exists. */
-  readonly peak: { readonly weekdayGroup: 'weekdays' | 'weekend' | 'all'; readonly startHour: number; readonly endHour: number; readonly occupancyPct: number } | null;
+  readonly peak: {
+    readonly weekdayGroup: 'weekdays' | 'weekend' | 'all';
+    readonly startHour: number;
+    readonly endHour: number;
+    readonly occupancyPct: number;
+  } | null;
 }
 
 const EMPTY_BIN_COUNT = 7 * 24;

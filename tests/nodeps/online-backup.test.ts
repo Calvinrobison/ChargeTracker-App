@@ -86,7 +86,11 @@ describe('a backup of a live WAL database', () => {
     const dir = await mkdtemp(join(tmpdir(), 'cw-backup-'));
     try {
       const { driver } = await liveDatabase(dir, 250);
-      assert.equal(driver.pragmaValue('journal_mode'), 'wal', 'the test needs WAL to be meaningful');
+      assert.equal(
+        driver.pragmaValue('journal_mode'),
+        'wal',
+        'the test needs WAL to be meaningful',
+      );
 
       const backupDir = join(dir, 'backups');
       const result = await createBackup({
@@ -118,7 +122,11 @@ describe('a backup of a live WAL database', () => {
         openForVerify: openNodeSqlite,
         expectedSha256: result.manifest.sha256,
       });
-      assert.equal(preview.ok, true, `restore preview rejected the backup: ${preview.detail ?? ''}`);
+      assert.equal(
+        preview.ok,
+        true,
+        `restore preview rejected the backup: ${preview.detail ?? ''}`,
+      );
       assert.equal(preview.siteCount, 250);
 
       driver.close();
@@ -191,7 +199,9 @@ describe('a backup of a live WAL database', () => {
       });
 
       const row = driver
-        .prepare('SELECT kind, file_sha256, byte_size, verified, manifest_json FROM backups WHERE id = ?')
+        .prepare(
+          'SELECT kind, file_sha256, byte_size, verified, manifest_json FROM backups WHERE id = ?',
+        )
         .get(result.manifest.id);
       assert.ok(row, 'the backup must be recorded');
       assert.equal(row.kind, 'pre_update');

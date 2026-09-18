@@ -252,7 +252,11 @@ const CATALOG_ONLY: SeedSite = {
 describe('overview', () => {
   test('monitored and catalog locations are distinguished', () => {
     const { driver, service } = seed([BUSY_DC, QUIET_DC, LEVEL2, CATALOG_ONLY]);
-    const overview = service.getOverview({ window: { preset: '30d' }, filters: FILTERS, sort: 'occupancy' });
+    const overview = service.getOverview({
+      window: { preset: '30d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
     assert.equal(overview.summary.catalogLocations, 4);
     assert.equal(overview.summary.monitoredLocations, 3);
     driver.close();
@@ -260,8 +264,15 @@ describe('overview', () => {
 
   test('the ranking is by observed occupancy and reports the comparable cohort', () => {
     const { driver, service } = seed([BUSY_DC, QUIET_DC]);
-    const overview = service.getOverview({ window: { preset: '30d' }, filters: FILTERS, sort: 'occupancy' });
-    assert.deepEqual(overview.ranked.map((s) => s.id), ['busy-dc', 'quiet-dc']);
+    const overview = service.getOverview({
+      window: { preset: '30d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
+    assert.deepEqual(
+      overview.ranked.map((s) => s.id),
+      ['busy-dc', 'quiet-dc'],
+    );
     assert.equal(Math.round(overview.ranked[0]?.occupancy ?? 0), 75);
     assert.equal(Math.round(overview.ranked[1]?.occupancy ?? 0), 40);
     assert.equal(overview.summary.comparableLocations, 2);
@@ -286,7 +297,11 @@ describe('overview', () => {
 
   test('a new location stays visible as provisional, out of the primary ranking', () => {
     const { driver, service } = seed([BUSY_DC, NEW_DC]);
-    const overview = service.getOverview({ window: { preset: '30d' }, filters: FILTERS, sort: 'occupancy' });
+    const overview = service.getOverview({
+      window: { preset: '30d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
     assert.ok(!overview.ranked.some((s) => s.id === 'new-dc'));
     const provisional = overview.provisional.find((s) => s.id === 'new-dc');
     assert.ok(provisional, 'it is still shown');
@@ -304,7 +319,11 @@ describe('overview', () => {
 
   test('the group occupancy is port-minute weighted, not an average of percentages', () => {
     const { driver, service } = seed([BUSY_DC, QUIET_DC]);
-    const overview = service.getOverview({ window: { preset: '30d' }, filters: FILTERS, sort: 'occupancy' });
+    const overview = service.getOverview({
+      window: { preset: '30d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
     // Averaging 75% and 40% would give 58%; weighting by port-minutes gives
     // 11/24, which is 46%.
     const expected = (100 * (3 + 8)) / (4 + 20);
@@ -315,21 +334,35 @@ describe('overview', () => {
 
   test('Level 2 is compared with Level 2 only', () => {
     const { driver, service } = seed([BUSY_DC, LEVEL2]);
-    const dc = service.getOverview({ window: { preset: '30d' }, filters: FILTERS, sort: 'occupancy' });
+    const dc = service.getOverview({
+      window: { preset: '30d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
     const l2 = service.getOverview({
       window: { preset: '30d' },
       filters: { ...FILTERS, cohort: 'level_2' },
       sort: 'occupancy',
     });
-    assert.deepEqual(dc.ranked.map((s) => s.id), ['busy-dc']);
-    assert.deepEqual(l2.ranked.map((s) => s.id), ['l2']);
+    assert.deepEqual(
+      dc.ranked.map((s) => s.id),
+      ['busy-dc'],
+    );
+    assert.deepEqual(
+      l2.ranked.map((s) => s.id),
+      ['l2'],
+    );
     assert.match(l2.summary.cohortDescription, /Level 2/);
     driver.close();
   });
 
   test('a 30-day request on ten days of history discloses the real window', () => {
     const { driver, service } = seed([BUSY_DC]);
-    const overview = service.getOverview({ window: { preset: '30d' }, filters: FILTERS, sort: 'occupancy' });
+    const overview = service.getOverview({
+      window: { preset: '30d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
     assert.equal(overview.summary.requestedDays, 30);
     assert.ok(overview.summary.effectiveDays <= 11);
     assert.equal(overview.summary.clippedByStudyStart, true);
@@ -338,7 +371,11 @@ describe('overview', () => {
 
   test('the heatmap has 168 bins and unobserved bins are null', () => {
     const { driver, service } = seed([BUSY_DC]);
-    const overview = service.getOverview({ window: { preset: '30d' }, filters: FILTERS, sort: 'occupancy' });
+    const overview = service.getOverview({
+      window: { preset: '30d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
     assert.equal(overview.heatmap.length, 168);
     for (const cell of overview.heatmap) {
       if (!cell.hasData) assert.equal(cell.occupancyPct, null);
@@ -348,7 +385,11 @@ describe('overview', () => {
 
   test('the trend draws missing days as null, never as zero', () => {
     const { driver, service } = seed([BUSY_DC]);
-    const overview = service.getOverview({ window: { preset: '60d' }, filters: FILTERS, sort: 'occupancy' });
+    const overview = service.getOverview({
+      window: { preset: '60d' },
+      filters: FILTERS,
+      sort: 'occupancy',
+    });
     const empties = overview.trend.points.filter((p) => !p.hasData);
     for (const point of empties) assert.equal(point.occupancyPct, null);
     assert.match(overview.trend.note, /not zero occupancy/);
@@ -384,13 +425,20 @@ describe('filters', () => {
       filters: { ...FILTERS, networks: ['OtherNet'], cohort: 'level_2' },
       sort: 'occupancy',
     });
-    assert.deepEqual(result.ranked.map((s) => s.id), ['l2']);
+    assert.deepEqual(
+      result.ranked.map((s) => s.id),
+      ['l2'],
+    );
     driver.close();
   });
 
   test('the map applies the same filters and window as the overview', () => {
     const { driver, service } = seed([BUSY_DC, QUIET_DC, CATALOG_ONLY]);
-    const request = { window: { preset: '30d' } as const, filters: FILTERS, sort: 'occupancy' as const };
+    const request = {
+      window: { preset: '30d' } as const,
+      filters: FILTERS,
+      sort: 'occupancy' as const,
+    };
     const overview = service.getOverview(request);
     const map = service.getMapMarkers({ ...request, metric: 'occupancy' });
     assert.deepEqual(map.summary, overview.summary, 'identical summary from the same engine');

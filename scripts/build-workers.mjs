@@ -22,13 +22,7 @@ import { existsSync } from 'node:fs';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
-const EXTERNAL = [
-  'playwright-core',
-  'playwright',
-  'electron',
-  'electron-updater',
-  /^node:/,
-];
+const EXTERNAL = ['playwright-core', 'playwright', 'electron', 'electron-updater', /^node:/];
 
 const ENTRIES = [
   { name: 'database', input: resolve(root, 'src/workers/database.ts') },

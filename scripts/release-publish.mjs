@@ -50,7 +50,13 @@ if (!/^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(tag)) {
 console.log('Running release verification first…\n');
 const verify = spawnSync(
   process.execPath,
-  ['--experimental-strip-types', '--no-warnings', join(here, 'release-verify.mjs'), '--dir', releaseDir],
+  [
+    '--experimental-strip-types',
+    '--no-warnings',
+    join(here, 'release-verify.mjs'),
+    '--dir',
+    releaseDir,
+  ],
   { cwd: root, stdio: 'inherit' },
 );
 if (verify.status !== 0) {
@@ -69,7 +75,12 @@ if (manifest.tag !== tag) {
   process.exit(1);
 }
 
-const REQUIRED = ['release-manifest.json', 'release-manifest.json.sig', 'SHA256SUMS.txt', 'build-info.json'];
+const REQUIRED = [
+  'release-manifest.json',
+  'release-manifest.json.sig',
+  'SHA256SUMS.txt',
+  'build-info.json',
+];
 const uploadable = readdirSync(releaseDir).filter((name) => {
   const path = join(releaseDir, name);
   if (!statSync(path).isFile()) return false;
@@ -175,7 +186,9 @@ const ghArgs = [
 if (dryRun) {
   console.log('\n--- DRY RUN: nothing was published ---\n');
   console.log('The command that would run:\n');
-  console.log(`  gh ${ghArgs.map((part) => (part.includes(' ') ? `"${part}"` : part)).join(' ')}\n`);
+  console.log(
+    `  gh ${ghArgs.map((part) => (part.includes(' ') ? `"${part}"` : part)).join(' ')}\n`,
+  );
   console.log('To create the draft release for real, re-run with --confirm.');
   console.log('After that, inspect the uploaded assets on GitHub and then publish the draft:');
   console.log(`  gh release edit ${tag} --repo ${repo} --draft=false\n`);
@@ -189,7 +202,9 @@ if (dryRun) {
 try {
   execFileSync('gh', ['--version'], { stdio: 'ignore' });
 } catch {
-  console.error('\nThe GitHub CLI (gh) is not available, so the release cannot be created from here.');
+  console.error(
+    '\nThe GitHub CLI (gh) is not available, so the release cannot be created from here.',
+  );
   console.error('Install it, or create the release manually with the assets listed above.');
   process.exit(1);
 }

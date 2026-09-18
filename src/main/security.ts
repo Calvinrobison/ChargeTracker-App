@@ -73,10 +73,7 @@ export function buildContentSecurityPolicy(inputs: CspInputs): string {
     ['font-src', ["'self'", 'data:']],
     // Map tiles are remote images by necessity.
     ['img-src', ["'self'", 'data:', 'blob:', tiles].filter(Boolean)],
-    [
-      'connect-src',
-      ["'self'", tiles, ...inputs.updateOrigins, dev, devWs].filter(Boolean),
-    ],
+    ['connect-src', ["'self'", tiles, ...inputs.updateOrigins, dev, devWs].filter(Boolean)],
     ['media-src', ["'none'"]],
     ['object-src', ["'none'"]],
     ['frame-src', ["'none'"]],
@@ -185,7 +182,10 @@ export function isTrustedSender(inputs: {
     externalOrigins: [],
   });
   if (decision.action !== 'allow') {
-    return { trusted: false, reason: `the sender document is not the application: ${inputs.senderUrl}` };
+    return {
+      trusted: false,
+      reason: `the sender document is not the application: ${inputs.senderUrl}`,
+    };
   }
   return { trusted: true, reason: null };
 }
@@ -208,7 +208,11 @@ export const DOCUMENTED_OUTBOUND_CONNECTIONS: readonly {
   },
   {
     purpose: 'GitHub release update checks and downloads',
-    origins: ['https://api.github.com', 'https://github.com', 'https://objects.githubusercontent.com'],
+    origins: [
+      'https://api.github.com',
+      'https://github.com',
+      'https://objects.githubusercontent.com',
+    ],
     optional: true,
   },
 ];
@@ -230,7 +234,10 @@ export function redactDiagnosticText(input: string, homeDirectory: string | null
   out = out.replace(/((?:api[_-]?key|token|secret|password)\s*[:=]\s*)\S+/gi, '$1[redacted]');
   out = out.replace(/\bbearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, 'bearer [redacted]');
   out = out.replace(/\b(gh[pousr]_[A-Za-z0-9]{16,})\b/g, '[redacted token]');
-  out = out.replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted jwt]');
+  out = out.replace(
+    /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+    '[redacted jwt]',
+  );
   out = out.replace(/[\w.+-]+@[\w-]+\.[\w.]{2,}/g, '[email redacted]');
 
   if (homeDirectory && homeDirectory.length > 3) {
@@ -239,7 +246,10 @@ export function redactDiagnosticText(input: string, homeDirectory: string | null
     // Also catch the forward-slash spelling of a Windows home path.
     const forward = homeDirectory.replace(/\\/g, '/');
     if (forward !== homeDirectory) {
-      out = out.replace(new RegExp(forward.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '<user home>');
+      out = out.replace(
+        new RegExp(forward.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+        '<user home>',
+      );
     }
   }
 

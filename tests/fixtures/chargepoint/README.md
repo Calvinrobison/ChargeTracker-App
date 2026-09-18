@@ -1,7 +1,7 @@
 # ChargePoint adapter fixtures — SYNTHETIC
 
 **Everything in this directory is synthetic.** These fixtures are written by
-hand to model page *shapes* the adapter must handle. They are **not** captured
+hand to model page _shapes_ the adapter must handle. They are **not** captured
 provider content, and they are **not** evidence that the adapter works against
 the live source.
 
