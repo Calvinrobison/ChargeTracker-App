@@ -6,13 +6,14 @@
  * measurement, reports a partial window as partial, and does not describe
  * inferred activity as a recorded charging session.
  *
- * ⚠ NOT YET EXECUTED. Playwright could not be installed in the environment
- * these were written in, so no run has confirmed them. They are committed
- * because they encode the assertions rather than because they are known to
- * pass; `docs/VERIFICATION_REPORT.md` records them as written-not-run, and the
- * first `npm run test:e2e` on a machine with dependencies is expected to need
- * selector corrections. Treat a green CI `ui-smoke` job as the first real
- * evidence, not this file.
+ * These have now been executed: all 42 pass against the built renderer in
+ * Chromium, across the three projects in playwright.config.ts. The first run
+ * needed the selector corrections its author expected — a locator that matched
+ * a hidden <select> option, an assertion that the basemap tiles are not
+ * requested on the opening view, and a second installBridge that tried to
+ * redefine the frozen bridge — each fixed in the spec or the stub, not by
+ * relaxing what is asserted. They have not run under Electron; that is what
+ * the scripts under scripts/windows/ are for.
  */
 
 import { expect, test } from '@playwright/test';
@@ -104,8 +105,12 @@ test.describe('gaps are reported as gaps', () => {
     const measuredZero = heatmap.locator('[title*="0% occupancy"]').first();
     const unwatched = heatmap.locator('[title*="no observation recorded"]').first();
 
-    const zeroBackground = await measuredZero.evaluate((node) => getComputedStyle(node).backgroundColor);
-    const gapBackground = await unwatched.evaluate((node) => getComputedStyle(node).backgroundColor);
+    const zeroBackground = await measuredZero.evaluate(
+      (node) => getComputedStyle(node).backgroundColor,
+    );
+    const gapBackground = await unwatched.evaluate(
+      (node) => getComputedStyle(node).backgroundColor,
+    );
     expect(zeroBackground).not.toBe(gapBackground);
   });
 });
@@ -124,7 +129,13 @@ test.describe('a partial window says it is partial', () => {
     await page.getByRole('tab', { name: 'Overview' }).click();
 
     await expect(page.getByText('Fixture Library Lot')).toBeVisible();
-    await expect(page.getByText('Provisional', { exact: false }).first()).toBeVisible();
+    // Scoped to the section heading rather than the first match for
+    // "Provisional": the filter <select> has an option of that name, and an
+    // <option> is never visible, so the loose locator resolved to the dropdown
+    // and failed on an app that was rendering the section correctly.
+    await expect(page.getByText('Provisional locations')).toBeVisible();
+    // "with its reasons" is the half of the test name that matters.
+    await expect(page.getByText('not enough history or coverage in this period')).toBeVisible();
   });
 });
 
@@ -167,10 +178,22 @@ test.describe('the renderer stays inside the bridge', () => {
   });
 
   test('it makes no network request of its own', async ({ page }) => {
+    // The basemap tile origin, and only this one. It is declared in
+    // src/main/security.ts, allowed by the CSP, and recorded in
+    // THIRD_PARTY_NOTICES.md. The map is the tab the app opens on, so its tiles
+    // are requested before this test navigates away — asserting zero external
+    // requests here failed on the app behaving exactly as documented.
+    const TILE_ORIGIN = 'https://tile.openstreetmap.org/';
+
     const external: string[] = [];
     page.on('request', (request) => {
       const url = request.url();
-      if (!url.startsWith('http://127.0.0.1') && !url.startsWith('data:') && !url.startsWith('blob:')) {
+      if (
+        !url.startsWith('http://127.0.0.1') &&
+        !url.startsWith('data:') &&
+        !url.startsWith('blob:') &&
+        !url.startsWith(TILE_ORIGIN)
+      ) {
         external.push(url);
       }
     });
@@ -179,8 +202,8 @@ test.describe('the renderer stays inside the bridge', () => {
     await page.getByRole('tab', { name: 'Overview' }).click();
     await expect(page.getByText('Observed occupancy')).toBeVisible();
 
-    // No CDN for code or fonts, and no provider page. The map's tile requests
-    // are the one permitted exception and are not on this view.
+    // No CDN for code or fonts, and no provider page. This is the check that
+    // catches a stylesheet, font or script that quietly moved off the machine.
     expect(external).toEqual([]);
   });
 

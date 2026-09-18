@@ -28,6 +28,17 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.CHARGEWATCH_UI_PORT ?? 4173);
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
+/**
+ * An optional Chromium to run against, instead of the build Playwright would
+ * download itself.
+ *
+ * Unset — the normal case — changes nothing. It exists for machines that ship a
+ * Chromium of their own and cannot fetch Playwright's exact revision: an
+ * offline workstation, or a CI image with a browser preinstalled. Without it
+ * the suite cannot run there at all, which is how these specs stayed unexecuted.
+ */
+const CHROMIUM_PATH = process.env.CHARGEWATCH_CHROMIUM;
+
 export default defineConfig({
   testDir: 'tests/ui',
   testMatch: /.*\.spec\.ts$/,
@@ -41,7 +52,11 @@ export default defineConfig({
   expect: { timeout: 7_000 },
 
   reporter: process.env.CI
-    ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }], ['junit', { outputFile: 'test-results/ui-junit.xml' }]]
+    ? [
+        ['list'],
+        ['html', { open: 'never', outputFolder: 'playwright-report' }],
+        ['junit', { outputFile: 'test-results/ui-junit.xml' }],
+      ]
     : [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
 
   use: {
@@ -60,6 +75,7 @@ export default defineConfig({
     // Offline. A test that only passes with network access is testing
     // something this suite does not intend to test.
     offline: false,
+    ...(CHROMIUM_PATH ? { launchOptions: { executablePath: CHROMIUM_PATH } } : {}),
   },
 
   projects: [
