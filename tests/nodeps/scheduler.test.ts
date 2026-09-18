@@ -153,10 +153,7 @@ describe('queue lag and achievable cadence', () => {
     const plan = scheduler.plan({ nowMs: T0 });
     assert.ok(plan.queueLag > 0, 'the overflow is reported as lag');
     assert.ok(plan.dispatch.length < 100, 'the cycle is not stuffed');
-    assert.ok(
-      plan.dispatch.length >= 30,
-      'and it is not quietly dropping most of the work either',
-    );
+    assert.ok(plan.dispatch.length >= 30, 'and it is not quietly dropping most of the work either');
     assert.equal(plan.achievableIntervalMs, achievable);
   });
 
@@ -180,7 +177,10 @@ describe('restart and sleep behaviour', () => {
     const result = scheduler.spreadOverdue(T0);
     assert.equal(result.restaged, 20);
 
-    const dueTimes = scheduler.snapshot().map((e) => e.nextDueMs - T0).sort((a, b) => a - b);
+    const dueTimes = scheduler
+      .snapshot()
+      .map((e) => e.nextDueMs - T0)
+      .sort((a, b) => a - b);
     assert.deepEqual(dueTimes.slice(0, 3), [0, 30_000, 60_000]);
     assert.equal(result.horizonMs - T0, 19 * 30_000);
 
@@ -346,10 +346,7 @@ describe('eligibility gating', () => {
     scheduler.load([entry('b1')]);
     const plan = scheduler.plan({ nowMs: T0 });
     assert.equal(plan.dispatch.length, 0);
-    assert.equal(
-      plan.skipped.find((s) => s.bindingId === 'b1')?.reason,
-      'source_not_eligible',
-    );
+    assert.equal(plan.skipped.find((s) => s.bindingId === 'b1')?.reason, 'source_not_eligible');
   });
 
   test('a paused binding is skipped but a resume restores it', () => {

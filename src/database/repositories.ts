@@ -391,7 +391,10 @@ export function sitesRepository(driver: SqliteDriver): SitesRepository {
 // ---------------------------------------------------------------------------
 
 export interface CoverageRepository {
-  setCapacity(record: CapacityRecord & { siteId: string; source: 'catalog' | 'source_observation' | 'user' }, nowMs: number): void;
+  setCapacity(
+    record: CapacityRecord & { siteId: string; source: 'catalog' | 'source_observation' | 'user' },
+    nowMs: number,
+  ): void;
   capacityFor(scopeKeys: readonly string[]): CapacityRecord[];
   openMonitoring(scopeKey: string, bindingId: string, startedMs: number, intervalMs: number): void;
   closeMonitoring(scopeKey: string, endedMs: number): void;
@@ -494,7 +497,11 @@ export function coverageRepository(driver: SqliteDriver): CoverageRepository {
     gapsFor(scopeKeys) {
       const rows =
         scopeKeys.length === 0
-          ? driver.prepare('SELECT scope_key, started_ms, ended_ms, reason FROM collection_gaps WHERE scope_key IS NULL').all()
+          ? driver
+              .prepare(
+                'SELECT scope_key, started_ms, ended_ms, reason FROM collection_gaps WHERE scope_key IS NULL',
+              )
+              .all()
           : driver
               .prepare(
                 `SELECT scope_key, started_ms, ended_ms, reason FROM collection_gaps
@@ -767,7 +774,9 @@ export function observationsRepository(driver: SqliteDriver): ObservationsReposi
      * automatically to free space.
      */
     deleteBefore(cutoffMs) {
-      const result = driver.prepare('DELETE FROM observations WHERE observed_at_ms < ?').run(cutoffMs);
+      const result = driver
+        .prepare('DELETE FROM observations WHERE observed_at_ms < ?')
+        .run(cutoffMs);
       return Number(result.changes);
     },
   };
@@ -804,7 +813,9 @@ export function metricsCacheRepository(driver: SqliteDriver): MetricsCacheReposi
       return Number(driver.prepare('UPDATE hourly_metrics SET stale = 1').run().changes);
     },
     staleCount() {
-      return Number(driver.prepare('SELECT COUNT(*) AS c FROM hourly_metrics WHERE stale = 1').get()?.c ?? 0);
+      return Number(
+        driver.prepare('SELECT COUNT(*) AS c FROM hourly_metrics WHERE stale = 1').get()?.c ?? 0,
+      );
     },
   };
 }
@@ -821,7 +832,10 @@ export interface SessionRepository {
    * Marks sessions that never recorded an end as crashed and returns the gap
    * each one left, so missing coverage is recorded instead of interpolated.
    */
-  recoverUncleanSessions(currentId: string, nowMs: number): Array<{
+  recoverUncleanSessions(
+    currentId: string,
+    nowMs: number,
+  ): Array<{
     sessionId: string;
     startedMs: number;
     lastHeartbeatMs: number;
@@ -862,7 +876,9 @@ export function sessionRepository(driver: SqliteDriver): SessionRepository {
         .all(currentId);
       if (rows.length > 0) {
         driver
-          .prepare(`UPDATE app_sessions SET state = 'crashed', ended_ms = ? WHERE state = 'running' AND id <> ?`)
+          .prepare(
+            `UPDATE app_sessions SET state = 'crashed', ended_ms = ? WHERE state = 'running' AND id <> ?`,
+          )
           .run(nowMs, currentId);
       }
       return rows.map((row) => ({

@@ -138,7 +138,14 @@ function observation(overrides: Partial<IngestObservation> = {}): IngestObservat
     sourceUpdatedAtUtcMs: null,
     method: 'rendered_dom',
     granularity: 'station_aggregate',
-    counts: { available: 1, occupied: 1, reserved: null, outOfService: null, unknown: null, total: 2 },
+    counts: {
+      available: 1,
+      occupied: 1,
+      reserved: null,
+      outOfService: null,
+      unknown: null,
+      total: 2,
+    },
     capacityBasis: 'ports_simultaneous',
     completeness: 'complete',
     level: 'level_2',
@@ -184,7 +191,9 @@ describe('migrations', () => {
 
   test('a changed historical migration is refused, not silently re-applied', () => {
     const driver = freshDb();
-    const tampered = [{ ...(MIGRATIONS[0] as (typeof MIGRATIONS)[0]), sql: '-- tampered\nSELECT 1;' }];
+    const tampered = [
+      { ...(MIGRATIONS[0] as (typeof MIGRATIONS)[0]), sql: '-- tampered\nSELECT 1;' },
+    ];
     const outcome = migrate(driver, tampered, { appVersion: APP_VERSION, nowMs: T0 });
     assert.equal(outcome.status, 'checksum_mismatch');
     // The database is untouched and still usable.
@@ -258,7 +267,8 @@ describe('constraints', () => {
     const obs = observationsRepository(driver);
 
     assert.throws(
-      () => obs.ingest('run-1', [observation({ counts: { ...observation().counts, occupied: -1 } })]),
+      () =>
+        obs.ingest('run-1', [observation({ counts: { ...observation().counts, occupied: -1 } })]),
       /CHECK/i,
     );
     // A seconds value where milliseconds are required would land in 1970; a
@@ -314,10 +324,7 @@ describe('observation ingestion', () => {
     const first = obs.ingest('run-1', [observation()]);
     const retry = obs.ingest('run-1', [observation()]);
 
-    assert.deepEqual(
-      [first.written, first.deduplicated],
-      [1, 0],
-    );
+    assert.deepEqual([first.written, first.deduplicated], [1, 0]);
     assert.deepEqual([retry.written, retry.deduplicated], [0, 1]);
     assert.equal(obs.countAll(), 1);
     driver.close();
@@ -352,7 +359,14 @@ describe('observation ingestion', () => {
 
     obs.ingest('run-1', [
       observation({
-        counts: { available: 0, occupied: 2, reserved: null, outOfService: null, unknown: null, total: 2 },
+        counts: {
+          available: 0,
+          occupied: 2,
+          reserved: null,
+          outOfService: null,
+          unknown: null,
+          total: 2,
+        },
       }),
     ]);
 
@@ -433,12 +447,12 @@ describe('observation ingestion', () => {
 
 describe('history survives a reopen', () => {
   test('observations written before a close are present after reopening the file', async () => {
-    const { mkdtemp, rm } = await import('node:fs/promises');
-    const { tmpdir } = await import('node:os');
-    const { join } = await import('node:path');
+    const fsp = await import('node:fs/promises');
+    const os = await import('node:os');
+    const path = await import('node:path');
 
-    const dir = await mkdtemp(join(tmpdir(), 'chargewatch-db-'));
-    const file = join(dir, 'history.sqlite');
+    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'chargewatch-db-'));
+    const file = path.join(dir, 'history.sqlite');
     try {
       const first = openNodeSqlite(file);
       applyConnectionPragmas(first);
@@ -457,7 +471,7 @@ describe('history survives a reopen', () => {
       assert.equal(checkIntegrity(second).ok, true);
       second.close();
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await fsp.rm(dir, { recursive: true, force: true });
     }
   });
 });

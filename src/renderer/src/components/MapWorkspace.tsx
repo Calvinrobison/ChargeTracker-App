@@ -135,11 +135,7 @@ export function MapWorkspace(props: MapWorkspaceProps): ReactNode {
         />
 
         {/* Metric selector, top-left. One metric at a time. */}
-        <div
-          className="map-chrome map-metric-selector"
-          role="group"
-          aria-label="Map metric"
-        >
+        <div className="map-chrome map-metric-selector" role="group" aria-label="Map metric">
           {(['occupancy', 'current', 'coverage', 'visits'] as const).map((metric) => {
             const disabled = metric === 'visits' && !props.visitsMetricAvailable;
             return (

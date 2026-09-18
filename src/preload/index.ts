@@ -66,7 +66,10 @@ const api = {
   contractVersion: IPC_CONTRACT_VERSION,
 
   /** Calls a named operation. Rejects with a ChargeWatchIpcError on failure. */
-  async invoke<N extends OperationName>(operation: N, payload: RequestOf<N>): Promise<ResponseOf<N>> {
+  async invoke<N extends OperationName>(
+    operation: N,
+    payload: RequestOf<N>,
+  ): Promise<ResponseOf<N>> {
     const requestId = newRequestId();
     const response = (await ipcRenderer.invoke(IPC_CHANNEL_REQUEST, {
       contractVersion: IPC_CONTRACT_VERSION,

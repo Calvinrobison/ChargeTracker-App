@@ -219,16 +219,17 @@ export function buildScopeIntervals(input: ScopeSeriesInput): ScopeIntervalSet {
   const monitoredAll = toSpans(monitoringWindows, scopeKey);
   // Remove recorded gaps from the monitoring union.
   const gapsAll = gapSpansFor(gaps, scopeKey);
-  const monitoredMinusGaps = normalize(
-    monitoredAll.flatMap((span) => subtract(span, gapsAll)),
-  );
+  const monitoredMinusGaps = normalize(monitoredAll.flatMap((span) => subtract(span, gapsAll)));
 
   const monitoredSpans = intersectAll(window, monitoredMinusGaps);
   const gapSpansInWindow = intersectAll(window, gapsAll);
 
   const ordered = [...snapshots]
     .filter((s) => s.scopeKey === scopeKey)
-    .sort((a, b) => a.observedAtUtcMs - b.observedAtUtcMs || a.observationId.localeCompare(b.observationId));
+    .sort(
+      (a, b) =>
+        a.observedAtUtcMs - b.observedAtUtcMs || a.observationId.localeCompare(b.observationId),
+    );
 
   const boundaries = capacityBoundaries(capacity, scopeKey);
 

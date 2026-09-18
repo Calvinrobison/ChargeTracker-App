@@ -91,7 +91,9 @@ const tables = db
 
 const migrations = tables.includes('schema_migrations')
   ? db
-      .prepare('SELECT version, name, checksum, app_version, applied_at_ms FROM schema_migrations ORDER BY version')
+      .prepare(
+        'SELECT version, name, checksum, app_version, applied_at_ms FROM schema_migrations ORDER BY version',
+      )
       .all()
   : [];
 
@@ -110,7 +112,8 @@ const fingerprint = {
   createdAtIso: stats.birthtime.toISOString(),
   modifiedAtIso: stats.mtime.toISOString(),
   journalMode: one('PRAGMA journal_mode')?.journal_mode ?? null,
-  schemaVersion: migrations.length > 0 ? Math.max(...migrations.map((m) => Number(m.version))) : null,
+  schemaVersion:
+    migrations.length > 0 ? Math.max(...migrations.map((m) => Number(m.version))) : null,
   appliedMigrations: migrations.map((m) => ({
     version: Number(m.version),
     name: m.name,

@@ -33,13 +33,13 @@ export default async function afterPack(context) {
     problems.push(
       strayCopy
         ? `The bundled browser is in the package but NOT where the application looks.\n` +
-          `    Found:   ${strayCopy}\n` +
-          `    Wanted:  ${candidates.slice(0, 3).join('\n             ')}\n` +
-          '    Either the payload layout or chromiumCandidates() in\n' +
-          '    src/collector/browser.ts needs to change - they have diverged.'
+            `    Found:   ${strayCopy}\n` +
+            `    Wanted:  ${candidates.slice(0, 3).join('\n             ')}\n` +
+            '    Either the payload layout or chromiumCandidates() in\n' +
+            '    src/collector/browser.ts needs to change - they have diverged.'
         : `The bundled browser is missing: no ${executable} under ${browserRoot}.\n` +
-          '    Run "npm run setup:browser" and package again. The app must not download a\n' +
-          '    browser at first run.',
+            '    Run "npm run setup:browser" and package again. The app must not download a\n' +
+            '    browser at first run.',
     );
   }
 

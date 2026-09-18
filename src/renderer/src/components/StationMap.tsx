@@ -304,7 +304,11 @@ export function StationMap({
         let white = 0;
         let total = 0;
         for (let i = 0; i < pixels.length; i += 4) {
-          if ((pixels[i] ?? 0) >= 250 && (pixels[i + 1] ?? 0) >= 250 && (pixels[i + 2] ?? 0) >= 250) {
+          if (
+            (pixels[i] ?? 0) >= 250 &&
+            (pixels[i + 1] ?? 0) >= 250 &&
+            (pixels[i + 2] ?? 0) >= 250
+          ) {
             white += 1;
           }
           total += 1;
@@ -315,7 +319,10 @@ export function StationMap({
         if (blocked) {
           image.src = BLANK_TILE;
           const hits = recentBlockedRef.current.filter(Boolean).length;
-          if (recentBlockedRef.current.length >= 6 && hits / recentBlockedRef.current.length > 0.6) {
+          if (
+            recentBlockedRef.current.length >= 6 &&
+            hits / recentBlockedRef.current.length > 0.6
+          ) {
             markBasemapUnavailable();
           }
         }

@@ -19,6 +19,11 @@
   "include": [
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
+    // The two utility-process entry points. scripts/build-workers.mjs bundles
+    // these into the packaged app, so they are shipped code; leaving them out
+    // of every project meant tsc never saw them and eslint could not parse
+    // them, which made a green typecheck partly vacuous.
+    "src/workers/**/*.ts",
     "src/collector/**/*.ts",
     "src/database/**/*.ts",
     "src/domain/**/*.ts",
@@ -26,6 +31,7 @@
     "tests/unit/**/*.ts",
     "tests/integration/**/*.ts",
     "tests/nodeps/**/*.ts",
+    "tests/support/**/*.ts",
     "tests/fixtures/**/*.ts",
     // format.ts is renderer code, but tests/nodeps/format.test.ts imports it:
     // it is a pure module with no DOM, and the honesty rules it enforces are

@@ -120,14 +120,18 @@ async function dispatch(op: string, payload: unknown): Promise<unknown> {
       await service.start();
       return service.status();
     case 'pause':
-      await service.pause((payload as { reason?: 'user_paused' | 'update_install' | 'offline' }).reason);
+      await service.pause(
+        (payload as { reason?: 'user_paused' | 'update_install' | 'offline' }).reason,
+      );
       return service.status();
     case 'status':
       return service.status();
     case 'sourceHealth':
       return service.sourceHealth();
     case 'refreshNow':
-      return service.requestManualRefresh((payload as { bindingIds: readonly string[] }).bindingIds);
+      return service.requestManualRefresh(
+        (payload as { bindingIds: readonly string[] }).bindingIds,
+      );
     case 'setOnline':
       service.setOnline((payload as { online: boolean }).online);
       return service.status();

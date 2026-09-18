@@ -34,6 +34,12 @@ declare global {
   interface Window {
     /** Set by the stub only. Absent in a real build. */
     __chargewatchCalls?: Array<{ operation: string; payload: unknown }>;
+    /**
+     * The fixture config the stub answers from. Set by the stub only, and
+     * replaced by each installBridge call so a later one can add failures or
+     * override a response without redefining the frozen bridge itself.
+     */
+    __chargewatchConfig?: unknown;
   }
 }
 
@@ -52,10 +58,21 @@ export async function installBridge(page: Page, options: BridgeOptions = {}): Pr
   };
 
   await page.addInitScript((config: typeof payload) => {
+    // Every addInitScript registered on the page runs, in order, on each
+    // navigation. A test that calls installBridge again to add failures or
+    // override a response therefore runs this twice, and the second run must
+    // not try to redefine a non-configurable property. The last config to be
+    // installed wins, and the bridge below reads it live rather than capturing
+    // it, so the second install takes effect without redefining anything.
+    window.__chargewatchConfig = config;
+    if (Object.prototype.hasOwnProperty.call(window, 'chargewatch')) return;
+
     const calls: Array<{ operation: string; payload: unknown }> = [];
     window.__chargewatchCalls = calls;
 
     const listeners = new Map<string, Set<(value: unknown) => void>>();
+
+    const active = (): typeof config => window.__chargewatchConfig as typeof config;
 
     const wait = (ms: number) =>
       ms > 0 ? new Promise<void>((resolve) => window.setTimeout(resolve, ms)) : Promise.resolve();
@@ -65,9 +82,9 @@ export async function installBridge(page: Page, options: BridgeOptions = {}): Pr
 
       async invoke(operation: string, requestPayload: unknown): Promise<unknown> {
         calls.push({ operation, payload: requestPayload });
-        await wait(config.latencyMs);
+        await wait(active().latencyMs);
 
-        const failure = (config.failures as Record<string, string>)[operation];
+        const failure = (active().failures as Record<string, string>)[operation];
         if (failure) {
           const error = new Error(`fixture failure for ${operation}`) as Error & { code: string };
           error.code = failure;
@@ -78,7 +95,7 @@ export async function installBridge(page: Page, options: BridgeOptions = {}): Pr
         // by site id so a test cannot pass by being handed the wrong station.
         if (operation === 'station.getDetail' || operation === 'station.getDetailById') {
           const siteId = (requestPayload as { siteId?: string } | null)?.siteId ?? '';
-          const detail = (config.details as Record<string, unknown>)[siteId];
+          const detail = (active().details as Record<string, unknown>)[siteId];
           if (!detail) {
             throw new Error(
               `No fixture detail for site "${siteId}". Add one to tests/ui/fixtures.ts.`,
@@ -87,14 +104,14 @@ export async function installBridge(page: Page, options: BridgeOptions = {}): Pr
           return detail;
         }
 
-        if (!Object.prototype.hasOwnProperty.call(config.responses, operation)) {
+        if (!Object.prototype.hasOwnProperty.call(active().responses, operation)) {
           // Loud on purpose. See rule 1 in the module comment.
           throw new Error(
             `No fixture for "${operation}". Add one to tests/ui/fixtures.ts rather than ` +
               'letting the renderer receive an empty response.',
           );
         }
-        return (config.responses as Record<string, unknown>)[operation];
+        return (active().responses as Record<string, unknown>)[operation];
       },
 
       cancel(): void {
@@ -111,7 +128,11 @@ export async function installBridge(page: Page, options: BridgeOptions = {}): Pr
       },
     };
 
-    Object.defineProperty(window, 'chargewatch', { value: api, configurable: false, writable: false });
+    Object.defineProperty(window, 'chargewatch', {
+      value: api,
+      configurable: false,
+      writable: false,
+    });
 
     // Lets a test push an event the way the main process would.
     Object.defineProperty(window, '__chargewatchEmit', {

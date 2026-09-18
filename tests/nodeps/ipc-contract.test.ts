@@ -61,7 +61,11 @@ describe('operation registry', () => {
   });
 
   test('destructive operations require explicit confirmation in their schema', () => {
-    for (const name of ['restore.perform', 'data.deleteRange', 'update.restartAndInstall'] as const) {
+    for (const name of [
+      'restore.perform',
+      'data.deleteRange',
+      'update.restartAndInstall',
+    ] as const) {
       const spec = OPERATIONS[name];
       assert.equal(spec.mutating, true, `${name} is mutating`);
       const unconfirmed = spec.request.safeParse({
@@ -111,10 +115,12 @@ describe('request envelope', () => {
       privileged: true,
       senderOverride: 'main',
     });
-    assert.deepEqual(
-      Object.keys(parsed).sort(),
-      ['contractVersion', 'operation', 'payload', 'requestId'],
-    );
+    assert.deepEqual(Object.keys(parsed).sort(), [
+      'contractVersion',
+      'operation',
+      'payload',
+      'requestId',
+    ]);
   });
 
   test('a missing contract version is rejected rather than defaulted', () => {
@@ -150,7 +156,8 @@ describe('window requests', () => {
 
   test('a seconds-valued instant is rejected', () => {
     assert.throws(
-      () => windowRequestSchema.parse({ preset: 'custom', customStartMs: 1.7e9, customEndMs: 1.8e13 }),
+      () =>
+        windowRequestSchema.parse({ preset: 'custom', customStartMs: 1.7e9, customEndMs: 1.8e13 }),
       ValidationError,
     );
   });
@@ -174,7 +181,10 @@ describe('filter state', () => {
   });
 
   test('an unknown monitoring state is rejected', () => {
-    assert.throws(() => filterStateSchema.parse({ monitoringStates: ['imaginary'] }), ValidationError);
+    assert.throws(
+      () => filterStateSchema.parse({ monitoringStates: ['imaginary'] }),
+      ValidationError,
+    );
   });
 });
 

@@ -180,7 +180,11 @@ describe('primary ranking eligibility', () => {
 });
 
 describe('ranking construction', () => {
-  function entry(metrics: ScopeMetrics, level: RankedEntry['level'], scopeKey: string): RankedEntry {
+  function entry(
+    metrics: ScopeMetrics,
+    level: RankedEntry['level'],
+    scopeKey: string,
+  ): RankedEntry {
     return { scopeKey, metrics, eligibility: evaluateEligibility(metrics), level };
   }
 
@@ -230,8 +234,14 @@ describe('ranking construction', () => {
   test('Level 2 is compared with Level 2 by default', () => {
     const dc = rankScopes(all, 'dc_fast', 'occupancy', window);
     const l2 = rankScopes(all, 'level_2', 'occupancy', window);
-    assert.deepEqual(dc.primary.map((e) => e.scopeKey), ['dc-busy', 'dc-big']);
-    assert.deepEqual(l2.primary.map((e) => e.scopeKey), ['l2']);
+    assert.deepEqual(
+      dc.primary.map((e) => e.scopeKey),
+      ['dc-busy', 'dc-big'],
+    );
+    assert.deepEqual(
+      l2.primary.map((e) => e.scopeKey),
+      ['l2'],
+    );
   });
 
   test('provisional locations stay visible but out of the primary ranking', () => {
@@ -317,7 +327,10 @@ describe('visit imports', () => {
   });
 
   test('duplicate and overlapping rows in one dataset are rejected, never summed', () => {
-    const result = validateVisitRows([row(), row(), row({ period: { startMs: T0 + HOUR, endMs: T0 + 2 * DAY } })], sites);
+    const result = validateVisitRows(
+      [row(), row(), row({ period: { startMs: T0 + HOUR, endMs: T0 + 2 * DAY } })],
+      sites,
+    );
     assert.equal(result.accepted.length, 1);
     const codes = result.issues.map((i) => i.code);
     assert.ok(codes.includes('duplicate_row'));
@@ -346,10 +359,13 @@ describe('visit imports', () => {
     assert.equal(ok.ok, true);
     if (ok.ok) assert.equal(ok.visitCount, 30);
 
-    const gappy = alignVisitsToWindow([daily[0] as VisitObservation, daily[2] as VisitObservation], {
-      startMs: T0,
-      endMs: T0 + 3 * DAY,
-    });
+    const gappy = alignVisitsToWindow(
+      [daily[0] as VisitObservation, daily[2] as VisitObservation],
+      {
+        startMs: T0,
+        endMs: T0 + 3 * DAY,
+      },
+    );
     assert.equal(gappy.ok, false);
     if (!gappy.ok) assert.equal(gappy.reason, 'partial_period_coverage');
   });
@@ -374,10 +390,10 @@ describe('visit imports', () => {
     if (!alignment.ok) return;
     const comparison = buildVisitComparison({
       alignment,
-      capacity: capacityForWindow(
-        [{ period: { startMs: T0, endMs: T0 + DAY }, ports: 4 }],
-        { startMs: T0, endMs: T0 + DAY },
-      ),
+      capacity: capacityForWindow([{ period: { startMs: T0, endMs: T0 + DAY }, ports: 4 }], {
+        startMs: T0,
+        endMs: T0 + DAY,
+      }),
       statusCoveragePct: 100,
       recordedSessionCount: null,
       recordedSessionsCoverSamePeriodAndScope: false,
@@ -397,10 +413,10 @@ describe('visit imports', () => {
     if (!alignment.ok) return;
     const comparison = buildVisitComparison({
       alignment,
-      capacity: capacityForWindow(
-        [{ period: { startMs: T0, endMs: T0 + DAY }, ports: 4 }],
-        { startMs: T0, endMs: T0 + DAY },
-      ),
+      capacity: capacityForWindow([{ period: { startMs: T0, endMs: T0 + DAY }, ports: 4 }], {
+        startMs: T0,
+        endMs: T0 + DAY,
+      }),
       statusCoveragePct: 100,
       recordedSessionCount: 50,
       recordedSessionsCoverSamePeriodAndScope: true,
@@ -513,7 +529,10 @@ describe('study-area geography', () => {
       { id: 'bad', coordinate: { latitude: Number.NaN, longitude: 0 } },
     ];
     const filtered = filterToRadius(rows, MESA, 50);
-    assert.deepEqual(filtered.map((r) => r.id), ['in']);
+    assert.deepEqual(
+      filtered.map((r) => r.id),
+      ['in'],
+    );
     assert.ok((filtered[0]?.distanceMiles ?? 99) < 1);
   });
 });

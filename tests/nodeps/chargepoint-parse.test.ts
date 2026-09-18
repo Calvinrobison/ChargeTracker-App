@@ -151,8 +151,22 @@ describe('port rows', () => {
   test('a mix of "In use" and "Charging" does not claim charging is distinguished', () => {
     const mixed = fixtures.reading({
       portRows: [
-        { label: 'Port 1', statusText: 'Charging', connectorText: 'CCS', powerText: null, lastUsedText: null, durablePortId: 'a' },
-        { label: 'Port 2', statusText: 'In use', connectorText: 'CCS', powerText: null, lastUsedText: null, durablePortId: 'b' },
+        {
+          label: 'Port 1',
+          statusText: 'Charging',
+          connectorText: 'CCS',
+          powerText: null,
+          lastUsedText: null,
+          durablePortId: 'a',
+        },
+        {
+          label: 'Port 2',
+          statusText: 'In use',
+          connectorText: 'CCS',
+          powerText: null,
+          lastUsedText: null,
+          durablePortId: 'b',
+        },
       ],
     });
     const result = parsePageReading(mixed, OPTIONS);
@@ -181,7 +195,10 @@ describe('port rows', () => {
     assert.equal(result.counts.unknown, 1);
     assert.equal(result.counts.available, 1);
     assert.equal(result.completeness, 'partial');
-    assert.ok(result.warnings.some((w) => /locale/.test(w)), 'the locale mismatch is recorded');
+    assert.ok(
+      result.warnings.some((w) => /locale/.test(w)),
+      'the locale mismatch is recorded',
+    );
   });
 
   test('connector rows are flagged so two plugs are not read as two spaces', () => {
@@ -274,7 +291,7 @@ describe('failure outcomes', () => {
 
   test('a page with no station identity is rejected when one was expected', () => {
     const result = parsePageReading(
-      fixtures.reading({ stationIdOnPage: null, portRows: [] , summaryText: '1 of 2 available' }),
+      fixtures.reading({ stationIdOnPage: null, portRows: [], summaryText: '1 of 2 available' }),
       OPTIONS,
     );
     assert.equal(result.ok, false);
@@ -305,7 +322,7 @@ describe('evidence sanitisation', () => {
   });
 
   test('retained evidence is bounded in size', () => {
-    const sanitized = sanitizeEvidence([('x'.repeat(5000))]);
+    const sanitized = sanitizeEvidence(['x'.repeat(5000)]);
     assert.ok(sanitized.length <= 1000);
   });
 

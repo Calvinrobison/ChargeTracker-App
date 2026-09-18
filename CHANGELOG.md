@@ -60,6 +60,63 @@ project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 - **Issue and pull request templates**, including a data-accuracy template and a
   data-honesty checklist that applies to every change.
 
+### Fixed
+
+- **The lockfile.** `package-lock.json` is committed. Every check beyond
+  `test:nodeps` was blocked on a dependency tree that had never been resolved.
+- **`npm test` collected nothing.** The specs under `tests/nodeps` register with
+  `node:test`, which Vitest cannot see, so all 19 files failed with "No test
+  suite found" while `vitest.config.ts` described itself as covering them.
+  `node:test` is now aliased to a shim re-exporting the same names from Vitest,
+  and 413 specs pass under both runners.
+- **The worker entry points were typechecked by nothing.**
+  `src/workers/database.ts` and `src/workers/collector.ts` belonged to no
+  tsconfig project, so two modules that ship in the packaged app were invisible
+  to `tsc` and unparseable by eslint. Both are in `tsconfig.node.json` now.
+- **`release-verify.mjs` accepted `--installed-version` and ignored it.** The
+  upgrade-path check the installed updater performs — `isDirectUpgradePermitted`,
+  which refuses a release that would skip a required data migration — was
+  therefore not part of the release gate. It is now.
+- **The lint configuration reported 930 problems that were not in the code.** No
+  globals were declared, so every `process`, `console` and `window` was an
+  undefined variable, and `node:test`'s `describe`/`it` were 514 dropped
+  promises. Renamed to `eslint.config.mjs`, because `"type": "module"` would
+  make Node read the packaged CJS main bundle as ESM.
+- **The UI specs had never been executed.** All 42 now pass against the built
+  renderer in Chromium. Three corrections were needed, all in the specs: a
+  locator matching a hidden `<option>`, an assertion that basemap tiles are not
+  requested on the opening view when the map is the tab the app opens on, and a
+  second `installBridge` call redefining the frozen bridge. The application was
+  correct in each case.
+- **Formatting.** `prettier --check` had never passed; 105 files did not match
+  the project's own configuration.
+- **The packaged Windows app could not start.** `WindowManager.appOrigins` built
+  the trusted renderer prefix as `'file://' + path`, which is correct on POSIX
+  and yields `file://C:/...` — two slashes — on Windows, where Electron reports
+  three. Origins are matched by string prefix, so every IPC message from the
+  application's own window was rejected and the first call the renderer made
+  failed, showing "ChargeWatch could not start". Construction moved to
+  `security.ts`, which imports nothing and can therefore be reached by the
+  dependency-free specs; five specs now cover it. Only reachable in a packaged
+  build — in development the renderer is served over http.
+- **The history file was written to the roaming profile.** The data root came
+  from `app.getPath('userData')`, which on Windows derives from `%APPDATA%`.
+  The application raised `cloud_roaming_directory` against its own data
+  directory on every start, and a live WAL database in a OneDrive-synced folder
+  can be corrupted by the sync client. Windows now reads `%LOCALAPPDATA%`,
+  which is what the documentation already promised.
+- **`--self-check` hung instead of failing.** Each RPC had a timeout, but they
+  run in sequence and the collector's default is 120 s, so an unresponsive
+  worker produced roughly ten silent minutes and no report. The run now has a
+  90 s ceiling and exits non-zero when it expires.
+
+- **A bundled station catalog.** 1083 charging locations within 50 miles of
+  Mesa, built from the AFDC Arizona export and shipped in `resources/catalog`
+  with a `provenance.json` recording the retrieval date, origin, licence,
+  attribution, file hash and field mapping. The first run of that mapping
+  against a genuine AFDC file accepted 1083 of 1652 rows with zero bad
+  coordinates and zero duplicates.
+
 ### Known limitations
 
 No release has been published. Live collection, the bundled station catalog and

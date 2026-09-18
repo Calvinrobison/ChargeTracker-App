@@ -55,7 +55,8 @@ interface Row {
 }
 
 function csv(rows: readonly Row[], headers: readonly string[] = HEADERS): string {
-  const quote = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+  const quote = (value: string) =>
+    /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
   const lines = [headers.join(',')];
   for (const row of rows) {
     lines.push(headers.map((header) => quote(row[header] ?? '')).join(','));
@@ -94,18 +95,29 @@ interface RunResult {
   readonly dir: string;
 }
 
-async function runRefresh(rows: readonly Row[], extra: string[] = [], headers = HEADERS): Promise<RunResult> {
+async function runRefresh(
+  rows: readonly Row[],
+  extra: string[] = [],
+  headers = HEADERS,
+): Promise<RunResult> {
   const dir = await mkdtemp(join(tmpdir(), 'cw-catalog-'));
   const csvPath = join(dir, 'alt_fuel_stations.csv');
   await writeFile(csvPath, csv(rows, headers), 'utf8');
   const result = spawnSync(process.execPath, [SCRIPT, '--file', csvPath, '--out', dir, ...extra], {
     encoding: 'utf8',
   });
-  return { status: result.status ?? -1, stdout: result.stdout ?? '', stderr: result.stderr ?? '', dir };
+  return {
+    status: result.status ?? -1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    dir,
+  };
 }
 
 async function readCatalog(dir: string): Promise<{ sites: Array<Record<string, unknown>> }> {
-  return JSON.parse(await readFile(join(dir, 'mesa-stations.json'), 'utf8'));
+  return JSON.parse(await readFile(join(dir, 'mesa-stations.json'), 'utf8')) as {
+    sites: Array<Record<string, unknown>>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +157,11 @@ describe('the catalog seed maps AFDC columns as documented', () => {
       assert.equal(sites.length, 1);
       const site = sites[0] as Record<string, unknown>;
 
-      assert.equal(site.id, 'afdc-100001', 'the registry id anchors a stable identity across refreshes');
+      assert.equal(
+        site.id,
+        'afdc-100001',
+        'the registry id anchors a stable identity across refreshes',
+      );
       assert.equal(site.registryStationId, '100001');
       assert.equal(site.name, 'Fixture Station');
       assert.equal(site.streetAddress, '1 Test Way');
@@ -159,7 +175,7 @@ describe('the catalog seed maps AFDC columns as documented', () => {
       assert.equal(site.catalogPortCount, 4);
       assert.equal(site.catalogLevel, 'level_2');
       assert.equal(site.connectorTypes, 'J1772');
-      assert.ok(typeof site.distanceMiles === 'number' && (site.distanceMiles as number) < 2);
+      assert.ok(typeof site.distanceMiles === 'number' && site.distanceMiles < 2);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -179,7 +195,11 @@ describe('the catalog seed maps AFDC columns as documented', () => {
       const byId = new Map(sites.map((s) => [s.registryStationId, s]));
       assert.equal(byId.get('1')?.catalogLevel, 'level_2');
       assert.equal(byId.get('2')?.catalogLevel, 'dc_fast');
-      assert.equal(byId.get('3')?.catalogLevel, 'mixed', 'both kinds present is mixed, never a guess');
+      assert.equal(
+        byId.get('3')?.catalogLevel,
+        'mixed',
+        'both kinds present is mixed, never a guess',
+      );
       assert.equal(byId.get('5')?.catalogLevel, 'level_1');
 
       // No port counts at all means the level is unknown and the count is null
@@ -204,9 +224,17 @@ describe('the catalog seed maps AFDC columns as documented', () => {
     try {
       assert.equal(status, 0);
       const { sites } = await readCatalog(dir);
-      assert.equal(sites.length, 1, `only the valid row should survive; got ${JSON.stringify(sites.map((s) => s.registryStationId))}`);
+      assert.equal(
+        sites.length,
+        1,
+        `only the valid row should survive; got ${JSON.stringify(sites.map((s) => s.registryStationId))}`,
+      );
       assert.equal(sites[0]?.registryStationId, '5');
-      assert.match(stdout, /skipped, bad coords\s+4/, 'the run must report what it dropped, and how many');
+      assert.match(
+        stdout,
+        /skipped, bad coords\s+4/,
+        'the run must report what it dropped, and how many',
+      );
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -306,7 +334,10 @@ describe('the catalog seed is reproducible and carries its provenance', () => {
       assert.ok(String(provenance.sourceUrl).includes('afdc.energy.gov'));
       assert.match(String(provenance.fileSha256), /^[0-9a-f]{64}$/);
       assert.ok(provenance.fieldMapping, 'the column mapping must be recorded, not just applied');
-      assert.ok(provenance.retrievedAtIso ?? provenance.retrievedAtMs, 'retrieval time must be recorded');
+      assert.ok(
+        provenance.retrievedAtIso ?? provenance.retrievedAtMs,
+        'retrieval time must be recorded',
+      );
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

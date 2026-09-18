@@ -118,7 +118,7 @@ file's own header. The ordering is deliberate at every step.
 3. **Open the database**, via `startDatabase()`. This is where recovery,
    the pre-migration backup and migration happen, inside the worker. If
    `databaseState.status !== 'ready'` the function shows a dialog that states
-   explicitly that existing data has *not* been changed, and returns without
+   explicitly that existing data has _not_ been changed, and returns without
    starting anything else.
 4. **Only if the database is ready**, start the collector and run the health
    checks. This is the load-bearing ordering: `bootstrap()` guards
@@ -183,9 +183,9 @@ sequenceDiagram
 honesty constraints in disguise: due times persist as UTC milliseconds while
 in-process delays use a monotonic clock, so a system clock change cannot
 stampede the queue; a per-source token bucket enforces the minimum navigation
-interval and manual refresh spends the *same* budget; transient failures back
+interval and manual refresh spends the _same_ budget; transient failures back
 off exponentially with jitter capped at six hours; authentication walls,
-challenges and access blocks *pause* the source rather than retrying forever;
+challenges and access blocks _pause_ the source rather than retrying forever;
 and on restart overdue work is spread rather than fired at once. The last point
 is why waking from sleep does not produce a request storm — and
 `spreadOverdue()` is called in both `start()` and `onResume()`.
@@ -221,14 +221,14 @@ identity mismatch is rejected rather than attributed to the wrong station.
 `EnvelopedObservation` carrying `sourceUrl`, `parserVersion`
 (`sourceId@adapterVersion`), `evidenceFingerprint`, `sanitizedSourceText`,
 `quality`, `sourceFreshness` and — importantly — the `freshnessPolicy` that was
-in force at the moment of the reading. Port rows are carried through *only*
+in force at the moment of the reading. Port rows are carried through _only_
 when both the source capability and the binding declare `identityReliability:
 'durable'`; otherwise the array is emptied here as well as in the adapter, so
 there is no path by which a page's display order becomes a port identity.
 
 The `evidenceFingerprint` deserves a note: `fingerprint()` at the bottom of
 `service.ts` is an FNV-1a digest used for provenance labelling only, and the
-comment states it is deliberately *not* used to discard a repeated identical
+comment states it is deliberately _not_ used to discard a repeated identical
 status. The same status at a new scheduled time is new evidence and is kept.
 
 **Main hands the run to the database worker.** The collector never writes
@@ -269,12 +269,12 @@ The report separates two kinds of result, because conflating them would make
 the check either useless or dishonest:
 
 - **Integrity** — `SELF_CHECK_INTEGRITY_IDS = ['data_dir', 'database',
-  'browser']`. These must pass. A failure means the package is broken, and the
+'browser']`. These must pass. A failure means the package is broken, and the
   exit code is 1.
 - **Readiness** — `SELF_CHECK_READINESS_IDS = ['sources', 'catalog']`. These
   are reported but do not fail the run.
 
-The split exists because readiness checks are *expected* to be unmet in a
+The split exists because readiness checks are _expected_ to be unmet in a
 correct fresh install: no source has been cleared for collection and no catalog
 has been imported. Failing on them would mean a correct package could never
 pass, which would train whoever reads the report to ignore it. So they are
@@ -316,7 +316,7 @@ schema, a response type, a `timeoutMs`, and `mutating` / `cancellable` flags.
 Validation happens at the boundary and is hand-written
 (`src/shared/validate.ts`, ADR-0002) rather than delegated to Zod. The reasons
 are recorded in the ADR: the npm registry was unreachable, so Zod schemas could
-not have been *executed* here, and unexecuted validation at a trust boundary is
+not have been _executed_ here, and unexecuted validation at a trust boundary is
 exactly the wrong thing to trust. The validator keeps `null` and `undefined`
 distinct, strips unknown keys so a compromised renderer cannot smuggle fields
 into a worker call, rejects fractional integers rather than rounding,
@@ -324,7 +324,7 @@ range-checks instants, and strips prototype-pollution payloads. Note that
 `src/domain/types.ts` still carries a stale header comment pointing at
 `src/shared/contracts` and Zod; no such module exists.
 
-Destructive operations encode confirmation *in the schema itself*, so an
+Destructive operations encode confirmation _in the schema itself_, so an
 unconfirmed request cannot reach a handler: `restore.perform`,
 `data.deleteRange` and `update.restartAndInstall` each `.refine()` on
 `confirmed` being true.
@@ -380,14 +380,14 @@ no permission, which is also why no permission prompt ever appears.
 
 **Diagnostic redaction.** `diagnostics.export` is user-initiated, previewable,
 and reports its own `contents` list. `redactDiagnosticText()` strips whole
-header *values* for `authorization` and `cookie` families (not just the first
+header _values_ for `authorization` and `cookie` families (not just the first
 word, so `Bearer <token>` does not leave the token), plus api-key/token/secret/
 password assignments, bearer tokens, GitHub `gh*_` tokens, JWTs, email
 addresses and the user's home path in both slash spellings. That is best-effort
 redaction layered on a stronger rule: profiles, credentials and the database
 are never included in the bundle at all.
 
-**Data paths.** `resolveDataPaths()` puts everything under the user's *local*
+**Data paths.** `resolveDataPaths()` puts everything under the user's _local_
 application data, outside the install directory — an install directory is
 replaced by an update, and history stored there would be destroyed by one. It
 warns on cloud-roaming folders. `isPermittedWriteDestination()` is called by
@@ -418,7 +418,7 @@ passed to `verifyManifest()` (`src/shared/release-manifest.ts`) with the
 trusted keys, application id, platform, arch, accepted channels, protocol
 version, the highest previously accepted release sequence, and
 `writableDbSchema: TARGET_SCHEMA_VERSION`. Signature verification is Ed25519
-over the exact bytes written to disk, checked *before* parsing. A rejection
+over the exact bytes written to disk, checked _before_ parsing. A rejection
 records a `manifest_rejected` event and sets a failure state whose message says
 the installation is unchanged. Then `isDirectUpgradePermitted()` is consulted
 before the manifest is accepted.
@@ -466,7 +466,7 @@ non-zero if either entry is missing rather than producing a partial build.
 **Why `better-sqlite3` and `playwright-core` are external.** Both are declared
 in `NATIVE_OR_BINARY_DEPS` and excluded from every bundle. `better-sqlite3` is
 a native addon and `playwright-core` depends on binaries on disk; bundling them
-produces a build that fails at *runtime* rather than at build time, which is
+produces a build that fails at _runtime_ rather than at build time, which is
 the worse failure because it ships. They stay in production `dependencies` and
 are unpacked from the asar by electron-builder. The preload gets
 `format: 'cjs'` with `inlineDynamicImports` because it runs in a sandboxed
@@ -476,7 +476,7 @@ context and must be a single file with no dynamic imports.
 payload via `extraResources` at `resources/browser/`, and it is resolved at
 runtime from `process.resourcesPath` by `resolveBundledChromium()`. A browser
 executable cannot be launched from inside an asar archive, and nothing may
-depend on the *builder's* home cache, which does not exist on a user's machine.
+depend on the _builder's_ home cache, which does not exist on a user's machine.
 For the same reason `asarUnpack` lists `better-sqlite3`, `bindings` and
 `file-uri-to-path`: a native module cannot be loaded from inside an archive.
 
@@ -499,28 +499,39 @@ against `docs/IMPLEMENTATION_STATUS.md` and `docs/VERIFICATION_REPORT.md`. Both
 of those documents are **stale in the optimistic direction about what is
 missing and pessimistic about what exists** — details at the end.
 
-**Never typechecked.** `npm run typecheck` has never been run. The
-dependency-free suite executes TypeScript through Node's type stripping, which
-runs code but does not check types. Expect real errors on first run.
+**Typechecked, linted and formatted.** `npm run typecheck`, `npm run lint` and
+`npm run format` all run clean on Linux with Node 22.22.2. `src/workers/*.ts`
+had been in neither tsconfig project, so they were never typechecked and eslint
+could not parse them; they are in `tsconfig.node.json` now. The dependency-free
+suite executes TypeScript through Node's type stripping, which runs code but
+does not check types, so this is a separate guarantee rather than a redundant
+one.
 
-**No lockfile.** `package-lock.json` does not exist; the npm registry was
-unreachable (`403 host_not_allowed`). Nothing requiring Electron, React, Vite,
-Playwright, better-sqlite3 or electron-builder has been installed, built or
-run.
+**Lockfile present.** `package-lock.json` is committed; install with `npm ci`.
+`npm run build` succeeds on Linux, which produces the bundles but not a package;
+`electron-builder --win` still needs a Windows host. Electron itself has been run
+there — `release\win-unpacked\ChargeWatch.exe` launches — and one installer has
+been produced, which crashes on install. See `docs/HANDOFF.md` section 1a.
 
 **Never executed at all.** These modules are complete and reviewable, but
 nothing has run them:
 
 - `src/collector/browser.ts` — bundled Chromium runtime, page pool, readiness.
 - `src/collector/adapters/chargepoint/index.ts` — the Playwright wiring around
-  the tested parser. The parser itself (`parse.ts`) *is* tested.
+  the tested parser. The parser itself (`parse.ts`) _is_ tested.
 - `src/collector/service.ts` — orchestration and provenance envelopes.
 - `src/main/workers.ts`, `src/main/updates.ts`, `src/main/updates-backend.ts` —
   worker supervision and the update service, including all the install gates.
-- `src/preload/index.ts` — the bridge.
-- `src/workers/{database,collector}.ts` — the utility-process entry points.
-- The renderer under `src/renderer/` — it exists but has never been built or
-  rendered. The UI specs under `tests/ui/` have never been executed.
+- `src/preload/index.ts` — the bridge. The UI specs install a stub bridge, not
+  this one.
+- `src/workers/{database,collector}.ts` — the utility-process entry points. They
+  build and typecheck; nothing has forked them.
+
+The renderer under `src/renderer/` is no longer on that list: it builds, and the
+42 UI specs under `tests/ui/` pass against `out/renderer/` in Chromium. That is
+a browser with a stub bridge and synthetic fixtures — no Electron, no database,
+no network — so it establishes the honesty rules on screen and nothing about
+the application as installed.
 
 `src/database/worker.ts` has been smoke-run against `node:sqlite` (it opens,
 migrates with WAL, seeds settings, exports CSV, and correctly refuses a backup
@@ -567,8 +578,9 @@ implemented in the router and the preload but is not reachable from the
 renderer.
 
 **No soak, no screenshots.** No bounded soak has run, because a soak needs a
-live source. There are no screenshots, because there is no built UI to
-photograph, and none were faked.
+live source. There are no screenshots: the only rendering so far is headless
+Chromium over synthetic fixtures, so there is nothing real to photograph, and
+none were faked.
 
 ### Where the existing status documents disagree with the source
 
@@ -577,7 +589,7 @@ Report these rather than trusting either document:
 - `IMPLEMENTATION_STATUS.md` lists I1 (`src/main/index.ts`, `window.ts`,
   `tray.ts`), I2 (the renderer), I3 (`scripts/`), I4 (packaging config), I6
   (CI, issue and PR templates, dependabot) and I7 (Vitest and Playwright
-  projects) as *outstanding*. All of them now exist in the tree. It also says
+  projects) as _outstanding_. All of them now exist in the tree. It also says
   `package.json` points at `out/main/index.js`, "which does not exist yet" — the
   source does.
 - It says a list of scripts is "deliberately absent from `package.json` rather
@@ -585,18 +597,20 @@ Report these rather than trusting either document:
   `setup:browser`, `catalog:refresh`, `keys:bootstrap`, `release:*`,
   `test:installed`, `test:update`. Every one of those scripts is now present,
   and `scripts/windows/test-installed.ps1` and `test-update.ps1` both exist.
-- Both documents state the test count as **329 specs / 55 suites**. Running
-  `node scripts/test-nodeps.mjs` today gives **380 tests / 103 suites, 380
-  passing, 0 failing**. The comment in `package.json` already says 380.
+- The test count has been stated as **329 specs / 55 suites** and later as
+  **380**. Running `node scripts/test-nodeps.mjs` today gives **413 tests / 113
+  suites, 413 passing, 0 failing**, and `npm test` now runs the same 413 under
+  Vitest. Both documents and the comment in `package.json` say 413.
 - Both documents state the schema has **54 indexes**. `001_initial.sql`
   contains **39 explicit `CREATE INDEX` statements** (12 of them `UNIQUE`). The
   table count of 28 is correct. The higher figure is presumably counting
   SQLite's implicit primary-key and unique-constraint indexes, but it is not
   the number of indexes in the file.
 - `VERIFICATION_REPORT.md` criterion 11 says "the tray and single-instance lock
-  are I1" and criterion 10 says "the renderer is not built". Both are now
-  written (though still never executed, so the *substance* of "not proven"
-  stands — it is the reason that is out of date).
+  are I1". They are written, though still never executed, so the _substance_ of
+  "not proven" stands — it is the reason that is out of date. Criterion 10 used
+  to say the renderer is not built; it is built now, and the criterion has been
+  corrected.
 - `src/domain/types.ts` has a header comment saying runtime validation "lives
   in `src/shared/contracts` (Zod)". There is no such module, and ADR-0002
   records the decision not to use Zod.

@@ -226,7 +226,13 @@ export function StationRail({
             }
           />
           <FilterChip
-            label={state.filters.cohort === 'level_2' ? 'Level 2' : state.filters.cohort === 'dc_fast' ? 'DC Fast' : 'All charging'}
+            label={
+              state.filters.cohort === 'level_2'
+                ? 'Level 2'
+                : state.filters.cohort === 'dc_fast'
+                  ? 'DC Fast'
+                  : 'All charging'
+            }
             active={state.filters.cohort !== 'dc_fast'}
             onClick={() =>
               dispatch({

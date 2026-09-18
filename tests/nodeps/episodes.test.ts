@@ -127,10 +127,7 @@ describe('detected occupancy starts', () => {
       port('available', 30, 'p2'),
     ]);
     assert.equal(result.episodes.length, 2);
-    assert.deepEqual(
-      [...new Set(result.episodes.map((e) => e.sourcePortId))].sort(),
-      ['p1', 'p2'],
-    );
+    assert.deepEqual([...new Set(result.episodes.map((e) => e.sourcePortId))].sort(), ['p1', 'p2']);
   });
 
   test('every episode carries its supporting observation ids and inference version', () => {

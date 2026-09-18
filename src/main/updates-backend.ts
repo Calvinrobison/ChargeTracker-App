@@ -116,7 +116,9 @@ export function createUpdaterBackend(options: UpdaterBackendOptions): UpdaterBac
       // The asset list is needed so the manifest's artifact names can be
       // checked against what the release actually contains.
       const assetNames = (info.files ?? [])
-        .map((file) => (file.url ? basename(new URL(file.url, 'https://github.com/').pathname) : null))
+        .map((file) =>
+          file.url ? basename(new URL(file.url, 'https://github.com/').pathname) : null,
+        )
         .filter((name): name is string => name !== null);
 
       return {
@@ -162,7 +164,7 @@ export function createUpdaterBackend(options: UpdaterBackendOptions): UpdaterBac
       // becoming a no-op.
       const { silent, forceRunAfter } = installOptions;
       try {
-        (autoUpdater.quitAndInstall as (arg: unknown) => void)({
+        autoUpdater.quitAndInstall({
           isSilent: silent,
           isForceRunAfter: forceRunAfter,
         });
@@ -172,7 +174,7 @@ export function createUpdaterBackend(options: UpdaterBackendOptions): UpdaterBac
           'warn',
           `the options form of quitAndInstall failed (${error instanceof Error ? error.message : String(error)}); trying the positional form`,
         );
-        (autoUpdater.quitAndInstall as (a: boolean, b: boolean) => void)(silent, forceRunAfter);
+        autoUpdater.quitAndInstall(silent, forceRunAfter);
         logger.log('info', 'handed off to the installer using the positional form');
       }
     },

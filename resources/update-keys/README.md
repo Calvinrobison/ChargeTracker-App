@@ -34,5 +34,5 @@ generate a new pair per release: installed copies verify against the key they
 shipped with, so a fresh key per release would make every update unverifiable.
 
 Rotation has an ordering requirement — the new public key must ship in a
-release signed by the *current* key before the new key is used to sign
+release signed by the _current_ key before the new key is used to sign
 anything. `docs/UPDATES_AND_RECOVERY.md` has the procedure.

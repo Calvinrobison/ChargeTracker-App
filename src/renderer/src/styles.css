@@ -1688,8 +1688,8 @@ select {
 }
 
 .cw-map .leaflet-tile-pane {
-  filter: invert(1) grayscale(1) brightness(1.06) contrast(1.12) sepia(0.62)
-    hue-rotate(102deg) saturate(1.55) brightness(0.52);
+  filter: invert(1) grayscale(1) brightness(1.06) contrast(1.12) sepia(0.62) hue-rotate(102deg)
+    saturate(1.55) brightness(0.52);
 }
 
 .cw-map.cw-nobasemap .leaflet-tile-pane {

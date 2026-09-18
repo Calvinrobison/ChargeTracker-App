@@ -74,7 +74,10 @@ if (!existsSync(changelogPath)) {
 let commit = 'unknown';
 try {
   commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-  const status = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim();
+  const status = execFileSync('git', ['status', '--porcelain'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
   if (status.length > 0) {
     failures.push(
       `The working tree has uncommitted changes, so this build could not be reproduced:\n      ${status.split('\n').slice(0, 5).join('\n      ')}`,
@@ -218,7 +221,11 @@ const buildInfo = {
     'Recorded so a released build can be traced to its exact source and dependency set. ' +
     'See docs/BUILDING.md.',
 };
-writeFileSync(join(releaseDir, 'build-info.json'), `${JSON.stringify(buildInfo, null, 2)}\n`, 'utf8');
+writeFileSync(
+  join(releaseDir, 'build-info.json'),
+  `${JSON.stringify(buildInfo, null, 2)}\n`,
+  'utf8',
+);
 
 const manifest = {
   manifestFormatVersion: 1,
@@ -267,7 +274,9 @@ for (const artifact of artifacts) {
     `    ${artifact.fileName.padEnd(40)} ${(artifact.byteSize / (1024 * 1024)).toFixed(1).padStart(7)} MB  ${artifact.kind}`,
   );
 }
-console.log('\n  wrote build-info.json, release-manifest.json, release-manifest.json.sig, SHA256SUMS.txt');
+console.log(
+  '\n  wrote build-info.json, release-manifest.json, release-manifest.json.sig, SHA256SUMS.txt',
+);
 console.log(`  signed with key ${resolvedKeyId} (the private key was not logged)`);
 console.log('\nNext:  npm run release:verify -- --dir release');
 

@@ -64,7 +64,7 @@ export class IpcRouter {
   }
 
   register<N extends OperationName>(name: N, handler: Handler<N>): void {
-    this.handlers.set(name, handler as Handler<OperationName>);
+    this.handlers.set(name, handler);
   }
 
   /** Names declared in the contract that have no handler yet. */
@@ -106,7 +106,11 @@ export class IpcRouter {
     const { requestId, operation, payload, contractVersion } = envelope.value;
 
     if (contractVersion !== IPC_CONTRACT_VERSION) {
-      return this.fail(requestId, 'contract_version_mismatch', `renderer sent version ${contractVersion}`);
+      return this.fail(
+        requestId,
+        'contract_version_mismatch',
+        `renderer sent version ${contractVersion}`,
+      );
     }
     if (!isOperationName(operation)) {
       return this.fail(requestId, 'unknown_operation', operation);
@@ -136,11 +140,15 @@ export class IpcRouter {
 
     try {
       const value = await Promise.race([
-        handler(parsedPayload as RequestOf<OperationName>, { requestId, signal: controller.signal }),
+        handler(parsedPayload as RequestOf<OperationName>, {
+          requestId,
+          signal: controller.signal,
+        }),
         new Promise<never>((_resolve, reject) => {
           controller.signal.addEventListener(
             'abort',
-            () => reject(new OperationError('timeout', `${operation} exceeded ${spec.timeoutMs}ms`)),
+            () =>
+              reject(new OperationError('timeout', `${operation} exceeded ${spec.timeoutMs}ms`)),
             { once: true },
           );
         }),

@@ -106,12 +106,20 @@ export function HeatmapKey(): ReactNode {
       <span>Low</span>
       <span className="heatmap-key-swatches" aria-hidden="true">
         {['--heat-1', '--heat-2', '--heat-3', '--heat-4', '--heat-5'].map((token) => (
-          <span key={token} className="heatmap-key-swatch" style={{ background: `var(${token})` }} />
+          <span
+            key={token}
+            className="heatmap-key-swatch"
+            style={{ background: `var(${token})` }}
+          />
         ))}
       </span>
       <span>High</span>
       <span style={{ marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <span className="heatmap-key-swatch" style={{ background: 'var(--heat-0)' }} aria-hidden="true" />
+        <span
+          className="heatmap-key-swatch"
+          style={{ background: 'var(--heat-0)' }}
+          aria-hidden="true"
+        />
         No data
       </span>
     </div>

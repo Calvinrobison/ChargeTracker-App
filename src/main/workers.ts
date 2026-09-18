@@ -133,7 +133,8 @@ export class SupervisedWorker {
       );
       return;
     }
-    const delay = RESTART_BACKOFF_MS[Math.min(this.restarts, RESTART_BACKOFF_MS.length - 1)] ?? 30_000;
+    const delay =
+      RESTART_BACKOFF_MS[Math.min(this.restarts, RESTART_BACKOFF_MS.length - 1)] ?? 30_000;
     this.restarts += 1;
     this.options.log('warn', `restarting ${this.options.name} worker in ${delay}ms`);
     await new Promise((resolve) => {

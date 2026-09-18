@@ -73,7 +73,11 @@ export interface PageReading {
 export interface ParsedObservation {
   readonly ok: true;
   readonly counts: StateCounts;
-  readonly ports: readonly { readonly sourcePortId: string; readonly state: PortState; readonly level: ChargingLevel }[];
+  readonly ports: readonly {
+    readonly sourcePortId: string;
+    readonly state: PortState;
+    readonly level: ChargingLevel;
+  }[];
   readonly level: ChargingLevel;
   readonly completeness: 'complete' | 'partial';
   readonly capacityBasis: 'ports_simultaneous' | 'connectors' | 'reported_total' | 'unknown';
@@ -111,7 +115,11 @@ const STATUS_PATTERNS: ReadonlyArray<{
   { pattern: /\bunavailable\b/i, state: 'out_of_service', explicitCharging: false },
   { pattern: /\boffline\b/i, state: 'out_of_service', explicitCharging: false },
   { pattern: /\bcoming soon\b/i, state: 'out_of_service', explicitCharging: false },
-  { pattern: /\bunder (?:repair|maintenance)\b/i, state: 'out_of_service', explicitCharging: false },
+  {
+    pattern: /\bunder (?:repair|maintenance)\b/i,
+    state: 'out_of_service',
+    explicitCharging: false,
+  },
   { pattern: /\breserved\b/i, state: 'reserved', explicitCharging: false },
   { pattern: /\bcharging\b/i, state: 'occupied', explicitCharging: true },
   { pattern: /\bin use\b/i, state: 'occupied', explicitCharging: false },
@@ -151,7 +159,10 @@ export function classifyStatus(text: string | null): ClassifiedStatus {
 }
 
 /** Maps connector and power text to a charging class, or `unknown`. */
-export function classifyLevel(connectorText: string | null, powerText: string | null): ChargingLevel {
+export function classifyLevel(
+  connectorText: string | null,
+  powerText: string | null,
+): ChargingLevel {
   const connector = (connectorText ?? '').toLowerCase();
   const power = (powerText ?? '').toLowerCase();
 
@@ -191,8 +202,13 @@ export function parseUpdatedText(text: string | null, readAtUtcMs: number): numb
     const amount = Number(relative[1]);
     const unit = relative[2] as string;
     if (!Number.isFinite(amount)) return null;
-    const unitMs =
-      unit.startsWith('sec') ? 1000 : unit.startsWith('min') ? 60_000 : unit.startsWith('hour') || unit.startsWith('hr') ? 3_600_000 : 86_400_000;
+    const unitMs = unit.startsWith('sec')
+      ? 1000
+      : unit.startsWith('min')
+        ? 60_000
+        : unit.startsWith('hour') || unit.startsWith('hr')
+          ? 3_600_000
+          : 86_400_000;
     return readAtUtcMs - amount * unitMs;
   }
   const iso = /\b(\d{4}-\d{2}-\d{2}t[\d:.]+(?:z|[+-]\d{2}:?\d{2}))\b/.exec(normalized);
@@ -307,7 +323,9 @@ export function parsePageReading(reading: PageReading, options: ParseOptions): P
 
   const rows = reading.portRows;
   const hasDurableIdentity = rows.length > 0 && rows.every((r) => r.durablePortId !== null);
-  const uniqueIds = new Set(rows.map((r) => r.durablePortId).filter((id): id is string => id !== null));
+  const uniqueIds = new Set(
+    rows.map((r) => r.durablePortId).filter((id): id is string => id !== null),
+  );
   const identityReliable = hasDurableIdentity && uniqueIds.size === rows.length;
 
   if (rows.length > 0 && !identityReliable) {
@@ -413,11 +431,7 @@ export function parsePageReading(reading: PageReading, options: ParseOptions): P
     };
   }
 
-  if (
-    options.catalogPortCount !== null &&
-    total !== null &&
-    total !== options.catalogPortCount
-  ) {
+  if (options.catalogPortCount !== null && total !== null && total !== options.catalogPortCount) {
     warnings.push(
       `the source shows ${total} ports where the catalog records ${options.catalogPortCount}; capacity drift is recorded rather than assumed`,
     );
@@ -432,13 +446,17 @@ export function parsePageReading(reading: PageReading, options: ParseOptions): P
 
   // "Last used" text is informational only. It is never counted.
   if (rows.some((r) => r.lastUsedText)) {
-    warnings.push('"last used" text is displayed by the source but is not a session or usage count');
+    warnings.push(
+      '"last used" text is displayed by the source but is not a session or usage count',
+    );
   }
 
   const evidence = sanitizeEvidence([
     reading.stationNameOnPage ?? '',
     reading.summaryText ?? '',
-    ...rows.map((r) => [r.label, r.statusText, r.connectorText, r.powerText].filter(Boolean).join(' ')),
+    ...rows.map((r) =>
+      [r.label, r.statusText, r.connectorText, r.powerText].filter(Boolean).join(' '),
+    ),
     ...reading.statusBlocks,
   ]);
 

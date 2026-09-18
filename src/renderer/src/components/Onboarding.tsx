@@ -51,8 +51,8 @@ export function Onboarding({
         </div>
 
         <p className="onboarding-lede">
-          ChargeWatch watches public charger status over time and keeps the history on this PC.
-          It records what it actually observed, and shows the gaps rather than filling them in.
+          ChargeWatch watches public charger status over time and keeps the history on this PC. It
+          records what it actually observed, and shows the gaps rather than filling them in.
         </p>
 
         {/* Real counts, not aspirational ones. */}

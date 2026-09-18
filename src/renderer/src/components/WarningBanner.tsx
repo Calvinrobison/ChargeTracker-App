@@ -70,7 +70,12 @@ export function WarningBanner({
         {variant === 'rail' ? (
           <span className="warning-actions">
             {canRetry ? (
-              <button type="button" className="button-warning" onClick={onRetry} disabled={retrying}>
+              <button
+                type="button"
+                className="button-warning"
+                onClick={onRetry}
+                disabled={retrying}
+              >
                 {retrying ? 'Trying…' : 'Try again'}
               </button>
             ) : null}
@@ -91,7 +96,12 @@ export function WarningBanner({
               View details
             </button>
             {canRetry ? (
-              <button type="button" className="button-warning" onClick={onRetry} disabled={retrying}>
+              <button
+                type="button"
+                className="button-warning"
+                onClick={onRetry}
+                disabled={retrying}
+              >
                 {retrying ? 'Trying…' : 'Try again'}
               </button>
             ) : null}

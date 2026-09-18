@@ -42,7 +42,10 @@ function readKeyring() {
   if (!existsSync(publicKeyFile)) return { formatVersion: 1, keys: [] };
   try {
     const parsed = JSON.parse(readFileSync(publicKeyFile, 'utf8'));
-    return { formatVersion: parsed.formatVersion ?? 1, keys: Array.isArray(parsed.keys) ? parsed.keys : [] };
+    return {
+      formatVersion: parsed.formatVersion ?? 1,
+      keys: Array.isArray(parsed.keys) ? parsed.keys : [],
+    };
   } catch (error) {
     console.error(`${publicKeyFile} is not valid JSON: ${error.message}`);
     process.exit(1);

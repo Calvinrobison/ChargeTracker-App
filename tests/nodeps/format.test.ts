@@ -72,7 +72,7 @@ function station(overrides: Partial<StationView> = {}): StationView {
     distinguishesCharging: false,
     scopeNote: null,
     ...overrides,
-  } as StationView;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +266,10 @@ describe('source freshness', () => {
 
 describe('coverage and age line', () => {
   it('omits a missing part instead of substituting a value', () => {
-    assert.equal(coverageAndAge(station({ coverage: 97.4, observed: '6 min ago' })), '97% cov · 6 min ago');
+    assert.equal(
+      coverageAndAge(station({ coverage: 97.4, observed: '6 min ago' })),
+      '97% cov · 6 min ago',
+    );
     assert.equal(coverageAndAge(station({ coverage: null, observed: '6 min ago' })), '6 min ago');
     assert.equal(coverageAndAge(station({ coverage: 97.4, observed: null })), '97% cov');
     assert.equal(coverageAndAge(station({ coverage: null, observed: null })), '');

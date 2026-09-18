@@ -28,10 +28,7 @@ export interface Interval {
 
 export function isSafeInstant(ms: unknown): ms is number {
   return (
-    typeof ms === 'number' &&
-    Number.isInteger(ms) &&
-    ms >= 0 &&
-    ms <= 4_102_444_800_000 // 2100-01-01T00:00:00Z — guards seconds/millis mix-ups
+    typeof ms === 'number' && Number.isInteger(ms) && ms >= 0 && ms <= 4_102_444_800_000 // 2100-01-01T00:00:00Z — guards seconds/millis mix-ups
   );
 }
 
@@ -90,7 +87,9 @@ export function contains(span: Interval, instantMs: number): boolean {
  * non-overlapping ascending set.
  */
 export function normalize(spans: readonly Interval[]): Interval[] {
-  const sorted = [...spans].filter((s) => s.endMs > s.startMs).sort((a, b) => a.startMs - b.startMs);
+  const sorted = [...spans]
+    .filter((s) => s.endMs > s.startMs)
+    .sort((a, b) => a.startMs - b.startMs);
   const out: Interval[] = [];
   for (const span of sorted) {
     const last = out[out.length - 1];

@@ -42,11 +42,7 @@ export type Completeness = 'complete' | 'partial';
  * `ambiguous_scope` observations are excluded from occupancy metrics.
  */
 export type QualityClass =
-  | 'reliable'
-  | 'provisional'
-  | 'stale_source'
-  | 'ambiguous_scope'
-  | 'invalid';
+  'reliable' | 'provisional' | 'stale_source' | 'ambiguous_scope' | 'invalid';
 
 /** Source-timestamp freshness. The absence of a source clock is distinct from staleness. */
 export type SourceFreshness = 'fresh' | 'stale' | 'unknown_source_clock';

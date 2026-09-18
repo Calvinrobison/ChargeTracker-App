@@ -116,7 +116,7 @@ const result = spawnSync(
 if (result.status !== 0) {
   console.error(
     '\nChromium could not be installed.\n' +
-      'If this machine has no route to Playwright\'s CDN, copy a working .playwright-cache/chromium\n' +
+      "If this machine has no route to Playwright's CDN, copy a working .playwright-cache/chromium\n" +
       'directory from a machine that does. Do NOT ship an installer without it: the app would try to\n' +
       'download a browser at first run, which it promises not to do.',
   );
@@ -174,10 +174,14 @@ function pruneUnusedPayload() {
     const size = directorySize(path);
     rmSync(path, { recursive: true, force: true });
     freedBytes += size;
-    console.log(`  removed ${entry.name} (${(size / (1024 * 1024)).toFixed(0)} MB, never executed)`);
+    console.log(
+      `  removed ${entry.name} (${(size / (1024 * 1024)).toFixed(0)} MB, never executed)`,
+    );
   }
 
   if (freedBytes > 0) {
-    console.log(`  ${(freedBytes / (1024 * 1024)).toFixed(0)} MB trimmed from the installer payload`);
+    console.log(
+      `  ${(freedBytes / (1024 * 1024)).toFixed(0)} MB trimmed from the installer payload`,
+    );
   }
 }

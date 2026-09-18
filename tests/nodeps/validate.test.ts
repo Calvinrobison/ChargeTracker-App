@@ -22,7 +22,11 @@ describe('primitives', () => {
   test('numbers reject NaN, Infinity and strings', () => {
     assert.equal(v.number().parse(1.5), 1.5);
     for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, '5', null, undefined]) {
-      assert.throws(() => v.number().parse(bad), ValidationError, `${String(bad)} must be rejected`);
+      assert.throws(
+        () => v.number().parse(bad),
+        ValidationError,
+        `${String(bad)} must be rejected`,
+      );
     }
   });
 
@@ -154,7 +158,9 @@ describe('nested error paths', () => {
 
 describe('unions, records and refinements', () => {
   test('a union accepts any permitted shape and rejects others', () => {
-    const schema = v.union<{ kind: 'preset'; preset: string } | { kind: 'custom'; startMs: number }>([
+    const schema = v.union<
+      { kind: 'preset'; preset: string } | { kind: 'custom'; startMs: number }
+    >([
       v.object({ kind: v.literal('preset'), preset: v.string() }),
       v.object({ kind: v.literal('custom'), startMs: v.instant() }),
     ]);
@@ -190,10 +196,12 @@ describe('unions, records and refinements', () => {
 describe('hostile input', () => {
   test('prototype pollution attempts are stripped, not applied', () => {
     const schema = v.object({ a: v.integer() });
-    const hostile = JSON.parse('{"a":1,"__proto__":{"polluted":true},"constructor":{"x":1}}') as unknown;
+    const hostile = JSON.parse(
+      '{"a":1,"__proto__":{"polluted":true},"constructor":{"x":1}}',
+    ) as unknown;
     const parsed = schema.parse(hostile);
     assert.deepEqual(Object.keys(parsed), ['a']);
-    assert.equal((({}) as Record<string, unknown>).polluted, undefined);
+    assert.equal(({} as Record<string, unknown>).polluted, undefined);
   });
 
   test('a function or symbol value is rejected', () => {

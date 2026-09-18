@@ -17,6 +17,7 @@ import {
   buildContentSecurityPolicy,
   decideNavigation,
   decidePermission,
+  rendererFileOrigin,
 } from './security.ts';
 import type { Logger } from './logger.ts';
 
@@ -53,7 +54,7 @@ export class WindowManager {
     const origins: string[] = [];
     if (this.options.rendererUrl) origins.push(new URL(this.options.rendererUrl).origin);
     if (this.options.rendererFile) {
-      origins.push(`file://${this.options.rendererFile.replace(/\\/g, '/').replace(/index\.html$/, '')}`);
+      origins.push(rendererFileOrigin(this.options.rendererFile));
     }
     return origins;
   }

@@ -145,7 +145,9 @@ export function parseCsv(text: string, options: ParseCsvOptions = {}): CsvParseR
   if (options.expectedHeaders) {
     const normalize = (value: string): string => value.trim().toLowerCase();
     const actual = headers.map(normalize);
-    const missing = options.expectedHeaders.filter((expected) => !actual.includes(normalize(expected)));
+    const missing = options.expectedHeaders.filter(
+      (expected) => !actual.includes(normalize(expected)),
+    );
     if (missing.length > 0) {
       errors.push({
         lineNumber: headerRow.lineNumber,
@@ -201,7 +203,9 @@ export function columnIndex(headers: readonly string[]): (name: string) => numbe
  * An offset or a `Z` is REQUIRED: a bare "2026-09-01 00:00" is ambiguous, and
  * guessing a zone would silently shift someone's monthly totals.
  */
-export function parseIsoInstant(value: string): { ok: true; ms: number } | { ok: false; reason: string } {
+export function parseIsoInstant(
+  value: string,
+): { ok: true; ms: number } | { ok: false; reason: string } {
   const trimmed = value.trim();
   if (trimmed.length === 0) return { ok: false, reason: 'the timestamp is empty' };
   if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(trimmed)) {

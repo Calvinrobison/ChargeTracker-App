@@ -40,8 +40,7 @@ export const BAND_LABELS: Record<OccupancyBand, string> = {
  * The legend must always say what the colour means and must always carry this
  * disclaimer: historical occupancy is not current availability.
  */
-export const HISTORICAL_NOT_CURRENT_NOTE =
-  'Historical occupancy is not current availability.';
+export const HISTORICAL_NOT_CURRENT_NOTE = 'Historical occupancy is not current availability.';
 
 /** Primary-ranking eligibility gates. */
 export const RANKING_ELIGIBILITY = {

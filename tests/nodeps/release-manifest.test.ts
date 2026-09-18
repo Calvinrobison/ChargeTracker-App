@@ -138,7 +138,10 @@ describe('signature and key failures', () => {
   });
 
   test('an unknown key id is rejected, and a self-declared key grants nothing', () => {
-    const { bytes, signature } = sign(baseManifest({ keyId: 'attacker-key' }), attackerKey.privateKey);
+    const { bytes, signature } = sign(
+      baseManifest({ keyId: 'attacker-key' }),
+      attackerKey.privateKey,
+    );
     const result = verifyManifest(bytes, signature, context());
     assert.equal(result.ok, false);
     if (result.ok) return;
@@ -184,7 +187,10 @@ describe('signature and key failures', () => {
   });
 
   test('a signed but structurally invalid manifest is rejected after signature checking', () => {
-    const bad = { ...baseManifest(), releaseVersion: 'not-a-version' } as unknown as ReleaseManifest;
+    const bad = {
+      ...baseManifest(),
+      releaseVersion: 'not-a-version',
+    } as unknown as ReleaseManifest;
     const { bytes, signature } = sign(bad);
     const result = verifyManifest(bytes, signature, context());
     assert.equal(result.ok, false);
@@ -231,7 +237,11 @@ describe('target and protocol checks', () => {
 
   test('a version or tag disagreeing with the updater is rejected', () => {
     const { bytes, signature } = sign(baseManifest());
-    const versionMismatch = verifyManifest(bytes, signature, context({ candidateVersion: '0.1.2' }));
+    const versionMismatch = verifyManifest(
+      bytes,
+      signature,
+      context({ candidateVersion: '0.1.2' }),
+    );
     assert.equal(versionMismatch.ok, false);
     if (!versionMismatch.ok) assert.equal(versionMismatch.code, 'version_mismatch');
 
@@ -260,7 +270,10 @@ describe('replay and downgrade', () => {
 
   test('a genuinely newer sequence is accepted', () => {
     const { bytes, signature } = sign(baseManifest({ releaseSequence: 9 }));
-    assert.equal(verifyManifest(bytes, signature, context({ highestAcceptedSequence: 8 })).ok, true);
+    assert.equal(
+      verifyManifest(bytes, signature, context({ highestAcceptedSequence: 8 })).ok,
+      true,
+    );
   });
 });
 
@@ -328,7 +341,10 @@ describe('artifact byte verification', () => {
   });
 
   test('a tampered installer fails its digest', () => {
-    const tampered = Buffer.concat([INSTALLER_BYTES.subarray(0, INSTALLER_BYTES.length - 1), Buffer.from('X')]);
+    const tampered = Buffer.concat([
+      INSTALLER_BYTES.subarray(0, INSTALLER_BYTES.length - 1),
+      Buffer.from('X'),
+    ]);
     const result = verifyArtifactBytes(INSTALLER_NAME, tampered, manifest);
     assert.equal(result.ok, false);
     assert.equal(result.code, 'sha256_mismatch');

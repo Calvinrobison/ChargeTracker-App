@@ -68,7 +68,8 @@ describe('PowerShell scripts survive Windows PowerShell 5.1', () => {
             `line ${line}: U+${character.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')} "${character}"`,
           );
           // Skip the rest of this character's bytes.
-          while (index + 1 < bytes.length && ((bytes[index + 1] as number) & 0xc0) === 0x80) index += 1;
+          while (index + 1 < bytes.length && ((bytes[index + 1] as number) & 0xc0) === 0x80)
+            index += 1;
         }
       }
 
@@ -86,7 +87,11 @@ describe('PowerShell scripts survive Windows PowerShell 5.1', () => {
       // above unenforceable by inspection. Keep exactly one convention.
       const bytes = readFileSync(file);
       const hasBom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
-      assert.equal(hasBom, false, `${name} starts with a UTF-8 BOM; keep these files plain ASCII instead`);
+      assert.equal(
+        hasBom,
+        false,
+        `${name} starts with a UTF-8 BOM; keep these files plain ASCII instead`,
+      );
     });
   }
 });

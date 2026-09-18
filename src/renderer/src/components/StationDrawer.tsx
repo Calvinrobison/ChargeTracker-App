@@ -24,13 +24,7 @@ import {
 } from '../format.ts';
 import { Heatmap, HeatmapKey } from './Heatmap.tsx';
 import { TrendChart } from './TrendChart.tsx';
-import {
-  BookmarkIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  CloseIcon,
-  ExternalIcon,
-} from './Icons.tsx';
+import { BookmarkIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, ExternalIcon } from './Icons.tsx';
 
 export interface StationDrawerProps {
   readonly detail: StationDetailView;
@@ -75,9 +69,7 @@ export function StationDrawer({
               className="dot"
               style={{
                 background:
-                  station.monitoring === 'catalog'
-                    ? 'var(--dot-catalog)'
-                    : bandColor(band),
+                  station.monitoring === 'catalog' ? 'var(--dot-catalog)' : bandColor(band),
               }}
               aria-hidden="true"
             />
@@ -138,11 +130,7 @@ export function StationDrawer({
               dotColor="var(--status-warning)"
               value={station.occupied}
             />
-            <StatusCard
-              label="Offline"
-              dotColor="var(--status-critical)"
-              value={station.offline}
-            />
+            <StatusCard label="Offline" dotColor="var(--status-critical)" value={station.offline} />
           </div>
           <div className="status-freshness">
             <span>
@@ -171,7 +159,8 @@ export function StationDrawer({
             <div className="quality-cell">
               <div className="quality-cell-label">History</div>
               <div className="quality-cell-value">
-                {detail.dataQuality.historyDays} day{detail.dataQuality.historyDays === 1 ? '' : 's'}
+                {detail.dataQuality.historyDays} day
+                {detail.dataQuality.historyDays === 1 ? '' : 's'}
               </div>
             </div>
             <div className="quality-cell">
@@ -351,7 +340,10 @@ export function StationDrawer({
             ).map(([label, value]) => (
               <div className="quality-cell" key={label}>
                 <div className="quality-cell-label">{label}</div>
-                <div className="quality-cell-value" style={{ color: 'var(--text-tertiary)', fontSize: 12.5 }}>
+                <div
+                  className="quality-cell-value"
+                  style={{ color: 'var(--text-tertiary)', fontSize: 12.5 }}
+                >
                   {value ?? 'Not available'}
                 </div>
               </div>

@@ -45,10 +45,7 @@ import {
   type ChargingLevel,
   type VisitObservation,
 } from '../domain/index.ts';
-import {
-  isAllowedSourceUrl,
-  stationIdFromUrl,
-} from '../collector/adapters/chargepoint/index.ts';
+import { isAllowedSourceUrl, stationIdFromUrl } from '../collector/adapters/chargepoint/index.ts';
 import type { FilterState, WindowRequest } from '../shared/ipc.ts';
 import type { RankSort } from '../domain/ranking.ts';
 
@@ -77,7 +74,11 @@ export interface DatabaseWorkerConfig {
 
 export type DatabaseReadyState =
   | { readonly status: 'ready'; readonly schemaVersion: number; readonly journalMode: string }
-  | { readonly status: 'migration_failed'; readonly detail: string; readonly backupPath: string | null }
+  | {
+      readonly status: 'migration_failed';
+      readonly detail: string;
+      readonly backupPath: string | null;
+    }
   | { readonly status: 'schema_too_new'; readonly detail: string; readonly schemaVersion: number };
 
 /**
@@ -179,7 +180,11 @@ export class DatabaseWorker {
     this.restoreOrMigrationActive = false;
 
     if (outcome.status === 'refused_newer_schema') {
-      return { status: 'schema_too_new', schemaVersion: outcome.schemaVersion, detail: outcome.detail };
+      return {
+        status: 'schema_too_new',
+        schemaVersion: outcome.schemaVersion,
+        detail: outcome.detail,
+      };
     }
     if (outcome.status === 'failed' || outcome.status === 'checksum_mismatch') {
       // Both the original backup and the working copy are preserved; the caller
@@ -606,7 +611,6 @@ export class DatabaseWorker {
       timeStyle: 'medium',
     });
 
-    const self = this;
     function* rowGenerator(): Generator<ReturnType<typeof text>[]> {
       for (;;) {
         const page = driver
@@ -652,14 +656,15 @@ export class DatabaseWorker {
             text(Number(row.distinguishes_charging) === 1 ? 'yes' : 'no'),
             number(Number(row.scheduled_interval_ms)),
             number(Number(row.max_carry_forward_cap_ms)),
-            number(row.source_freshness_limit_ms === null ? null : Number(row.source_freshness_limit_ms)),
+            number(
+              row.source_freshness_limit_ms === null ? null : Number(row.source_freshness_limit_ms),
+            ),
             text(String(row.parser_version)),
             text(String(row.source_url)),
             text(String(row.evidence_fingerprint)),
           ];
         }
         offset += page.length;
-        void self;
       }
     }
 
@@ -724,7 +729,8 @@ export class DatabaseWorker {
         let observationCount = 0;
         try {
           observationCount = Number(
-            (JSON.parse(String(row.manifest_json)) as { observationCount?: number }).observationCount ?? 0,
+            (JSON.parse(String(row.manifest_json)) as { observationCount?: number })
+              .observationCount ?? 0,
           );
         } catch {
           observationCount = 0;
@@ -753,7 +759,9 @@ export class DatabaseWorker {
    * Collection must already be stopped by the caller. The current database is
    * preserved, never overwritten in place.
    */
-  async performRestore(filePath: string): Promise<{ ok: boolean; detail: string | null; preservedPreviousPath: string | null }> {
+  async performRestore(
+    filePath: string,
+  ): Promise<{ ok: boolean; detail: string | null; preservedPreviousPath: string | null }> {
     this.restoreOrMigrationActive = true;
     try {
       await this.createBackupNow('manual');
@@ -770,7 +778,11 @@ export class DatabaseWorker {
       if (!result.ok) {
         // Reopen whatever is there so the app is not left with no database.
         await this.open();
-        return { ok: false, detail: result.detail ?? 'restore failed', preservedPreviousPath: null };
+        return {
+          ok: false,
+          detail: result.detail ?? 'restore failed',
+          preservedPreviousPath: null,
+        };
       }
       const reopened = await this.open();
       if (reopened.status !== 'ready') {
@@ -780,7 +792,11 @@ export class DatabaseWorker {
           preservedPreviousPath: result.preservedPreviousPath ?? null,
         };
       }
-      return { ok: true, detail: null, preservedPreviousPath: result.preservedPreviousPath ?? null };
+      return {
+        ok: true,
+        detail: null,
+        preservedPreviousPath: result.preservedPreviousPath ?? null,
+      };
     } finally {
       this.restoreOrMigrationActive = false;
     }
@@ -1231,8 +1247,11 @@ export class DatabaseWorker {
     detail: string | null;
   } {
     const driver = this.requireDriver();
-    const site = driver.prepare('SELECT id, catalog_level FROM sites WHERE id = ?').get(input.siteId);
-    if (!site) return { ok: false, code: 'unknown_site', detail: 'that location is not in the catalog' };
+    const site = driver
+      .prepare('SELECT id, catalog_level FROM sites WHERE id = ?')
+      .get(input.siteId);
+    if (!site)
+      return { ok: false, code: 'unknown_site', detail: 'that location is not in the catalog' };
 
     if (!isAllowedSourceUrl(input.url)) {
       return {
@@ -1280,7 +1299,9 @@ export class DatabaseWorker {
         detail:
           error instanceof Error && /UNIQUE/i.test(error.message)
             ? 'That station is already linked to a location.'
-            : (error instanceof Error ? error.message : String(error)),
+            : error instanceof Error
+              ? error.message
+              : String(error),
       };
     }
 
@@ -1380,9 +1401,11 @@ export class DatabaseWorker {
         siteId: cell('site_id'),
         period: { startMs: start.ms, endMs: end.ms },
         visitCount: count.value,
-        countDefinition: (cell('count_definition') || 'other') as VisitObservation['countDefinition'],
+        countDefinition: (cell('count_definition') ||
+          'other') as VisitObservation['countDefinition'],
         method: (cell('method') || 'measured') as VisitObservation['method'],
-        geographicScope: (cell('geographic_scope') || 'other') as VisitObservation['geographicScope'],
+        geographicScope: (cell('geographic_scope') ||
+          'other') as VisitObservation['geographicScope'],
         sourceName: cell('source_name') || 'unnamed source',
         sourceReference: cell('source_url_or_reference') || null,
         notes: cell('notes') || null,

@@ -27,7 +27,11 @@ function isApiError(value: unknown): value is ApiError & Error {
 /** Normalises anything thrown by the bridge into a displayable error. */
 export function toApiError(error: unknown): ApiError {
   if (isApiError(error)) {
-    return { code: error.code, message: error.message, detail: (error as { detail?: string }).detail };
+    return {
+      code: error.code,
+      message: error.message,
+      detail: (error as { detail?: string }).detail,
+    };
   }
   return {
     code: 'internal_error',

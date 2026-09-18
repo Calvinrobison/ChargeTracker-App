@@ -31,7 +31,8 @@ export function TrendChart({ trend, width, height, gridlines = 2 }: TrendChartPr
     const points = trend.points;
     const count = Math.max(1, points.length - 1);
     const xOf = (index: number): number => (index / count) * width;
-    const yOf = (value: number): number => height - (Math.min(100, Math.max(0, value)) / 100) * height;
+    const yOf = (value: number): number =>
+      height - (Math.min(100, Math.max(0, value)) / 100) * height;
 
     const built: Segment[] = [];
     let current: { x: number; y: number }[] = [];
@@ -160,7 +161,9 @@ export function HistoryBuilding({
   return (
     <div className="dashed-card">
       <div style={{ fontSize: 13, fontWeight: 500 }}>History is building</div>
-      <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+      <div
+        style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5 }}
+      >
         Charts appear once there is enough collected history to be worth showing. ChargeWatch will
         not draw a graph of data it does not have.
       </div>

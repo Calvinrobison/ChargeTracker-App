@@ -115,6 +115,12 @@ It also checks every artifact's size and both digests, confirms the updater
 metadata digest recorded in the manifest matches the metadata file on disk, and
 refuses an upload set containing a key, a credential or a database.
 
+It now also runs `isDirectUpgradePermitted` — the same upgrade-path check an
+installed copy performs — against `--installed-version` (default `0.0.1`). The
+script previously accepted that flag and ignored it, so the one check that
+decides whether an existing install will take this release was not part of the
+gate. It is now.
+
 What it does **not** prove: GitHub permissions, asset availability, or that a
 real client can reach the release. Only an actual publish and a real client
 discovering it can establish those.

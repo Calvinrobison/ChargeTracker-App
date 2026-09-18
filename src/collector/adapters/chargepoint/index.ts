@@ -29,12 +29,7 @@ import type {
 } from '../../contract.ts';
 import type { BrowserRuntime } from '../../browser.ts';
 import { safeHttpUrl } from '../../browser.ts';
-import {
-  PARSER_VERSION,
-  REQUESTED_LOCALE,
-  type PageReading,
-  parsePageReading,
-} from './parse.ts';
+import { PARSER_VERSION, REQUESTED_LOCALE, type PageReading, parsePageReading } from './parse.ts';
 
 export const SOURCE_ID = 'chargepoint';
 export const ADAPTER_VERSION = '0.1.0';
@@ -341,7 +336,11 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
           const page = await options.runtime.acquirePage();
           navigationCount += 1;
 
-          const navigation = await options.runtime.navigate(page, binding.canonicalUrl, abortSignal);
+          const navigation = await options.runtime.navigate(
+            page,
+            binding.canonicalUrl,
+            abortSignal,
+          );
           if (navigation.retryAfterMs !== null) {
             retryAfterMs = Math.max(retryAfterMs ?? 0, navigation.retryAfterMs);
           }
@@ -371,6 +370,11 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
           }
 
           await waitForStatusContent(page);
+          // `evaluate` is generic over its return type and infers `unknown` for
+          // a string script, so this assertion is what gives `raw` a shape.
+          // eslint reads it as redundant because the assertion is itself what
+          // it infers the call's type from; removing it fails typecheck.
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
           const raw = (await page.evaluate(EXTRACT_SCRIPT)) as RawExtraction;
           const readAtUtcMs = context.nowMs();
 

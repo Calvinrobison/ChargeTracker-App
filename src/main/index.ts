@@ -13,15 +13,7 @@
  *   5. once startup has settled, begin update checks.
  */
 
-import {
-  BrowserWindow,
-  app,
-  dialog,
-  ipcMain,
-  nativeTheme,
-  powerMonitor,
-  shell,
-} from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, nativeTheme, powerMonitor, shell } from 'electron';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -65,7 +57,7 @@ import type { DatabaseReadyState } from '../database/worker.ts';
 const BRANDING = {
   productName: 'ChargeWatch',
   appId: 'com.formicaria.chargewatch',
-  releaseOwner: 'Calvinrobison',
+  releaseOwner: 'the-x1x1',
   releaseRepo: 'ChargeTracker-App',
 } as const;
 
@@ -118,6 +110,13 @@ const isDevelopment = !app.isPackaged;
 const SELF_CHECK_INTEGRITY_IDS = ['data_dir', 'database', 'browser'] as const;
 const SELF_CHECK_READINESS_IDS = ['sources', 'catalog'] as const;
 
+/**
+ * The ceiling on a whole `--self-check` run. Generous next to the 817 ms a
+ * healthy run takes, and far below the sum of the individual RPC timeouts it
+ * replaces as the effective limit.
+ */
+const SELF_CHECK_DEADLINE_MS = 90_000;
+
 const selfCheckRequested = process.argv.some(
   (argument) => argument === '--self-check' || argument.startsWith('--self-check='),
 );
@@ -134,6 +133,31 @@ function selfCheckOutputPath(fallbackDir: string): string {
     if (value && !value.startsWith('--')) return value;
   }
   return join(fallbackDir, 'self-check.json');
+}
+
+/**
+ * The local (non-roaming) application data directory.
+ *
+ * On Windows this MUST NOT be derived from `app.getPath('userData')`. Electron
+ * builds that from `app.getPath('appData')`, which is `%APPDATA%` — the
+ * ROAMING profile. Stripping its last segment therefore yielded
+ * `...\AppData\Roaming`, and the history file was created in a directory that
+ * OneDrive and every other sync client replicates. A live SQLite database in
+ * WAL mode there can be corrupted by the sync client, which is why
+ * `resolveDataPaths` lists `appdata\roaming` as a roaming hint — the
+ * application was raising `cloud_roaming_directory` against its own data
+ * directory on every start, and README.md documented a location it did not use.
+ *
+ * `%LOCALAPPDATA%` is the correct home and the one the documentation promises.
+ * The fallback keeps the old derivation for the case where the variable is
+ * missing, because a wrong directory still beats refusing to start.
+ */
+function localAppDataDirectory(): string {
+  if (process.platform === 'win32') {
+    const local = process.env.LOCALAPPDATA?.trim();
+    if (local && local.length > 0) return local;
+  }
+  return app.getPath('userData').replace(/[\\/][^\\/]+$/, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +317,10 @@ async function refreshSourceHealth(): Promise<SourceHealthView[]> {
 function onCollectorNotification(notification: { notify: string; payload: unknown }): void {
   switch (notification.notify) {
     case 'log': {
-      const entry = notification.payload as { level: 'debug' | 'info' | 'warn' | 'error'; message: string };
+      const entry = notification.payload as {
+        level: 'debug' | 'info' | 'warn' | 'error';
+        message: string;
+      };
       logger.log(entry.level, `[collector] ${entry.message}`);
       break;
     }
@@ -385,7 +412,13 @@ async function runHealthChecks(): Promise<void> {
       null,
     );
   } else if (databaseState?.status === 'schema_too_new') {
-    push('database', 'History file is ready', 'fail', databaseState.detail, 'Install the newer version of ChargeWatch that created this history file.');
+    push(
+      'database',
+      'History file is ready',
+      'fail',
+      databaseState.detail,
+      'Install the newer version of ChargeWatch that created this history file.',
+    );
   } else {
     push(
       'database',
@@ -398,7 +431,11 @@ async function runHealthChecks(): Promise<void> {
 
   // Bundled browser.
   try {
-    const browser = await collector<{ ok: boolean; detail: string | null }>('healthCheck', {}, 60_000);
+    const browser = await collector<{ ok: boolean; detail: string | null }>(
+      'healthCheck',
+      {},
+      60_000,
+    );
     push(
       'browser',
       'Bundled browser starts',
@@ -422,7 +459,13 @@ async function runHealthChecks(): Promise<void> {
   const health = await refreshSourceHealth().catch(() => [] as SourceHealthView[]);
   const enabled = health.filter((source) => source.eligibilityState === 'enabled');
   if (enabled.length > 0) {
-    push('sources', 'A charger status source is enabled', 'pass', enabled.map((s) => s.displayName).join(', '), null);
+    push(
+      'sources',
+      'A charger status source is enabled',
+      'pass',
+      enabled.map((s) => s.displayName).join(', '),
+      null,
+    );
   } else {
     push(
       'sources',
@@ -468,9 +511,11 @@ async function runHealthChecks(): Promise<void> {
 function registerHandlers(): void {
   router.register('app.getBootstrap', async () => {
     settingsCache = await db<Record<string, unknown>>('getSettings');
-    const counts = await db<{ catalogSites: number; monitoredScopes: number; observations: number }>(
-      'counts',
-    );
+    const counts = await db<{
+      catalogSites: number;
+      monitoredScopes: number;
+      observations: number;
+    }>('counts');
     const status = collectionStatus ?? (await refreshCollectionStatus());
 
     const bootstrap: BootstrapView = {
@@ -514,9 +559,7 @@ function registerHandlers(): void {
     return { applied };
   });
 
-  router.register('overview.get', async (payload) =>
-    db('overview', payload, 30_000),
-  );
+  router.register('overview.get', async (payload) => db('overview', payload, 30_000));
 
   router.register('map.getMarkers', async (payload) => db('mapMarkers', payload, 30_000));
 
@@ -575,7 +618,8 @@ function registerHandlers(): void {
 
   router.register('source.openWindow', async (payload) => {
     const detail = await db<{ url: string | null }>('sourceUrlForSite', { siteId: payload.siteId });
-    if (!detail.url) throw new OperationError('invalid_payload', 'that location has no source link');
+    if (!detail.url)
+      throw new OperationError('invalid_payload', 'that location has no source link');
     await collector('openSourceWindow', { url: detail.url }, 60_000);
     return { opened: true };
   });
@@ -654,7 +698,11 @@ function registerHandlers(): void {
   router.register('backup.createNow', async () => {
     maintenanceActive = true;
     try {
-      const result = await db<{ manifest: { fileName: string } }>('createBackup', { kind: 'manual' }, 300_000);
+      const result = await db<{ manifest: { fileName: string } }>(
+        'createBackup',
+        { kind: 'manual' },
+        300_000,
+      );
       return { ok: true, fileName: result.manifest.fileName, detail: null };
     } catch (error) {
       return {
@@ -751,7 +799,14 @@ function registerHandlers(): void {
       written: true,
       path: destination,
       byteSize: Buffer.byteLength(body, 'utf8'),
-      contents: ['version and environment', 'database state', 'collection and source state', 'health checks', 'settings', 'recent log (redacted)'],
+      contents: [
+        'version and environment',
+        'database state',
+        'collection and source state',
+        'health checks',
+        'settings',
+        'recent log (redacted)',
+      ],
     };
   });
 
@@ -887,22 +942,24 @@ async function startDatabase(): Promise<void> {
         : databaseState.status === 'migration_failed'
           ? databaseState.detail
           : 'unknown';
-    await dialog.showMessageBox({
-      type: 'error',
-      title: 'ChargeWatch could not open its history file',
-      message:
-        databaseState.status === 'schema_too_new'
-          ? 'This history file was written by a newer version of ChargeWatch.'
-          : 'ChargeWatch could not upgrade its history file.',
-      detail:
-        `${detail}\n\nYour existing data has NOT been changed. ` +
-        `A backup was preserved where one could be made. ` +
-        `Collection is stopped until this is resolved. See docs/UPDATES_AND_RECOVERY.md.`,
-      buttons: ['Open data folder', 'Close'],
-      defaultId: 0,
-    }).then(async (choice) => {
-      if (choice.response === 0) await shell.openPath(paths.root);
-    });
+    await dialog
+      .showMessageBox({
+        type: 'error',
+        title: 'ChargeWatch could not open its history file',
+        message:
+          databaseState.status === 'schema_too_new'
+            ? 'This history file was written by a newer version of ChargeWatch.'
+            : 'ChargeWatch could not upgrade its history file.',
+        detail:
+          `${detail}\n\nYour existing data has NOT been changed. ` +
+          `A backup was preserved where one could be made. ` +
+          `Collection is stopped until this is resolved. See docs/UPDATES_AND_RECOVERY.md.`,
+        buttons: ['Open data folder', 'Close'],
+        defaultId: 0,
+      })
+      .then(async (choice) => {
+        if (choice.response === 0) await shell.openPath(paths.root);
+      });
     return;
   }
 
@@ -969,8 +1026,12 @@ function startUpdates(): void {
         with: { type: 'json' },
       }).catch(() => ({ default: { keys: [] } }));
 
-      const trustedKeys = (keys.default as { keys?: Array<{ keyId: string; publicKeyPem: string; retired?: boolean }> })
-        .keys?.map((key) => ({
+      const trustedKeys =
+        (
+          keys.default as {
+            keys?: Array<{ keyId: string; publicKeyPem: string; retired?: boolean }>;
+          }
+        ).keys?.map((key) => ({
           keyId: key.keyId,
           publicKeyPem: key.publicKeyPem,
           retired: key.retired ?? false,
@@ -989,11 +1050,16 @@ function startUpdates(): void {
         repo: BRANDING.releaseRepo,
         channel: 'stable',
         logger,
-        autoUpdater: (module as unknown as { autoUpdater: Parameters<typeof createUpdaterBackend>[0]['autoUpdater'] }).autoUpdater,
+        autoUpdater: (
+          module as unknown as {
+            autoUpdater: Parameters<typeof createUpdaterBackend>[0]['autoUpdater'];
+          }
+        ).autoUpdater,
         fetchReleaseAsset: async (name) => {
           const url = `https://github.com/${BRANDING.releaseOwner}/${BRANDING.releaseRepo}/releases/latest/download/${encodeURIComponent(name)}`;
           const response = await fetch(url, { redirect: 'follow' });
-          if (!response.ok) throw new Error(`${name} could not be fetched (HTTP ${response.status})`);
+          if (!response.ok)
+            throw new Error(`${name} could not be fetched (HTTP ${response.status})`);
           return new Uint8Array(await response.arrayBuffer());
         },
       });
@@ -1017,7 +1083,10 @@ function startUpdates(): void {
                 reason: 'update_install',
                 detail: 'update installation',
               }).catch(() => undefined);
-              return { ok: true, detail: result.clean ? null : 'the collector did not stop cleanly' };
+              return {
+                ok: true,
+                detail: result.clean ? null : 'the collector did not stop cleanly',
+              };
             } catch (error) {
               return {
                 ok: false,
@@ -1098,7 +1167,7 @@ function startUpdates(): void {
 async function runSelfCheck(): Promise<void> {
   const startedMs = Date.now();
   const resolution = resolveDataPaths({
-    localAppDataDir: app.getPath('userData').replace(/[\\/][^\\/]+$/, ''),
+    localAppDataDir: localAppDataDirectory(),
     installDir: app.getAppPath(),
     platform: process.platform,
   });
@@ -1115,10 +1184,35 @@ async function runSelfCheck(): Promise<void> {
   const outputPath = selfCheckOutputPath(paths.root);
   const fatal: string[] = [];
 
+  /**
+   * A hard ceiling on the whole check.
+   *
+   * Every RPC below already has its own timeout, but they are sequential and
+   * the collector's default is 120 s. An unresponsive worker therefore did not
+   * fail the check — it made it sit through one timeout after another, roughly
+   * ten minutes in total, with no output and no report. A diagnostic tool that
+   * hangs is worse than one that fails, because the operator learns nothing and
+   * cannot tell a slow check from a dead one.
+   *
+   * On expiry the process exits non-zero rather than writing a report: a report
+   * assembled from half-finished checks would claim more than was established.
+   */
+  const deadline = setTimeout(() => {
+    logger.log(
+      'error',
+      `self-check exceeded ${SELF_CHECK_DEADLINE_MS} ms and was abandoned; a worker did not respond`,
+    );
+    logger.close();
+    app.exit(1);
+  }, SELF_CHECK_DEADLINE_MS);
+  deadline.unref();
+
   try {
     await startDatabase();
   } catch (error) {
-    fatal.push(`the database worker did not start: ${error instanceof Error ? error.message : String(error)}`);
+    fatal.push(
+      `the database worker did not start: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   if (databaseState?.status === 'ready') {
@@ -1141,8 +1235,12 @@ async function runSelfCheck(): Promise<void> {
 
   const byId = (id: string) => healthChecks.find((check) => check.id === id) ?? null;
   /** A check that did not run is reported as not_run, never as a pass. */
-  const notRun = (id: string) =>
-    ({ label: id, status: 'not_run' as const, detail: 'the check did not run', recoveryAction: null });
+  const notRun = (id: string) => ({
+    label: id,
+    status: 'not_run' as const,
+    detail: 'the check did not run',
+    recoveryAction: null,
+  });
   // `id` goes last: the spread carries its own, and a trailing key is the one
   // that wins. Putting it first made it dead.
   const integrity = SELF_CHECK_INTEGRITY_IDS.map((id) => ({ ...(byId(id) ?? notRun(id)), id }));
@@ -1201,6 +1299,7 @@ async function runSelfCheck(): Promise<void> {
   } catch {
     // Same.
   }
+  clearTimeout(deadline);
   logger.close();
 
   // The exit code is the gate. A caller that only reads stdout still gets a
@@ -1210,7 +1309,7 @@ async function runSelfCheck(): Promise<void> {
 
 async function bootstrap(): Promise<void> {
   const resolution = resolveDataPaths({
-    localAppDataDir: app.getPath('userData').replace(/[\\/][^\\/]+$/, ''),
+    localAppDataDir: localAppDataDirectory(),
     installDir: app.getAppPath(),
     platform: process.platform,
   });
@@ -1273,7 +1372,8 @@ async function bootstrap(): Promise<void> {
     logger,
     onOpen: () => windows.activate(),
     onTogglePause: () => {
-      const running = collectionStatus?.kind !== 'paused' && collectionStatus?.kind !== 'not_started';
+      const running =
+        collectionStatus?.kind !== 'paused' && collectionStatus?.kind !== 'not_started';
       // The tray is part of the main process, not a renderer, so it calls the
       // services directly rather than round-tripping through the IPC router —
       // which would (correctly) reject it as an untrusted sender.
@@ -1385,8 +1485,10 @@ app.whenReady().then(
     if (selfCheckRequested) {
       void runSelfCheck().catch((error: unknown) => {
         // A crash in the check is a failure of the check, not a pass.
-        // eslint-disable-next-line no-console
-        console.error(`self-check crashed: ${error instanceof Error ? error.message : String(error)}`);
+
+        console.error(
+          `self-check crashed: ${error instanceof Error ? error.message : String(error)}`,
+        );
         app.exit(1);
       });
       return;
@@ -1421,9 +1523,11 @@ app.on('before-quit', (event) => {
 // session end must not be ignored: it is the one moment an update installer
 // must never start. Subscribed through a widened handle rather than dropped,
 // with the reason recorded here so it does not look like a stray cast.
-(powerMonitor as unknown as {
-  on(event: 'shutdown', listener: (event?: { preventDefault: () => void }) => void): void;
-}).on('shutdown', (event?: { preventDefault: () => void }) => {
+(
+  powerMonitor as unknown as {
+    on(event: 'shutdown', listener: (event?: { preventDefault: () => void }) => void): void;
+  }
+).on('shutdown', (event?: { preventDefault: () => void }) => {
   sessionEnding = true;
   logger?.log('info', 'the OS is ending the session');
   event?.preventDefault?.();

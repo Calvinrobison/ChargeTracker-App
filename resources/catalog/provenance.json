@@ -1,0 +1,48 @@
+{
+  "formatVersion": 1,
+  "sourceName": "AFDC alternative fuel stations, Arizona",
+  "sourceUrl": "https://afdc.energy.gov/data_download",
+  "fieldDefinitionsUrl": "https://afdc.energy.gov/data_download/alt_fuel_stations_format",
+  "origin": "C:\\Users\\jconn\\Downloads\\alt_fuel_stations (Sep 18 2026).csv",
+  "retrievedAtMs": 1789763044726,
+  "retrievedAtIso": "2026-09-18T20:24:04.726Z",
+  "retrievedVia": "local file",
+  "fileSha256": "876f47f941edab9340e91b9f6e0b043e4f4cbbd3451dc3e08b139f34142574b8",
+  "license": "U.S. Department of Energy AFDC data, reusable with attribution",
+  "attribution": "U.S. Department of Energy, Alternative Fuels Data Center",
+  "fieldMapping": {
+    "Station Name": "name",
+    "Street Address": "streetAddress",
+    "City": "city",
+    "State": "state",
+    "ZIP": "postalCode",
+    "Latitude": "latitude",
+    "Longitude": "longitude",
+    "EV Network": "network",
+    "Access Code": "accessCondition",
+    "Access Days Time": "hoursText",
+    "EV Level1 EVSE Num": "level1Ports",
+    "EV Level2 EVSE Num": "level2Ports",
+    "EV DC Fast Count": "dcFastPorts",
+    "EV Connector Types": "connectorTypes",
+    "ID": "registryStationId",
+    "Fuel Type Code": "fuelTypeCode",
+    "Status Code": "statusCode"
+  },
+  "bounds": {
+    "centerLatitude": 33.4152,
+    "centerLongitude": -111.8315,
+    "radiusMiles": 50,
+    "measurement": "great-circle straight-line distance, inclusive of the boundary"
+  },
+  "counts": {
+    "rowsConsidered": 1652,
+    "accepted": 1083,
+    "skippedNonElectric": 0,
+    "skippedNonPublic": 99,
+    "skippedBadCoordinates": 0,
+    "skippedOutOfRadius": 470,
+    "duplicateIds": 0
+  },
+  "note": "A station appearing in this catalog says nothing about its present occupancy, and nothing about whether ChargeWatch can observe it. Those are separate facts recorded separately."
+}

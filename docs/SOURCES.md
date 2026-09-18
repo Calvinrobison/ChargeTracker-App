@@ -4,7 +4,7 @@ Which charger networks ChargeWatch can observe, on what basis, and what each one
 can and cannot tell you.
 
 **A network appearing in the station catalog is not a claim that ChargeWatch can
-observe it.** The catalog says a location exists. A *source* is a page
+observe it.** The catalog says a location exists. A _source_ is a page
 ChargeWatch is permitted and able to read. The two are separate, and the
 interface keeps them separate: a catalog-only location shows "Catalog only, not
 monitored" rather than an empty set of numbers.
@@ -13,9 +13,9 @@ monitored" rather than an empty set of numbers.
 
 ## Current status
 
-| Source | Eligibility | Verification | Observations recorded |
-| --- | --- | --- | --- |
-| ChargePoint | `needs_review` | `blocked` | **none** |
+| Source      | Eligibility    | Verification | Observations recorded |
+| ----------- | -------------- | ------------ | --------------------- |
+| ChargePoint | `needs_review` | `blocked`    | **none**              |
 
 **No source is currently cleared for automated collection, so ChargeWatch is
 not recording any observations.** This is shown on the onboarding screen, in a
@@ -39,7 +39,7 @@ Every adapter declares a `SourceCapabilities` record
 it and changes behaviour accordingly.
 
 **`eligibilityState`** — `enabled`, `disabled`, or `needs_review`. Whether
-observing this source is *permitted*. Only `enabled` allows the scheduler to
+observing this source is _permitted_. Only `enabled` allows the scheduler to
 dispatch work to it. A source that is not enabled is not retried, because
 retrying would mean making a request that has not been established as
 permissible; the interface offers "View details" instead of "Try again".
@@ -83,7 +83,7 @@ No public charger status page exposes:
 - **revenue** — what anyone paid.
 
 ChargeWatch sees counts of ports in each state, at the moments it looked. From a
-per-port source it can *infer* occupancy episodes, with explicit uncertainty at
+per-port source it can _infer_ occupancy episodes, with explicit uncertainty at
 both ends where the episode extends past the observation window. Those are
 labelled as inferred everywhere they appear, and the station detail carries the
 explanation in `NO_SESSION_RECORDS_EXPLANATION`.

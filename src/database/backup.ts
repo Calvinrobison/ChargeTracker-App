@@ -362,7 +362,10 @@ export async function performRestore(options: PerformRestoreOptions): Promise<Re
     openForVerify: options.openForVerify,
   });
   if (!preview.ok) {
-    return { ok: false, detail: `restore candidate rejected: ${preview.rejection} ${preview.detail ?? ''}` };
+    return {
+      ok: false,
+      detail: `restore candidate rejected: ${preview.rejection} ${preview.detail ?? ''}`,
+    };
   }
 
   await mkdir(stagingDir, { recursive: true });

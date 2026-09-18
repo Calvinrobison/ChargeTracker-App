@@ -122,7 +122,10 @@ export function proposeMatches(
     let confidence = 0;
 
     const separation =
-      subject.coordinate && candidate.coordinate && isValidCoordinate(subject.coordinate) && isValidCoordinate(candidate.coordinate)
+      subject.coordinate &&
+      candidate.coordinate &&
+      isValidCoordinate(subject.coordinate) &&
+      isValidCoordinate(candidate.coordinate)
         ? distanceMiles(subject.coordinate, candidate.coordinate)
         : null;
 

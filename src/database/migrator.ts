@@ -47,8 +47,16 @@ export interface AppliedMigration {
 }
 
 export type MigrationOutcome =
-  | { readonly status: 'up_to_date'; readonly schemaVersion: number; readonly applied: readonly number[] }
-  | { readonly status: 'migrated'; readonly schemaVersion: number; readonly applied: readonly number[] }
+  | {
+      readonly status: 'up_to_date';
+      readonly schemaVersion: number;
+      readonly applied: readonly number[];
+    }
+  | {
+      readonly status: 'migrated';
+      readonly schemaVersion: number;
+      readonly applied: readonly number[];
+    }
   | {
       readonly status: 'refused_newer_schema';
       readonly schemaVersion: number;
@@ -71,7 +79,9 @@ export type MigrationOutcome =
 export function readAppliedMigrations(driver: SqliteDriver): AppliedMigration[] {
   driver.exec(MIGRATIONS_TABLE_SQL);
   return driver
-    .prepare('SELECT version, name, checksum, app_version, applied_at_ms FROM schema_migrations ORDER BY version')
+    .prepare(
+      'SELECT version, name, checksum, app_version, applied_at_ms FROM schema_migrations ORDER BY version',
+    )
     .all()
     .map((row) => ({
       version: Number(row.version),

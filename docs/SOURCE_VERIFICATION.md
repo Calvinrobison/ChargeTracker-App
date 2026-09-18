@@ -5,8 +5,8 @@ established that reading it is permitted and that the adapter reads it
 correctly. This document is that process.
 
 It is written down because the failure mode is quiet: an adapter that works is
-indistinguishable, from the code, from an adapter that works *and should not be
-running*. Nothing in the test suite can tell you whether you are allowed to make
+indistinguishable, from the code, from an adapter that works _and should not be
+running_. Nothing in the test suite can tell you whether you are allowed to make
 a request.
 
 ---
@@ -15,7 +15,7 @@ a request.
 
 `docs/IMPLEMENTATION_STATUS.md` blocker B2. The build environment had no route
 to `driver.chargepoint.com` or to the terms pages that govern it, so neither
-question — *may we read this?* and *do we read it correctly?* — could be
+question — _may we read this?_ and _do we read it correctly?_ — could be
 answered. The adapter therefore ships declaring both unanswered:
 
 ```ts
@@ -115,9 +115,9 @@ immediately is telling you something about step 1 that step 2 did not.
 
 ## The record
 
-| Source | Reviewed on | Reviewed by | Terms URL | Rate limit basis | Outcome |
-| --- | --- | --- | --- | --- | --- |
-| ChargePoint | — | — | — | — | **Not reviewed.** No route to the provider or its terms from the build environment. Ships `needs_review` / `blocked`. |
+| Source      | Reviewed on | Reviewed by | Terms URL | Rate limit basis | Outcome                                                                                                               |
+| ----------- | ----------- | ----------- | --------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| ChargePoint | —           | —           | —         | —                | **Not reviewed.** No route to the provider or its terms from the build environment. Ships `needs_review` / `blocked`. |
 
 Add a row per review, including re-reviews. Do not edit an old row when terms
 change — add a new one, so the history of what was believed and when stays
@@ -136,7 +136,7 @@ agreed to anything.
 **"We'll be gentle about it."** Rate limiting is a condition of responsible
 collection, not a replacement for permission. The token bucket, the jittered
 backoff capped at six hours, the circuit breaker and the honoured `Retry-After`
-all exist to be a good citizen *of a source we are allowed to read*.
+all exist to be a good citizen _of a source we are allowed to read_.
 
 **A green test suite.** Nothing in `npm run test:nodeps` can tell you whether a
 request should be made. The specs prove the parser handles what it is given.

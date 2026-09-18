@@ -22,7 +22,15 @@
  * Usage: node scripts/verify-package.mjs [--dir release]
  */
 
-import { closeSync, existsSync, openSync, readSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -32,7 +40,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
 const dirIndex = process.argv.indexOf('--dir');
-const releaseDir = resolve(root, dirIndex === -1 ? 'release' : (process.argv[dirIndex + 1] ?? 'release'));
+const releaseDir = resolve(
+  root,
+  dirIndex === -1 ? 'release' : (process.argv[dirIndex + 1] ?? 'release'),
+);
 
 /** @type {{name: string, status: 'PASS'|'FAIL'|'SKIP', detail: string, required: boolean}[]} */
 const results = [];
@@ -78,7 +89,8 @@ function readAsarListing(path) {
       const prefix = Buffer.alloc(16);
       if (readSync(fd, prefix, 0, 16, 0) !== 16) return null;
       const jsonLength = prefix.readUInt32LE(12);
-      if (!Number.isFinite(jsonLength) || jsonLength <= 0 || jsonLength > 64 * 1024 * 1024) return null;
+      if (!Number.isFinite(jsonLength) || jsonLength <= 0 || jsonLength > 64 * 1024 * 1024)
+        return null;
       const json = Buffer.alloc(jsonLength);
       if (readSync(fd, json, 0, jsonLength, 16) !== jsonLength) return null;
       const parsed = JSON.parse(json.toString('utf8'));
@@ -304,7 +316,11 @@ if (!unpacked) {
         );
       }
     } catch (error) {
-      record('only public update keys are embedded', 'FAIL', `keys.json is not valid JSON: ${error.message}`);
+      record(
+        'only public update keys are embedded',
+        'FAIL',
+        `keys.json is not valid JSON: ${error.message}`,
+      );
     }
   } else {
     record(
@@ -323,7 +339,10 @@ if (!unpacked) {
     installers.length > 0 ? 'PASS' : 'FAIL',
     installers.length > 0
       ? installers
-          .map((name) => `${name} (${(statSync(join(releaseDir, name)).size / (1024 * 1024)).toFixed(0)} MB)`)
+          .map(
+            (name) =>
+              `${name} (${(statSync(join(releaseDir, name)).size / (1024 * 1024)).toFixed(0)} MB)`,
+          )
           .join(', ')
       : `no *Setup*.exe under ${releaseDir}`,
   );

@@ -144,10 +144,7 @@ export function TopBar({ bootstrap, status, lastRefreshedMs }: TopBarProps): Rea
 
       <div className="collection-status">
         <span className="collection-status-line">
-          <span
-            className={statusDotClass(status?.kind ?? 'not_started')}
-            aria-hidden="true"
-          />
+          <span className={statusDotClass(status?.kind ?? 'not_started')} aria-hidden="true" />
           {/* Colour is never the only signal: the label always carries the state. */}
           <span>{status?.label ?? 'Starting…'}</span>
         </span>

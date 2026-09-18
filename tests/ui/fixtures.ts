@@ -64,7 +64,7 @@ function baseStation(overrides: Partial<StationView>): StationView {
     distinguishesCharging: false,
     scopeNote: null,
     ...overrides,
-  } as StationView;
+  };
 }
 
 /**
@@ -161,7 +161,8 @@ export const SUMMARY: SummaryView = {
   requestedDays: 30,
   effectiveDays: 11,
   clippedByStudyStart: true,
-  cohortDescription: 'DC fast locations with at least 7 days of history and 90% known-state coverage.',
+  cohortDescription:
+    'DC fast locations with at least 7 days of history and 90% known-state coverage.',
 };
 
 /**
@@ -251,9 +252,27 @@ export const BOOTSTRAP: BootstrapView = {
   collection: COLLECTION_STATUS,
   sources: SOURCES,
   healthChecks: [
-    { id: 'data_dir', label: 'Data folder is writable', status: 'pass', detail: null, recoveryAction: null },
-    { id: 'database', label: 'History file is ready', status: 'pass', detail: 'schema 1, journal mode wal', recoveryAction: null },
-    { id: 'browser', label: 'Bundled browser starts', status: 'pass', detail: null, recoveryAction: null },
+    {
+      id: 'data_dir',
+      label: 'Data folder is writable',
+      status: 'pass',
+      detail: null,
+      recoveryAction: null,
+    },
+    {
+      id: 'database',
+      label: 'History file is ready',
+      status: 'pass',
+      detail: 'schema 1, journal mode wal',
+      recoveryAction: null,
+    },
+    {
+      id: 'browser',
+      label: 'Bundled browser starts',
+      status: 'pass',
+      detail: null,
+      recoveryAction: null,
+    },
     {
       id: 'sources',
       label: 'A charger status source is enabled',
@@ -261,7 +280,13 @@ export const BOOTSTRAP: BootstrapView = {
       detail: 'FixtureNet: needs_review / blocked',
       recoveryAction: 'No source has been cleared for automated collection yet.',
     },
-    { id: 'catalog', label: 'Station catalog is loaded', status: 'pass', detail: '4 catalog locations, 3 monitored', recoveryAction: null },
+    {
+      id: 'catalog',
+      label: 'Station catalog is loaded',
+      status: 'pass',
+      detail: '4 catalog locations, 3 monitored',
+      recoveryAction: null,
+    },
     {
       id: 'network',
       label: 'Network is reachable',
@@ -276,7 +301,7 @@ export const BOOTSTRAP: BootstrapView = {
   theme: 'dark',
   demoMode: false,
   studyStartMs: NOW_MS - 11 * DAY_MS,
-} as BootstrapView;
+};
 
 export const OVERVIEW: ResponseOf<'overview.get'> = {
   summary: SUMMARY,
@@ -314,7 +339,12 @@ function detailFor(station: StationView): ResponseOf<'station.getDetail'> {
         : 'Counts are as last read from the source.'
       : 'This location is in the station catalog but is not monitored, so no history exists for it.',
     dataQuality: {
-      badge: station.monitoring === 'stale' ? 'stale_source' : monitored && station.eligibleForRanking ? 'reliable' : 'provisional',
+      badge:
+        station.monitoring === 'stale'
+          ? 'stale_source'
+          : monitored && station.eligibleForRanking
+            ? 'reliable'
+            : 'provisional',
       coveragePct: station.coverage,
       historyDays: station.history,
       latestObservation: station.observed,
@@ -357,7 +387,7 @@ function detailFor(station: StationView): ResponseOf<'station.getDetail'> {
       adapterVersion: 'fixture-adapter@0.0.0',
       metricAlgorithmVersion: 1,
     },
-  } as ResponseOf<'station.getDetail'>;
+  };
 }
 
 export const STATION_DETAILS: Readonly<Record<string, ResponseOf<'station.getDetail'>>> =

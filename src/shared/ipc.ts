@@ -59,7 +59,9 @@ export const windowRequestSchema = v
  */
 export const filterStateSchema = v.object({
   query: v.string({ max: 200 }).withDefault(''),
-  chargingTypes: v.array(v.enumOf(['level_2', 'dc_fast', 'level_1', 'unknown'] as const), { max: 8 }).withDefault([]),
+  chargingTypes: v
+    .array(v.enumOf(['level_2', 'dc_fast', 'level_1', 'unknown'] as const), { max: 8 })
+    .withDefault([]),
   networks: v.array(v.string({ max: 80 }), { max: 40 }).withDefault([]),
   monitoringStates: v.array(monitoringStateSchema, { max: 8 }).withDefault([]),
   savedOnly: v.boolean().withDefault(false),
@@ -166,7 +168,11 @@ export interface TrendPointView {
 
 export interface TrendView {
   readonly points: readonly TrendPointView[];
-  readonly gaps: readonly { readonly startMs: number; readonly endMs: number; readonly reason: string }[];
+  readonly gaps: readonly {
+    readonly startMs: number;
+    readonly endMs: number;
+    readonly reason: string;
+  }[];
   readonly note: string;
 }
 
@@ -233,7 +239,8 @@ export interface StationDetailView {
   readonly trend: TrendView;
   readonly heatmap: readonly HeatmapCellView[];
   readonly activity: {
-    readonly capability: 'recorded_sessions' | 'detected_port_episodes' | 'aggregate_count_changes' | 'none';
+    readonly capability:
+      'recorded_sessions' | 'detected_port_episodes' | 'aggregate_count_changes' | 'none';
     readonly explanation: string;
     readonly detectedStartsPerDay: number | null;
     readonly estimatedDwell: string | null;
@@ -312,7 +319,11 @@ export interface BootstrapView {
     readonly label: string;
     readonly timeZone: string;
   };
-  readonly counts: { readonly catalogSites: number; readonly monitoredScopes: number; readonly observations: number };
+  readonly counts: {
+    readonly catalogSites: number;
+    readonly monitoredScopes: number;
+    readonly observations: number;
+  };
   readonly collection: CollectionStatusView;
   readonly sources: readonly SourceHealthView[];
   readonly healthChecks: readonly {
@@ -391,7 +402,10 @@ export const OPERATIONS = {
     cancellable: true,
   }),
 
-  'station.setSaved': op<{ readonly siteId: string; readonly saved: boolean }, { readonly saved: boolean }>({
+  'station.setSaved': op<
+    { readonly siteId: string; readonly saved: boolean },
+    { readonly saved: boolean }
+  >({
     name: 'station.setSaved',
     request: v.object({ siteId: v.string({ min: 1, max: 128 }), saved: v.boolean() }),
     timeoutMs: 5_000,
@@ -400,7 +414,11 @@ export const OPERATIONS = {
 
   'sites.setMonitored': op<
     { readonly siteIds: readonly string[]; readonly enabled: boolean },
-    { readonly enabledCount: number; readonly refusedCount: number; readonly refusals: readonly string[] }
+    {
+      readonly enabledCount: number;
+      readonly refusedCount: number;
+      readonly refusals: readonly string[];
+    }
   >({
     name: 'sites.setMonitored',
     request: v.object({
@@ -425,10 +443,7 @@ export const OPERATIONS = {
     mutating: true,
   }),
 
-  'collection.setRunning': op<
-    { readonly running: boolean },
-    CollectionStatusView
-  >({
+  'collection.setRunning': op<{ readonly running: boolean }, CollectionStatusView>({
     name: 'collection.setRunning',
     request: v.object({ running: v.boolean() }),
     timeoutMs: 60_000,
@@ -437,15 +452,24 @@ export const OPERATIONS = {
 
   'collection.refreshNow': op<
     { readonly siteIds: readonly string[] },
-    { readonly queued: number; readonly earliestStartMs: number | null; readonly budgetNote: string | null }
+    {
+      readonly queued: number;
+      readonly earliestStartMs: number | null;
+      readonly budgetNote: string | null;
+    }
   >({
     name: 'collection.refreshNow',
-    request: v.object({ siteIds: v.array(v.string({ min: 1, max: 128 }), { max: 100 }).withDefault([]) }),
+    request: v.object({
+      siteIds: v.array(v.string({ min: 1, max: 128 }), { max: 100 }).withDefault([]),
+    }),
     timeoutMs: 15_000,
     mutating: true,
   }),
 
-  'source.openWindow': op<{ readonly sourceId: string; readonly siteId: string }, { readonly opened: boolean }>({
+  'source.openWindow': op<
+    { readonly sourceId: string; readonly siteId: string },
+    { readonly opened: boolean }
+  >({
     name: 'source.openWindow',
     request: v.object({
       sourceId: v.string({ min: 1, max: 64 }),
@@ -472,7 +496,11 @@ export const OPERATIONS = {
   }),
 
   'export.rawObservations': op<
-    { readonly window: WindowRequest; readonly filters: FilterState; readonly destinationPath: string },
+    {
+      readonly window: WindowRequest;
+      readonly filters: FilterState;
+      readonly destinationPath: string;
+    },
     { readonly written: boolean; readonly path: string; readonly rowCount: number }
   >({
     name: 'export.rawObservations',
@@ -485,7 +513,10 @@ export const OPERATIONS = {
     cancellable: true,
   }),
 
-  'visits.getTemplate': op<Record<string, never>, { readonly headers: readonly string[]; readonly csv: string }>({
+  'visits.getTemplate': op<
+    Record<string, never>,
+    { readonly headers: readonly string[]; readonly csv: string }
+  >({
     name: 'visits.getTemplate',
     request: empty,
     timeoutMs: 5_000,
@@ -496,7 +527,11 @@ export const OPERATIONS = {
     {
       readonly acceptedCount: number;
       readonly rejectedCount: number;
-      readonly issues: readonly { readonly rowIndex: number; readonly code: string; readonly detail: string }[];
+      readonly issues: readonly {
+        readonly rowIndex: number;
+        readonly code: string;
+        readonly detail: string;
+      }[];
       readonly preview: readonly Record<string, string>[];
       readonly datasetId: string;
       readonly overlapsExisting: readonly string[];
@@ -558,7 +593,10 @@ export const OPERATIONS = {
         ] as const),
         notes: v.string({ max: 1000 }).nullable(),
       })
-      .refine((value) => value.periodEndMs > value.periodStartMs, 'the period must have positive length'),
+      .refine(
+        (value) => value.periodEndMs > value.periodStartMs,
+        'the period must have positive length',
+      ),
     timeoutMs: 15_000,
     mutating: true,
   }),
@@ -602,7 +640,11 @@ export const OPERATIONS = {
 
   'restore.perform': op<
     { readonly filePath: string; readonly confirmed: boolean },
-    { readonly ok: boolean; readonly detail: string | null; readonly preservedPreviousPath: string | null }
+    {
+      readonly ok: boolean;
+      readonly detail: string | null;
+      readonly preservedPreviousPath: string | null;
+    }
   >({
     name: 'restore.perform',
     request: v
@@ -626,7 +668,12 @@ export const OPERATIONS = {
 
   'diagnostics.export': op<
     { readonly destinationPath: string },
-    { readonly written: boolean; readonly path: string; readonly byteSize: number; readonly contents: readonly string[] }
+    {
+      readonly written: boolean;
+      readonly path: string;
+      readonly byteSize: number;
+      readonly contents: readonly string[];
+    }
   >({
     name: 'diagnostics.export',
     request: v.object({ destinationPath: v.string({ min: 1, max: 4096 }) }),
@@ -657,7 +704,10 @@ export const OPERATIONS = {
     }
   >({ name: 'update.getState', request: empty, timeoutMs: 10_000 }),
 
-  'update.check': op<Record<string, never>, { readonly started: boolean; readonly detail: string | null }>({
+  'update.check': op<
+    Record<string, never>,
+    { readonly started: boolean; readonly detail: string | null }
+  >({
     name: 'update.check',
     request: empty,
     timeoutMs: 60_000,
@@ -671,7 +721,10 @@ export const OPERATIONS = {
     name: 'update.restartAndInstall',
     request: v
       .object({ confirmed: v.boolean() })
-      .refine((value) => value.confirmed, 'installing an update from the foreground requires confirmation'),
+      .refine(
+        (value) => value.confirmed,
+        'installing an update from the foreground requires confirmation',
+      ),
     timeoutMs: 30_000,
     mutating: true,
   }),
@@ -765,12 +818,14 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   cancelled: 'That was cancelled.',
   worker_unavailable: 'The background service is not running. ChargeWatch is restarting it.',
   database_locked: 'The history file is busy. Try again in a moment.',
-  database_migration_pending: 'ChargeWatch is upgrading its history file. Collection is paused until it finishes.',
+  database_migration_pending:
+    'ChargeWatch is upgrading its history file. Collection is paused until it finishes.',
   database_schema_too_new:
     'This history file was written by a newer version of ChargeWatch. Install the newer version to open it.',
   source_not_eligible: 'Collection from that source is not enabled.',
   not_permitted: 'That action is not permitted.',
-  disk_full: 'There is not enough free disk space. Collection is paused and your history is intact.',
+  disk_full:
+    'There is not enough free disk space. Collection is paused and your history is intact.',
   path_not_permitted: 'ChargeWatch cannot read or write that location.',
   internal_error: 'Something went wrong. The details are in the diagnostics export.',
 };
@@ -780,18 +835,16 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
 // ---------------------------------------------------------------------------
 
 export type EventName =
-  | 'collection.status'
-  | 'source.health'
-  | 'update.state'
-  | 'data.changed'
-  | 'toast';
+  'collection.status' | 'source.health' | 'update.state' | 'data.changed' | 'toast';
 
 export interface EventPayloads {
   'collection.status': CollectionStatusView;
   'source.health': { readonly sources: readonly SourceHealthView[] };
   'update.state': ResponseOf<'update.getState'>;
   /** Tells the renderer its cached view models are stale. */
-  'data.changed': { readonly reason: 'observations' | 'catalog' | 'visits' | 'settings' | 'restore' };
+  'data.changed': {
+    readonly reason: 'observations' | 'catalog' | 'visits' | 'settings' | 'restore';
+  };
   toast: { readonly level: 'info' | 'warn' | 'error'; readonly message: string };
 }
 
