@@ -45,7 +45,7 @@
     "release:verify": "node --experimental-strip-types --no-warnings scripts/release-verify.mjs",
     "release:publish": "node scripts/release-publish.mjs"
   },
-  "//scripts-not-yet-implemented": "test:installed and test:update require Windows and a packaged build; they fail with a stated reason rather than passing vacuously elsewhere. test and test:e2e require the dependency tree, which needs package-lock.json (see docs/BUILDING.md). The UI specs under tests/ui have never been executed \u2014 docs/VERIFICATION_REPORT.md records them as written-not-run. npm run test:nodeps runs 380 real specs with no install required.",
+  "//scripts-not-yet-implemented": "test:installed and test:update require Windows and a packaged build; they fail with a stated reason rather than passing vacuously elsewhere. npm run test:nodeps runs 413 real specs with no install required; npm test runs the same 413 under Vitest; npm run test:e2e runs 42 UI specs against the built renderer and needs npm run build first. Nothing here has been packaged or installed on Windows — see docs/VERIFICATION_REPORT.md.",
   "dependencies": {
     "electron-updater": "^6.6.2",
     "playwright-core": "^1.55.0"
@@ -65,6 +65,7 @@
     "electron-vite": "^4.0.0",
     "eslint": "^9.35.0",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.5.0",
     "leaflet": "^1.9.4",
     "playwright": "^1.55.0",
     "prettier": "^3.6.2",
