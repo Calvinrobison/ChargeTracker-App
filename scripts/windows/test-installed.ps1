@@ -158,6 +158,60 @@ $installSeconds = ((Get-Date) - $installStart).TotalSeconds
 
 if ($install.ExitCode -ne 0) {
   Add-Result 'installer exits cleanly' 'FAIL' "exit code $($install.ExitCode)"
+
+  # `/S` suppresses the installer's window, and with it any error it would have
+  # shown. A nonzero exit on its own is a dead end, so gather the diagnosis
+  # here rather than leaving someone to hunt for it.
+  Write-Host ''
+  Write-Host 'Diagnosis' -ForegroundColor Yellow
+
+  $code = $install.ExitCode
+  $known = @{
+    -1073740940 = 'STATUS_HEAP_CORRUPTION - the installer process crashed rather than reporting an error. Nothing was installed.'
+    -1073741819 = 'STATUS_ACCESS_VIOLATION - the installer process crashed. Nothing was installed.'
+    -1073741510 = 'STATUS_CONTROL_C_EXIT - the installer was interrupted.'
+             2  = 'The installer was cancelled or could not elevate.'
+  }
+  if ($known.ContainsKey($code)) {
+    Write-Host ("  {0} (0x{1:X8})" -f $known[$code], [uint32]($code -band 0xFFFFFFFF)) -ForegroundColor Yellow
+  } else {
+    Write-Host ("  Exit code {0} (0x{1:X8})" -f $code, [uint32]($code -band 0xFFFFFFFF)) -ForegroundColor Yellow
+  }
+
+  # A crash leaves an Application Error record naming the faulting module,
+  # which is the single most useful fact about this failure.
+  try {
+    $since = $installStart.AddMinutes(-1)
+    $faults = @(Get-WinEvent -FilterHashtable @{
+      LogName = 'Application'; ProviderName = 'Application Error'; StartTime = $since
+    } -MaxEvents 5 -ErrorAction SilentlyContinue)
+    if ($faults.Count -gt 0) {
+      Write-Host ''
+      Write-Host '  Windows recorded a crash:' -ForegroundColor Yellow
+      foreach ($fault in $faults) {
+        foreach ($line in ($fault.Message -split "`n" | Select-Object -First 4)) {
+          if ($line.Trim()) { Write-Host ("    {0}" -f $line.Trim()) -ForegroundColor DarkGray }
+        }
+        Write-Host ''
+      }
+      Write-Host '  A third-party DLL named above - a security product in particular -' -ForegroundColor Yellow
+      Write-Host '  points away from ChargeWatch and towards something on this machine.' -ForegroundColor Yellow
+    } else {
+      Write-Host '  No Application Error record was found, so the process did not crash;' -ForegroundColor Yellow
+      Write-Host '  the installer exited with this code deliberately.' -ForegroundColor Yellow
+    }
+  } catch {
+    Write-Host '  The Application event log could not be read for crash details.' -ForegroundColor DarkGray
+  }
+
+  Write-Host ''
+  Write-Host '  Next, in order:' -ForegroundColor Yellow
+  Write-Host ("    1. Run it interactively, which shows errors /S hides:") -ForegroundColor Yellow
+  Write-Host ("         {0}" -f $Installer) -ForegroundColor Gray
+  Write-Host '    2. Rebuild from clean: Remove-Item -Recurse -Force .\release; npm run package:win' -ForegroundColor Yellow
+  Write-Host '    3. Exclude the release folder from real-time scanning and retry.' -ForegroundColor Yellow
+  Write-Host '    4. docs/TROUBLESHOOTING.md has the rest.' -ForegroundColor Yellow
+
   Fail-Now 'The installer failed. Nothing further can be tested.'
 }
 Add-Result 'installer exits cleanly' 'PASS' ("{0:N0}s, exit code 0" -f $installSeconds)

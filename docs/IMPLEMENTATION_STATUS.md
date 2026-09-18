@@ -212,6 +212,8 @@ Ordered by what unblocks the most.
 | # | Work | Depends on | Notes |
 | --- | --- | --- | --- |
 | I1 | Commit `package-lock.json` | B1 | Everything below needs it. |
+| I0 | **The installer builds and passes verify:package, then crashes on install** | — | Exit `-1073740940` (`STATUS_HEAP_CORRUPTION`) during a silent install of the 328 MB package. Cause not established. `differentialPackage` turned off and ~120 MB of never-executed browser payload removed; both are correct independently and either may be the fix. `test-installed.ps1` now reads the Windows Application log and names the faulting module on failure. **This blocks the release.** |
+| I0a | electron-builder runs signtool over the bundled Chromium binaries | — | With `signAndEditExecutable: true` and no certificate, electron-builder rewrites all eleven Chromium executables Google already signed. Pointless work on a large payload. Narrowing it needs a custom sign hook; not written blind against a build that currently succeeds. |
 | I2a | `partial_coverage` collection status is never emitted | — | Declared in `CollectionStatusView` and handled by the renderer, but `QueryService.collectionStatus` has no coverage figure to derive it from. Found by typecheck as an unreachable branch; the branch was removed rather than left pretending the state is reachable. |
 | ~~I2~~ | ~~Fix whatever `npm run typecheck` reports~~ | — | **Done.** Runs clean on Windows. Found a duplicate method that was silently discarding every update event. |
 | I2b | Run `npm run catalog:refresh` against a real AFDC export | network | The application shows nothing until a catalog exists. The script is now covered by 11 specs but has still never seen a genuine AFDC file. |

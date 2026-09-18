@@ -61,6 +61,18 @@ win:
   icon: resources/icons/icon.ico
   # Unsigned for now. Signing is a separate, authorised decision; see
   # docs/adr and docs/RELEASING.md. No fake publisher is configured.
+  #
+  # KNOWN ODDITY, not yet changed: with this true and no certificate present,
+  # electron-builder still runs signtool.exe over every executable in the
+  # output -- including the eleven Chromium binaries under resources/browser,
+  # which Google already signed. Rewriting binaries we did not produce is
+  # pointless work on a large payload and is worth stopping.
+  #
+  # It is left alone because the knob that disables it also disables the
+  # resource editing that embeds our icon and version strings into
+  # ChargeWatch.exe, and the packaging step currently succeeds. Narrowing it to
+  # skip extraResources needs a custom sign hook, which should not be written
+  # blind against a build that works. Tracked in docs/IMPLEMENTATION_STATUS.md.
   signAndEditExecutable: true
   artifactName: ${productName}-Setup-${version}.${ext}
 
@@ -76,7 +88,23 @@ nsis:
   # Uninstalling KEEPS the user's history. Removing data is a separate,
   # explicit action, never a side effect of uninstalling.
   deleteAppDataOnUninstall: false
-  differentialPackage: true
+
+  # OFF, deliberately.
+  #
+  # Differential packaging embeds blockmap machinery so an update can download
+  # only the changed blocks instead of the whole installer. That is worth
+  # having -- but only when there is a PREVIOUS RELEASE to compute a delta
+  # against, and there are none. Today it buys nothing and costs a more
+  # complicated installer over a ~250 MB payload.
+  #
+  # It is also a plausible contributor to the STATUS_HEAP_CORRUPTION
+  # (-1073740940) seen when the first built installer was run silently, which
+  # is why it is off now rather than later. That is a hypothesis, not a
+  # diagnosis: nobody has established the cause.
+  #
+  # Turn it back on once a release exists to delta against, and confirm the
+  # installer still runs when you do.
+  differentialPackage: false
 
 publish:
   provider: github
