@@ -1,11 +1,20 @@
 {
   "formatVersion": 1,
+  "note": "PUBLIC keys only. Key ids must be unique: the manifest names one, and two keys sharing an id means two different people can sign something this application accepts under the same name. See docs/RELEASING.md.",
   "keys": [
     {
-      "keyId": "cw-2026-09",
+      "keyId": "cw-2026-09-cr",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA+cdbjmiiwhnRasIbaNSyzRpoMhfGZyNfe8b4+FasPVk=\n-----END PUBLIC KEY-----\n",
+      "retired": false,
+      "createdAt": "2026-09-18T06:05:24.326Z",
+      "holder": "Calvinrobison"
+    },
+    {
+      "keyId": "cw-2026-09-x1",
       "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA4JcdCyYhj8QEjQHgP2kC2LHWwxt7vHrTL/mUnr3Ma9g=\n-----END PUBLIC KEY-----\n",
       "retired": false,
-      "createdAt": "2026-09-18T20:08:25.786Z"
+      "createdAt": "2026-09-18T20:08:25.786Z",
+      "holder": "the-x1x1"
     }
   ]
 }

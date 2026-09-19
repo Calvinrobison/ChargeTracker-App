@@ -1,6 +1,6 @@
 # Verification report
 
-Date: 2026-09-17
+Date: 2026-09-19
 Repository: `Calvinrobison/ChargeTracker-App`
 Branch: `chargewatch-v1` — see `git log -1` for the exact commit.
 
@@ -26,10 +26,10 @@ is marked green because it looks right in the source.
 
 ```
 $ node scripts/test-nodeps.mjs
-Running 19 spec file(s) on Node 22.22.2
-# tests 413
-# suites 113
-# pass 413
+Running 22 spec file(s) on Node 22.22.2
+# tests 454
+# suites 123
+# pass 454
 # fail 0
 # cancelled 0
 # skipped 0
@@ -113,6 +113,69 @@ The first of those stopped the application starting at all, and no amount of
 testing on Linux would have found any of them. That is the sharpest available
 evidence for this report's recurring claim: **a suite that runs on one platform
 is weaker evidence than its pass count suggests.**
+
+### A working install, and three defects only a running application could show (2026-09-19)
+
+The owner installed a build on Windows 11 and reported the application opening
+and working. That is the first time ChargeWatch has been **observed running**
+rather than reasoned about, and it immediately produced evidence that months of
+green specs had not.
+
+The startup log from the installed copy:
+
+```
+21:31:13.692 INFO  ChargeWatch 0.1.0 starting
+21:31:13.944 INFO  chargewatch-database worker started (pid 26916)
+21:31:14.622 INFO  chargewatch-collector worker started (pid 29108)
+21:31:14.896 WARN  [collector] source chargepoint is registered but not enabled
+21:31:16.631 INFO  [collector] bundled browser started (headless)
+21:31:16.721 INFO  tray icon created
+21:31:17.244 WARN  the updater could not be initialised: Cannot set properties
+                   of undefined (setting 'autoDownload'). ChargeWatch keeps collecting.
+```
+
+Three and a half seconds, every subsystem up — and one line that meant an
+entire subsystem was dead.
+
+**The updater has never worked in any packaged build.** `electron-updater` is
+CommonJS; `import()` from the bundled ESM main process resolved its exports
+under `.default`, so `module.autoUpdater` was `undefined` and the first
+assignment threw. `v0.1.0`, the release published on GitHub, can neither check
+for nor install an update. The 35 update-authenticity specs pass and always
+did: they inject a well-formed fake, so nothing exercised the line that decides
+whether the real library is usable. Recorded at WARN, in a sentence ending
+"ChargeWatch keeps collecting", it read as a note rather than a dead feature.
+
+**The application could not find the browser it ships.** An earlier launch
+reported the bundled browser missing from a 432 MB payload that contained it,
+because the resolver looked at `chrome-win/` and the payload was at
+`chromium-1243/chrome-win64/`. `afterPack` and `verify:package` both passed —
+both searched the tree for any file named `chrome.exe`. **`verify:package`
+reported "Package looks releasable" 10/10 about a package whose first log line
+was that its browser was missing.**
+
+**Two signing keys shared one id.** Two different Ed25519 public keys, held by
+two different people, were both embedded as `cw-2026-09`. Verification accepts
+a signature from any embedded key carrying the declared id, so either private
+key could produce an update the application installs, logged identically. The
+release-manifest specs construct their keys inline and never read the shipped
+file, so nothing detected it.
+
+All three are fixed, each with specs that read the real artifact rather than a
+fixture: `browser-layout.test.ts`, `updater-module-shape.test.ts`,
+`trusted-keys.test.ts`.
+
+The common shape is worth stating plainly, because it is the same failure three
+times: **every one of these was covered by specs that passed.** The specs
+tested the consumer and not the producer, the fixture and not the artifact, the
+injected fake and not the real module. A pass count is evidence about the code
+under test, and in each case the code that broke was not under test.
+
+One correction to this report's own record: it previously said "no catalog" as
+a standing limitation of the self-check readiness result. A catalog of 1083
+locations has shipped since, and `catalog-shipped.test.ts` now covers the file
+itself — recomputing every distance, refusing live-state fields on catalog rows
+and reconciling the provenance counts.
 
 ### And on Windows
 
@@ -263,11 +326,11 @@ plain browser with a stub bridge and synthetic fixtures.
 | 11  | Tray, pause/resume, single-instance, sleep/wake, Quit                      | **NT**                               | All implemented in `src/main/index.ts` and `src/main/tray.ts`, including the power-monitor wiring and the graceful-quit path. None of it has been executed: it requires Electron.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 12  | Exports match the selected data and sanitize untrusted text                | **P**                                | 17 CSV specs including formula-injection payloads, plus a real export smoke run. Numeric measurements are deliberately left untouched.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 13  | Backup/restore and migration recovery implemented and verified             | **P**                                | 6 online-backup specs now run against the **shipping** driver: a 250-site WAL database backed up, verified, digest-matched and restored; 810 rows captured including those still in the WAL; the database record written; and both refusal paths. Restore validation and archive-path safety are separately covered. See ADR-0003.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| 14  | Full Windows installer with working browser, native SQLite and assets      | **F**                                | **The installer now BUILDS and passes `verify:package` 10/10 — and then fails to install.** `ChargeWatch-Setup-0.1.0.exe` (328 MB) exits with `-1073740940` (`STATUS_HEAP_CORRUPTION`) during a silent install; the NSIS process crashes rather than reporting an error. Cause **not** established. A subsequent build failed to package at all — `Can't allocate required memory!` from a 32-bit `7za.exe` — and this report briefly claimed that as the cause of both. That was wrong: differential packaging pins the 7z dictionary to 1 MB, so the build that produced the crashing installer never approached that memory ceiling. Two separate faults; the packaging one is fixed (`ELECTRON_BUILDER_7ZIP_PATH`), the crash is not diagnosed. No installer has been successfully built since. |
+| 14  | Full Windows installer with working browser, native SQLite and assets      | **P**                                | **Built, installed, launched and used.** `ChargeWatch-Setup-0.1.0.exe` (247 MB) installed with exit code 0 on Windows 11 build 26200, the self-check from the installed copy reported `verdict: "pass"`, and on 2026-09-19 the owner confirmed the application opens and works. The `-1073740940` crash and the `Can't allocate required memory!` packaging failure did not recur; neither is recorded as fixed, because nothing targeted them — see `I0`/`I0b`. The browser the package ships was, separately, not where the application looked for it; fixed, and both build checks now ask the question the application asks. |
 | 15  | A nondeveloper can use it without a terminal or paid credentials           | **NT**                               | No installer that installs (item 14). The design contains no API key, no account and no paid dependency; the installer is per-user and needs no administrator rights, but that claim is itself untested.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| 16  | Update artifacts authenticated; failed verification cannot install         | **P**                                | 35 release-manifest specs — attacker signatures, tampered payloads, unknown and retired keys, wrong application/platform/arch/channel, replayed sequences, traversal artifact names and digest mismatches all rejected — plus the end-to-end pipeline run quoted above.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 16  | Update artifacts authenticated; failed verification cannot install         | **P (logic)** / **F (as shipped)**   | The 35 release-manifest specs hold — attacker signatures, tampered payloads, unknown and retired keys, wrong target, replayed sequences, traversal names and digest mismatches all rejected — plus the end-to-end pipeline run quoted above. **But no packaged build has ever been able to run any of it:** `import('electron-updater')` yielded `undefined` and the updater died at startup in every package including `v0.1.0`. The specs injected a well-formed fake, so the failure was invisible to them. Fixed, with specs over both module shapes; still **F as shipped** until a package is observed checking for an update. |
 | 17  | Version A → B installed update preserves marked history and settings       | **NT**                               | `scripts/windows/test-update.ps1` is written and proves in-place migration via the database file's creation time. It needs Windows and two installers — B5. Note its own stated limit: it does not prove observation survival, because it will not write a synthetic observation to do so.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| 18  | Foreground activity not interrupted; tray update resumes appropriately     | **NT**                               | Gate logic implemented in `UpdateService` with a seam for the updater backend; never executed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 18  | Foreground activity not interrupted; tray update resumes appropriately     | **NT**                               | Gate logic implemented in `UpdateService` with a seam for the updater backend; never executed. It could not have been until now — the backend it gates was never successfully constructed in a package.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 19  | CI, release preparation, signing and artifact verification implemented     | **P (written)** / **NT (never run)** | `ci.yml` and `release.yml` are written; the release workflow keeps the signing key out of the job that runs the project build and stages a draft rather than publishing. Manifest signing and verification are implemented and tested. No workflow has ever executed — GitHub Actions cannot run from here.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 20  | GitHub publication/discovery verified, or remaining setup reported         | **P (reported)**                     | Push is blocked — B6. The exact pending commands are in `HANDOFF.md`. No release is claimed to exist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 21  | Required docs, real screenshots, source notices and roadmap current        | **Partial**                          | Docs are written and current as of this commit. **No screenshots**: the only rendering so far is headless Chromium over synthetic fixtures, so there is nothing real to photograph; none were faked or mocked up.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |

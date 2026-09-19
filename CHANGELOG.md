@@ -7,7 +7,7 @@ can be released.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the
 project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.2.0] - 2026-09-19
 
 ### Added
 
@@ -117,8 +117,50 @@ project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   against a genuine AFDC file accepted 1083 of 1652 rows with zero bad
   coordinates and zero duplicates.
 
+- **The application could not find the browser it ships.**
+  `resolveBundledChromium` looked in `resources/browser/chrome-win/chrome.exe`;
+  Playwright writes `chromium-<revision>/chrome-win64/chrome.exe`. The resolver
+  now enumerates the real layouts newest-revision-first, and `after-pack.mjs`
+  and `verify-package.mjs` share that candidate list via
+  `scripts/lib/browser-layout.mjs` — previously both searched the tree for any
+  file named `chrome.exe` and passed on a package the application could not
+  start from.
+- **Automatic updates had never worked in a packaged build.**
+  `import('electron-updater')` resolves the CommonJS exports under `.default`,
+  so `module.autoUpdater` was `undefined` and configuration threw before
+  anything was set. Every package ever built, `v0.1.0` included, could neither
+  check for nor install an update; it was reported at WARN and read as a note.
+  `resolveAutoUpdater` handles both module shapes, and a module that yields
+  nothing usable is now an error that names the consequence.
+- **Two signing keys shared one id.** Two different Ed25519 public keys were
+  both embedded as `cw-2026-09`, so either private key could sign an update the
+  application accepts, under one name. They now carry distinct ids, and
+  `parseTrustedKeys` refuses any key file with duplicate ids, malformed entries
+  or PRIVATE key material.
+- **Startup was silent for as long as it took.** The tray and window were
+  created only after the database, collector and health checks — stages
+  allowing 180 s, 120 s and 60 s — while bootstrap logged one line and then
+  nothing. A slow stage was indistinguishable from a hang. The tray now comes
+  up first and each stage logs its start, duration and failure.
+
+### Changed
+
+- **Releases publish from `Calvinrobison/ChargeTracker-App` again.** A period of
+  work was done from a fork and pointed `publish.owner` and
+  `BRANDING.releaseOwner` at it. Both are back to the owned repository; they
+  must agree, or the updater refuses its own download as an untrusted source.
+
 ### Known limitations
 
-No release has been published. Live collection, the bundled station catalog and
-the Windows installer are **blocked** rather than done; `docs/VERIFICATION_REPORT.md`
-records, per item, what was actually tested and what was not.
+**No source is cleared for collection**, so no observation is ever recorded and
+every occupancy, coverage and activity figure is empty by design. The station
+catalog is real; everything about how busy those stations are is not yet
+collectable. `docs/SOURCE_VERIFICATION.md` sets out what a review must
+establish.
+
+The installer is **not code-signed**, so Windows SmartScreen warns on first
+run. The package carries a second full Chromium (432 MB of an 814 MiB payload)
+beside the one inside Electron, for a collector that cannot yet run.
+
+`docs/VERIFICATION_REPORT.md` records, per item, what was actually tested and
+what was not.

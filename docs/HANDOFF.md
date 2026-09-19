@@ -10,27 +10,30 @@ to break.
 
 ---
 
-## 1. Get the branch onto GitHub
+## 1. Get the branch
 
-The work is on `fix/toolchain-green`, pushed to the fork
-`the-x1x1/ChargeTracker-App` and open upstream as pull request #8.
+Work happens on `chargewatch-v1`, which is the repository's default branch on
+`Calvinrobison/ChargeTracker-App`.
 
 ```powershell
-git clone https://github.com/the-x1x1/ChargeTracker-App.git
+git clone https://github.com/Calvinrobison/ChargeTracker-App.git
 cd ChargeTracker-App
-git checkout fix/toolchain-green
 ```
 
-The maintainer account cannot push to `Calvinrobison/ChargeTracker-App`, which
-is why the fork exists and why releases are cut from it. See
-`build: publish releases from the-x1x1 fork` — that commit is fork-specific and
-should not be merged upstream.
+Releases are published from this repository, and the updater downloads from it
+(`publish.owner` in `electron-builder.yml`, `BRANDING.releaseOwner` in
+`src/main/index.ts` — both must agree, or the updater refuses its own
+download as an untrusted source).
 
-The pull request template will prompt you through the data-honesty checklist;
-it applies to this change like any other.
+A period of work was done from the fork `the-x1x1/ChargeTracker-App` and merged
+as pull request #8. That fork's release configuration has been reverted; if you
+are working from a clone made during that period, check `publish.owner` before
+cutting anything.
 
-**Run the checks in section 2 before merging.** The blockers in section 1a have
-moved a long way, but nothing here has been seen working with real data.
+The pull request template prompts through the data-honesty checklist; it
+applies to every change here.
+
+**Run the checks in section 2 before merging.**
 
 ---
 
@@ -81,6 +84,62 @@ Each RPC had a timeout but they run in sequence, and the collector's default is
 120 s, so an unresponsive worker made the check sit through one timeout after
 another - about ten minutes, silent, no report. There is now a 90 s ceiling on
 the whole run.
+
+### Fixed - the application could not find the browser it ships (`I4`)
+
+The first line the installed application printed was that the bundled browser
+was missing. It was not: `resolveBundledChromium` looked in
+`resources/browser/chrome-win/chrome.exe`, and Playwright writes
+`chromium-<revision>/chrome-win64/chrome.exe`, with the revision changing on
+every upgrade.
+
+Both build-time checks passed, because both searched the package recursively
+for any file named `chrome.exe`, found one, and reported success.
+`verify:package` said "Package looks releasable" 10/10 about that package. The
+question that matters is not whether a browser is in there but whether it is
+where the application looks; `scripts/lib/browser-layout.mjs` is now the one
+candidate list, shared by the resolver and both checks, with specs asserting
+they agree.
+
+### Fixed - automatic updates had never worked (`I5`)
+
+Every packaged build, including the `v0.1.0` release, logged this and carried
+on:
+
+```
+WARN the updater could not be initialised: Cannot set properties of
+undefined (setting 'autoDownload'). ChargeWatch keeps collecting.
+```
+
+`electron-updater` is CommonJS; `import()` from the bundled ESM main process
+resolved its exports under `.default`, so `module.autoUpdater` was `undefined`
+and the first assignment threw before anything was configured. An entire
+subsystem - and every signature check it gates - was dead in every package ever
+built, reported at WARN in a sentence ending on a reassurance.
+
+The 35 update-authenticity specs passed throughout. They inject a well-formed
+fake, so nothing ever exercised the line that decides whether the real library
+is usable. `resolveAutoUpdater` now looks in both shapes and a module that
+yields nothing usable is an ERROR naming the consequence.
+
+### Fixed - two signing keys shared one id (`I6`)
+
+Two different Ed25519 public keys, held by two different people, were both
+embedded as `cw-2026-09` - one in the `v0.1.0` release, one in a working tree.
+Verification collects every embedded key matching the id a manifest declares
+and accepts a signature from any of them, so either private key could produce
+an update this application installs, logged identically.
+
+Nothing detected it because the collision was in data, not code; the
+release-manifest specs build their keys inline and never read the shipped file.
+The keys now carry distinct ids (`cw-2026-09-cr`, `cw-2026-09-x1`),
+`parseTrustedKeys` refuses a file with duplicate ids, malformed entries or any
+PRIVATE key material, and specs read `resources/update-keys/keys.json` itself.
+
+**Anyone holding an installation from before this change cannot be updated to
+after it** - those copies trust only `cw-2026-09`, and no release will ever
+carry that id again. They need a fresh install. Since `v0.1.0` could not update
+itself at all, this costs nothing that was not already lost.
 
 ### Not reproduced - the installer crash (`I0`) and the compressor failure (`I0b`)
 
@@ -226,14 +285,21 @@ than failed).
 None of these are oversights. Each one was a decision to report a gap rather
 than fill it with something invented.
 
-### No station catalog is bundled
+### The station catalog is bundled, and it is the only real data in the product
 
-`resources/catalog/` contains a README and nothing else. The AFDC dataset was
-unreachable from the build environment, and writing plausible-looking station
-rows would have put fabricated locations in front of a user who had no way to
-tell. Run `npm run catalog:refresh` on a networked machine and review what it
-produces — the field mapping in `CatalogImportRecord` is a declared shape that
-has never seen a real file.
+`resources/catalog/` holds 1083 public charging locations within 50 miles of
+Mesa, built by `catalog:refresh` from the AFDC Arizona export
+(`provenance.json` records the source URL, the file's SHA-256, the field
+mapping and the counts: 1652 rows considered, 1083 accepted, 99 non-public, 470
+outside the radius, 0 with bad coordinates).
+
+Because no source is cleared for collection, this catalog is currently the
+entire product: the map of where chargers are. Every occupancy figure is empty
+by design. `tests/nodeps/catalog-shipped.test.ts` covers the shipped file
+rather than the refresh script - recomputing every distance with the
+application's own `distanceMiles`, refusing any live-state field on a catalog
+row, and reconciling the provenance counts - because a wrong row here is not
+cosmetic.
 
 ### No source is cleared for collection
 
@@ -287,14 +353,27 @@ goes into `resources/update-keys/keys.json`, which is what installed copies use
 to verify an update. Lose the private key and you cannot ship an update that
 existing installs will accept.
 
+Two keys are currently embedded, `cw-2026-09-cr` and `cw-2026-09-x1`, held by
+Calvinrobison and the-x1x1 respectively. Either can sign a release that
+installed copies accept. Sign with the id whose private half you hold:
+
+```powershell
+npm run release:prepare -- --version 0.2.0 --key-id cw-2026-09-cr
+```
+
+**Key ids must stay unique.** They were not once — both of these were
+`cw-2026-09`, which meant a manifest naming that id could be signed by either
+party and nothing in the log would say which. `parseTrustedKeys` now refuses a
+file with a duplicate id and the build cannot embed one.
+
 Then, per release:
 
 ```powershell
 npm run package:win
 npm run verify:package
-npm run release:prepare -- --version 0.1.0
+npm run release:prepare -- --version 0.2.0 --key-id cw-2026-09-cr
 npm run release:verify
-npm run release:publish -- --tag v0.1.0 --dry-run
+npm run release:publish -- --tag v0.2.0 --dry-run
 ```
 
 `release:verify` runs the **same code the installed application runs**, against

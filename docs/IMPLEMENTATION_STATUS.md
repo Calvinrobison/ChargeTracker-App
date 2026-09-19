@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-09-17.
+Last updated: 2026-09-19.
 
 This is the resume point. It records what is done with evidence, what is
 blocked with the reason, and what is next with the exact command.
@@ -9,13 +9,27 @@ blocked with the reason, and what is next with the exact command.
 **Base commit**: none — the repository was empty (`git ls-remote` returned no
 refs), so this is an initial implementation. No unrelated changes existed to
 preserve.
-**Branch**: `chargewatch-v1` (local; not yet pushed — see _Blocked_ below)
+**Branch**: `chargewatch-v1`, pushed and the repository's default branch
 **Schema version**: 1
-**Test count**: 413 specs / 113 suites, all passing, via `npm run test:nodeps` —
-on Linux with Node 22.22.2, and (at 380) on Windows 11 x64 with Node 24.19.0.
-The same 413 specs now also pass under Vitest via `npm test`. The Windows
-run found one real defect in a spec that had only ever run on Linux; it is fixed
-and recorded in `VERIFICATION_REPORT.md`.
+**Test count**: 454 specs / 123 suites, all passing, via `npm run test:nodeps` —
+on Linux with Node 22.22.2 and on Windows 11 x64 with Node 24.19.0. The same
+specs pass under Vitest via `npm test`, and 42 UI specs run against the built
+renderer in Chromium.
+
+A caution that belongs beside that number rather than in a footnote: **every
+defect found since this application was first packaged was covered by specs
+that passed.** The IPC origin bug, the browser path, the dead updater and the
+key-id collision each had green tests over the consumer, the fixture or an
+injected fake, while the producer, the artifact and the real module went
+untested. Read the count as evidence about the code under test, then check what
+that is.
+
+A caution that belongs beside that number rather than in a footnote: **every
+defect found since the application was first packaged was covered by specs that
+passed.** The IPC origin bug, the browser path, the dead updater and the key-id
+collision each had green tests over the consumer, the fixture or an injected
+fake, while the producer, the artifact and the real module went untested. Read
+the count as evidence about the code under test, and check what that is.
 
 ---
 
@@ -225,6 +239,8 @@ Ordered by what unblocks the most.
 | I0     | ~~The installer crashes on install~~ **Not reproduced**                       | —          | On 2026-09-18 a fresh build installed cleanly on Windows 11 (build 26200): `Start-Process -Wait` returned exit **0** and the app launched. `I0b` did not reproduce either. **Not recorded as fixed:** nothing targeted it, and the artifact is 247 MB against the 328 MB that failed. That 81 MB is unexplained and is the first thing to compare if it returns. Two explanations for this crash have already been retracted; do not offer a third without evidence.                                                                                                                           |
 | I0d    | ~~The app could not find the browser it ships~~                               | —          | **Fixed.** `resolveBundledChromium` looked at `resources/browser/chrome-win/chrome.exe`; Playwright writes `chromium-<rev>/chrome-win64/chrome.exe`. Both build checks passed because both searched recursively for any `chrome.exe`. `verify:package` said "releasable" for a package whose first log line was `the bundled browser was not found`. Resolver now enumerates the real layouts newest-revision-first; `after-pack.mjs` and `verify-package.mjs` share that list via `scripts/lib/browser-layout.mjs`; 9 specs build the directory shape on disk and assert the two lists agree. |
 | I0b    | ~~Packaging fails with `Can't allocate required memory!`~~ **Not reproduced** | —          | electron-builder 26.15.3 downloaded `7zip-win-x64.tar.gz` and compressed the 432 MB payload without complaint, with `differentialPackage: true`. This also retires the 32-bit-compressor theory by observation. `scripts/windows/diagnose-7z.ps1` remains if it returns.                                                                                                                                                                                                                                                                                                                       |
+| I0e    | ~~Automatic updates never worked in a package~~                               | —          | **Fixed.** `import('electron-updater')` resolved its CommonJS exports under `.default`, so `module.autoUpdater` was `undefined` and configuration threw at startup in every package built, `v0.1.0` included. Reported at WARN and read as a note. `resolveAutoUpdater` handles both shapes, and a module yielding nothing usable is an error naming the consequence. 9 specs. **Still unproven in a package**: no build has yet been observed checking for an update.                                        |
+| I0f    | ~~Two signing keys shared the id `cw-2026-09`~~                                | —          | **Fixed.** Two different Ed25519 public keys, held by different people, were both embedded under one id; verification accepts any embedded key carrying the declared id, so either private key could sign an accepted update, logged identically. Now `cw-2026-09-cr` and `cw-2026-09-x1`, with `parseTrustedKeys` refusing duplicate ids, malformed entries and PRIVATE key material. 12 specs, including over the shipped file. **Installations from before this change cannot be updated** — they trust only the retired id. |
 | I0c    | The package ships a second Chromium                                           | —          | 432 MB of the 814 MiB payload is a full `chrome-win64` beside the Chromium already inside Electron. Most of the installer's size and the reason there is so much to compress. A design question — drive collection through Electron's own browser, or fetch the collector on first run — not a build-script one. Neither attempted.                                                                                                                                                                                                                                                            |
 | I0a    | electron-builder runs signtool over the bundled Chromium binaries             | —          | With `signAndEditExecutable: true` and no certificate, electron-builder rewrites all eleven Chromium executables Google already signed. Pointless work on a large payload. Narrowing it needs a custom sign hook; not written blind against a build that currently succeeds.                                                                                                                                                                                                                                                                                                                   |
 | I2a    | `partial_coverage` collection status is never emitted                         | —          | Declared in `CollectionStatusView` and handled by the renderer, but `QueryService.collectionStatus` has no coverage figure to derive it from. Found by typecheck as an unreachable branch; the branch was removed rather than left pretending the state is reachable.                                                                                                                                                                                                                                                                                                                          |
@@ -275,17 +291,20 @@ _More info → Run anyway_. No packaging change removes this; it needs a real
 code-signing certificate. Decide whether to buy one before publishing widely,
 because the warning is what most people will judge the download by.
 
-### 4. Bootstrap the update signing keys
+### 4. ~~Bootstrap the update signing keys~~ — done
 
-`verify:package` fails its tenth check until this is done:
+Two public keys are embedded, `cw-2026-09-cr` (Calvinrobison) and
+`cw-2026-09-x1` (the-x1x1). Either holder can sign a release that installed
+copies accept; `release:prepare` refuses to guess and requires `--key-id` while
+more than one active key exists.
 
-```powershell
-npm run keys:bootstrap -- --key-id cw-2026-09
-```
+The private halves live in each holder's `~/.chargewatch-release-keys`, outside
+the repository. They are never committed and never shipped. Lose one and that
+holder can no longer ship an update existing installs accept.
 
-The private key is written to `~/.chargewatch-release-keys`, outside the
-repository; only the public key is committed. Generate it **once** — a new key
-per release means installed copies cannot verify the next update.
+**Key ids must stay unique** — these two were both `cw-2026-09` until
+2026-09-19, which meant either private key could sign an update accepted under
+one name. `parseTrustedKeys` now refuses a file with a duplicate id.
 
 ### 5. Resolve the second Chromium (`I0c`)
 

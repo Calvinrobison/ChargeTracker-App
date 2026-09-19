@@ -27,6 +27,7 @@ import { resolveDataPaths, isPermittedWriteDestination, type ResolvedPaths } fro
 import { redactDiagnosticText } from './security.ts';
 import { UpdateService } from './updates.ts';
 import { createUpdaterBackend, resolveAutoUpdater } from './updates-backend.ts';
+import { parseTrustedKeys } from '../shared/release-manifest.ts';
 import {
   IPC_CHANNEL_EVENT,
   IPC_CHANNEL_REQUEST,
@@ -57,7 +58,7 @@ import type { DatabaseReadyState } from '../database/worker.ts';
 const BRANDING = {
   productName: 'ChargeWatch',
   appId: 'com.formicaria.chargewatch',
-  releaseOwner: 'the-x1x1',
+  releaseOwner: 'Calvinrobison',
   releaseRepo: 'ChargeTracker-App',
 } as const;
 
@@ -1026,16 +1027,25 @@ function startUpdates(): void {
         with: { type: 'json' },
       }).catch(() => ({ default: { keys: [] } }));
 
-      const trustedKeys =
-        (
-          keys.default as {
-            keys?: Array<{ keyId: string; publicKeyPem: string; retired?: boolean }>;
-          }
-        ).keys?.map((key) => ({
-          keyId: key.keyId,
-          publicKeyPem: key.publicKeyPem,
-          retired: key.retired ?? false,
-        })) ?? [];
+      const parsed = parseTrustedKeys(keys.default);
+
+      // Refused outright rather than filtered down to the usable entries. A
+      // key file with a duplicate id or a malformed entry is a file nobody
+      // should be trusting the rest of, and quietly verifying updates against
+      // whatever survived is how a bad key becomes permanent.
+      if (parsed.problems.length > 0) {
+        for (const problem of parsed.problems) {
+          logger.log('error', `update key file: ${problem}`);
+        }
+        logger.log(
+          'error',
+          'the embedded update keys are not usable, so this build will not check for or ' +
+            'install updates. Collection is unaffected.',
+        );
+        return;
+      }
+
+      const trustedKeys = parsed.keys;
 
       if (trustedKeys.length === 0) {
         logger.log(
