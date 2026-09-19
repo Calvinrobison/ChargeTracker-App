@@ -26,7 +26,7 @@ import { SupervisedWorker } from './workers.ts';
 import { resolveDataPaths, isPermittedWriteDestination, type ResolvedPaths } from './paths.ts';
 import { redactDiagnosticText } from './security.ts';
 import { UpdateService } from './updates.ts';
-import { createUpdaterBackend } from './updates-backend.ts';
+import { createUpdaterBackend, resolveAutoUpdater } from './updates-backend.ts';
 import {
   IPC_CHANNEL_EVENT,
   IPC_CHANNEL_REQUEST,
@@ -1045,16 +1045,26 @@ function startUpdates(): void {
         return;
       }
 
+      // electron-updater is CommonJS, and the packaged build resolves its
+      // exports under `.default` rather than on the namespace. Reading
+      // `module.autoUpdater` directly produced `undefined` and the first
+      // property assignment threw, so updates have never worked in a package.
+      const autoUpdater = resolveAutoUpdater(module);
+      if (!autoUpdater) {
+        logger.log(
+          'error',
+          'electron-updater loaded but exposed no usable autoUpdater, so this build cannot ' +
+            'check for or install updates. Collection is unaffected.',
+        );
+        return;
+      }
+
       const backend = createUpdaterBackend({
         owner: BRANDING.releaseOwner,
         repo: BRANDING.releaseRepo,
         channel: 'stable',
         logger,
-        autoUpdater: (
-          module as unknown as {
-            autoUpdater: Parameters<typeof createUpdaterBackend>[0]['autoUpdater'];
-          }
-        ).autoUpdater,
+        autoUpdater,
         fetchReleaseAsset: async (name) => {
           const url = `https://github.com/${BRANDING.releaseOwner}/${BRANDING.releaseRepo}/releases/latest/download/${encodeURIComponent(name)}`;
           const response = await fetch(url, { redirect: 'follow' });

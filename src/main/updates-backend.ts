@@ -74,6 +74,40 @@ export interface UpdaterBackendOptions {
   readonly fetchReleaseAsset: (name: string) => Promise<Uint8Array>;
 }
 
+/**
+ * Finds `autoUpdater` in whatever shape `import('electron-updater')` returns.
+ *
+ * electron-updater is CommonJS. A dynamic `import()` of a CJS module from the
+ * bundled ESM main process may expose its exports directly on the namespace,
+ * or only under `.default`, depending on how the bundler and Node's interop
+ * resolve it. The packaged build got the second shape, so `module.autoUpdater`
+ * was `undefined`, and the first property assignment failed with:
+ *
+ *     the updater could not be initialised: Cannot set properties of
+ *     undefined (setting 'autoDownload')
+ *
+ * That was caught and logged as a warning, so the application kept running and
+ * nothing else complained — which meant automatic updates had never once
+ * worked in a packaged build, and nothing said so. The `.default` fallback is
+ * the fix; returning null rather than a broken object is what lets the caller
+ * report it honestly.
+ */
+export function resolveAutoUpdater(module: unknown): AutoUpdaterLike | null {
+  if (typeof module !== 'object' || module === null) return null;
+
+  const namespace = module as {
+    autoUpdater?: unknown;
+    default?: { autoUpdater?: unknown } | null;
+  };
+
+  const candidate = namespace.autoUpdater ?? namespace.default?.autoUpdater;
+
+  // A namespace with the key present but undefined is the failure this exists
+  // to catch, so presence is not enough: it has to be settable.
+  if (typeof candidate !== 'object' || candidate === null) return null;
+  return candidate as AutoUpdaterLike;
+}
+
 export function createUpdaterBackend(options: UpdaterBackendOptions): UpdaterBackend {
   const { autoUpdater, logger } = options;
   let downloadedFiles: string[] = [];
