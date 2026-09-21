@@ -7,6 +7,72 @@ can be released.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the
 project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-09-21
+
+0.3.0 could collect and could not record. This is the release that stores
+anything.
+
+### Fixed
+
+- **Every collection run was discarded.** The application read pages every ~30
+  seconds, completed the run, and lost all of it, logging
+  `failed to persist collection run` indefinitely while "Observations stored"
+  stayed at 0.
+
+  Four things combined, and only in 0.3.0. `port_observations.port_id` is
+  `NOT NULL REFERENCES ports (id)`; every connection runs
+  `PRAGMA foreign_keys = ON`; the collector synthesises a port id of
+  `${scopeKey}:${sourcePortId}`; and **nothing in the application had ever
+  inserted a row into `ports`.** So ingest wrote a child row whose parent did
+  not exist, the foreign key rejected it, and because the insert sits inside
+  the transaction in `DatabaseWorker.ingestRun`, the entire run rolled back —
+  run, attempts and observations together.
+
+  Only 0.3.0 could hit it: this is the release that gave ChargePoint
+  `granularity: 'port'` and `identityReliability: 'durable'`, which is what
+  makes the per-port list non-empty. Earlier versions recorded nothing at all,
+  so the defect had nothing to fire on.
+
+  Ingest now upserts the `ports` row in the same transaction, keyed on
+  `(scope_key, source_port_id)` via the existing `ux_ports_scope_source`, so
+  repeat observations reuse one row and per-port history stays continuous.
+  `first_seen_ms` and `last_seen_ms` widen rather than overwrite, and a level
+  of `unknown` never replaces a level already known.
+
+- **Releases were published where the application does not look.**
+  `release-publish.mjs` defaulted its target to a fork while
+  `electron-builder.yml`, the generated `app-update.yml` and
+  `BRANDING.releaseOwner` all named `Calvinrobison`. That is how 0.2.0 reached
+  the wrong repository and the updater reported "Found version 0.1.0". The
+  default now matches, and a spec asserts all four agree and that none names a
+  fork.
+
+### How this passed every gate
+
+507 no-dependency specs, 48 UI specs and a 16/16 installed self-check were all
+green on a build that could not store a single observation. None of them
+performed a real ingest carrying ports through the real schema.
+
+The spec that looked like it covered this — "port rows are stored only when the
+source supplies durable identity" — opened by inserting the `ports` row itself.
+One line, doing the thing production never does, then asserting production
+worked. That line is gone, and
+`tests/nodeps/ingest-ports-end-to-end.test.ts` seeds only what a real
+installation already has and lets ingest create the rest. It fails 6/6 without
+the fix.
+
+### Known gaps, recorded rather than patched
+
+Two columns on `ports` are still written by nothing. `reported_power_kw` has no
+source: no part of the pipeline captures power, so NULL is accurate. `retired`
+is never set, so a port that disappears from a source stays marked active —
+retiring one needs a policy about absences, history and metrics, which is a
+behaviour decision and not something to decide while repairing a foreign key.
+
+`connectors`, `inferred_episodes` and `hourly_metrics` are also never written,
+but nothing reads them on a write path, so unlike `ports` they cannot break a
+run.
+
 ## [0.3.0] - 2026-09-21
 
 The first version that can record an observation. Until now the application

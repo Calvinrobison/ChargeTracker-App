@@ -1,7 +1,7 @@
 {
   "name": "chargewatch",
   "productName": "ChargeWatch",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local historical observation tool for public EV charger status around Mesa, Arizona.",
   "private": true,
   "license": "UNLICENSED",

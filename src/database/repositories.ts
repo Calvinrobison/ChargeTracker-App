@@ -597,6 +597,52 @@ export function observationsRepository(driver: SqliteDriver): ObservationsReposi
      ON CONFLICT (observation_id) DO NOTHING`,
   );
 
+  /**
+   * Creates the `ports` row a port observation refers to, or updates the
+   * window of time it has been seen over.
+   *
+   * NOTHING ELSE IN THE APPLICATION WRITES TO `ports`. Until 0.3.1 nothing did
+   * at all, while `port_observations.port_id` is `NOT NULL REFERENCES ports
+   * (id)` and every connection runs `PRAGMA foreign_keys = ON`. So the first
+   * release whose adapter reported per-port state wrote a row referencing a
+   * parent that did not exist, the foreign key rejected it, and because ingest
+   * runs inside the transaction in `DatabaseWorker.ingestRun` the whole
+   * collection run rolled back — run, attempts, observations, all of it. The
+   * application collected every 30 seconds and stored nothing, indefinitely.
+   *
+   * Keyed on `(scope_key, source_port_id)` via `ux_ports_scope_source`, which
+   * is the port's real identity; `id` is synthesised from exactly those two in
+   * `src/collector/service.ts`, so it is stable across runs and per-port
+   * history stays continuous.
+   *
+   * `first_seen_ms` and `last_seen_ms` take the MIN and MAX rather than the
+   * incoming value, so a backfilled or out-of-order reading widens the window
+   * instead of dragging an endpoint the wrong way.
+   *
+   * A level of `unknown` never overwrites a level we already know: unknown is
+   * the absence of a reading, not a reading that the port has no level.
+   *
+   * Two columns on this table are still written by nothing, which is
+   * deliberate and recorded rather than quietly patched:
+   *
+   *   - `reported_power_kw` — no part of the pipeline captures power, so there
+   *     is no value to write. NULL means unknown, which is true.
+   *   - `retired` — a port that disappears from a source stays marked active.
+   *     Retiring it needs a policy (how many absences, and what that does to
+   *     history and metrics) and is a behaviour decision, not a fix to make
+   *     while repairing a foreign key. See docs/IMPLEMENTATION_STATUS.md.
+   */
+  const upsertPort = driver.prepare(
+    `INSERT INTO ports
+       (id, scope_key, site_id, source_port_id, level, first_seen_ms, last_seen_ms)
+     VALUES (?,?,?,?,?,?,?)
+     ON CONFLICT (scope_key, source_port_id) DO UPDATE SET
+       first_seen_ms = MIN(ports.first_seen_ms, excluded.first_seen_ms),
+       last_seen_ms  = MAX(ports.last_seen_ms, excluded.last_seen_ms),
+       level         = CASE WHEN excluded.level = 'unknown' THEN ports.level
+                            ELSE excluded.level END`,
+  );
+
   const insertPortObservation = driver.prepare(
     `INSERT INTO port_observations
        (observation_id, port_id, scope_key, source_port_id, observed_at_ms, state, level)
@@ -694,6 +740,19 @@ export function observationsRepository(driver: SqliteDriver): ObservationsReposi
           );
 
           for (const port of obs.ports) {
+            // The parent row first, in this same transaction. Writing the
+            // observation row without it is what silently discarded every
+            // collection run in 0.3.0.
+            upsertPort.run(
+              port.portId,
+              obs.scopeKey,
+              obs.siteId,
+              port.sourcePortId,
+              port.level,
+              obs.observedAtUtcMs,
+              obs.observedAtUtcMs,
+            );
+
             const portResult = insertPortObservation.run(
               obs.id,
               port.portId,
