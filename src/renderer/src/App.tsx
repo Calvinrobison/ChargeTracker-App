@@ -270,6 +270,83 @@ function AppInner(): ReactNode {
     [notify, report],
   );
 
+  /** Reloads the selected station's detail after a change that affects it. */
+  const reloadDetail = useCallback(async () => {
+    if (state.selectedId === null) return;
+    const next = await invoke('station.getDetail', {
+      siteId: state.selectedId,
+      window: windowRequest,
+    });
+    setDetail(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.selectedId, filtersKey]);
+
+  const setMonitored = useCallback(
+    (siteId: string, enabled: boolean) =>
+      runWithBusy(enabled ? 'Monitor this location' : 'Stop monitoring', async () => {
+        const result = await invoke('sites.setMonitored', { siteIds: [siteId], enabled });
+        if (result.refusedCount > 0) {
+          throw new Error(result.refusals[0] ?? 'this location cannot be monitored');
+        }
+        await reloadDetail();
+        await loadBootstrap();
+        setLastRefreshedMs(null);
+        return enabled
+          ? 'Monitoring on. The first reading is due now and will show here once it lands.'
+          : 'Monitoring off. History is kept, and the gap is recorded.';
+      }),
+    [loadBootstrap, reloadDetail, runWithBusy],
+  );
+
+  const addLink = useCallback(
+    (siteId: string, url: string) =>
+      runWithBusy('Link station page', async () => {
+        const result = await invoke('sites.addManualLink', { siteId, url });
+        if (!result.ok) throw new Error(result.detail ?? result.code);
+        await reloadDetail();
+        return result.detail;
+      }),
+    [reloadDetail, runWithBusy],
+  );
+
+  const discoverStations = useCallback(
+    (sourceId: string) =>
+      runWithBusy('Find ChargePoint stations', async () => {
+        const result = await invoke('sources.discover', { sourceId });
+        await loadBootstrap();
+        await reloadDetail().catch(() => undefined);
+        setLastRefreshedMs(null);
+        const parts = [
+          `Found ${result.found} station${result.found === 1 ? '' : 's'}.`,
+          `${result.linked} newly linked`,
+          result.alreadyLinked > 0 ? `${result.alreadyLinked} already linked` : null,
+          result.proposed > 0
+            ? `${result.proposed} need a manual link (a near-namesake was found but not trusted)`
+            : null,
+          result.unmatched > 0 ? `${result.unmatched} are not in the catalog` : null,
+          result.truncated ? 'the list was cut short' : null,
+        ].filter(Boolean);
+        return `${parts.join(' · ')}. New links start with monitoring off.`;
+      }),
+    [loadBootstrap, reloadDetail, runWithBusy],
+  );
+
+  const setMonitoredAll = useCallback(
+    (enabled: boolean) =>
+      runWithBusy(enabled ? 'Monitor all linked locations' : 'Stop monitoring all', async () => {
+        const result = await invoke('sites.setMonitoredAll', { enabled });
+        await loadBootstrap();
+        await reloadDetail().catch(() => undefined);
+        setLastRefreshedMs(null);
+        const refused =
+          result.refusedCount > 0 ? ` ${result.refusedCount} could not be changed.` : '';
+        return enabled
+          ? `Monitoring on for ${result.enabledCount} location${result.enabledCount === 1 ? '' : 's'}.${refused} Readings are spread out to respect the source's rate; the achievable interval is shown under Collection.`
+          : `Monitoring off for ${result.enabledCount} location${result.enabledCount === 1 ? '' : 's'}.${refused}`;
+      }),
+    [loadBootstrap, reloadDetail, runWithBusy],
+  );
+
   const exportCurrentView = useCallback(
     () =>
       runWithBusy('Export current view', async () => {
@@ -389,6 +466,9 @@ function AppInner(): ReactNode {
               'Import visit counts from Settings → Data and backups, using the template.',
             )
           }
+          onSetMonitored={(siteId, enabled) => void setMonitored(siteId, enabled)}
+          onAddLink={(siteId, url) => void addLink(siteId, url)}
+          busy={busy !== null}
           onOpenSourceDetails={() => dispatch({ type: 'setSettingsOpen', open: true })}
           onRetrySource={() => void retrySource()}
           retrying={retrying}
@@ -423,6 +503,8 @@ function AppInner(): ReactNode {
           backups={backups}
           busy={busy}
           onSetSetting={(key, value) => void setSetting(key, value)}
+          onDiscoverStations={(sourceId) => void discoverStations(sourceId)}
+          onSetMonitoredAll={(enabled) => void setMonitoredAll(enabled)}
           onExportCurrentView={() => void exportCurrentView()}
           onExportRawObservations={() => void exportRawObservations()}
           onBackupNow={() =>

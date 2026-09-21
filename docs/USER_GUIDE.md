@@ -23,10 +23,10 @@ you exactly what to do:
 | A charger status source is enabled | Whether anything can be collected              |
 | Station catalog is loaded          | Whether ChargeWatch knows which stations exist |
 
-**Today, the source check fails.** No charger network has been cleared for
-automated collection yet, so ChargeWatch cannot record observations. It says so
-rather than showing you an empty screen and letting you conclude the chargers
-are all idle. `docs/SOURCES.md` explains why.
+**The source check passes for ChargePoint** (cleared 2026-09-21;
+`docs/SOURCES.md` explains on what basis). Passing it does not record anything
+by itself: nothing is read until a location is linked to its station page and
+monitoring is switched on, which is the next section.
 
 **The two questions** are whether to start with Windows, and whether to begin
 collecting now. Both can be changed later in Settings.
@@ -115,15 +115,32 @@ such, because their length is unknown.
 
 ## Choosing what to monitor
 
-The station rail's monitoring filter shows what is being watched and what is
-catalog-only. Turning monitoring on for a location adds it to the collection
-schedule; the achievable interval is shown, and it may be longer than the target
-if you monitor more locations than the rate limit allows in one cycle.
+Two steps, both deliberate.
 
-If ChargeWatch cannot match a catalog entry to a source page automatically, you
-can link it by hand from the station's detail panel. It will not auto-merge on
-proximity alone — two chargers 40 metres apart in the same garage are routinely
-different operators.
+**1. Link locations to their station pages.** Settings → Locations and sources
+→ **Find ChargePoint stations** reads the provider's list for the study area
+once (about a minute; a toast counts the pages) and links each station to the
+catalog location with the same name at the same spot. It records nothing. The
+result says how many were linked, how many were already linked, how many have
+a near-namesake that was not trusted, and how many are not in the catalog at
+all. A location it did not link can be linked by hand from its detail panel:
+open the ChargePoint map, select the station, and paste the
+`driver.chargepoint.com/stations/…` address into the **Monitoring** section.
+ChargeWatch never auto-merges on proximity alone — two chargers 40 metres apart
+in the same garage are routinely different operators.
+
+**2. Switch monitoring on.** Each linked location has a switch in its detail
+panel; **Monitor all linked** in Settings turns them all on at once. A newly
+monitored location is read as soon as the source's rate allows and then every
+15 minutes. The station rail's monitoring filter shows what is being watched
+and what is catalog-only.
+
+**About the rate.** The source allows one page load every 30 seconds, so 30
+monitored locations fill the 15-minute cycle exactly; more than that and the
+achievable interval, shown under Settings → Collection, grows in proportion —
+674 locations would be read about once every 5½ hours each. Monitor the set
+you want answers about. Turning monitoring off keeps the history and records
+the gap.
 
 ## Importing visit data
 

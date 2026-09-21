@@ -22,7 +22,11 @@
 import type { ChargingLevel, PortState, StateCounts } from '../../../domain/types.ts';
 import type { AttemptOutcome } from '../../../domain/types.ts';
 
-export const PARSER_VERSION = 'chargepoint-dom@0.1.0';
+/**
+ * Bumped 0.1.0 → 0.2.0 on 2026-09-21: the first version to read the real
+ * station page. 0.1.0 was written blind and matched nothing on it.
+ */
+export const PARSER_VERSION = 'chargepoint-dom@0.2.0';
 
 /**
  * The locale the adapter explicitly requests from the source, so status-word
@@ -43,6 +47,14 @@ export interface PortRowReading {
   /** Visible label, e.g. "Port 1". Display order only; not an identity. */
   readonly label: string | null;
   readonly statusText: string | null;
+  /**
+   * The provider's own status code, when the page exposes one beside the
+   * visible words (the station page carries it as
+   * `data-qa-id="port_status_pill_<code>"`). Null when absent. The visible
+   * text is still what a person sees, so a disagreement between the two is
+   * recorded as a warning and the text wins.
+   */
+  readonly statusCode?: string | null;
   readonly connectorText: string | null;
   readonly powerText: string | null;
   /** "Last used 3 hours ago" and similar. Never a count of anything. */
@@ -120,6 +132,9 @@ const STATUS_PATTERNS: ReadonlyArray<{
     state: 'out_of_service',
     explicitCharging: false,
   },
+  // "Closed" is the station-hours pill: the port exists but is not open to
+  // the public right now, which is out of service for occupancy purposes.
+  { pattern: /\bclosed\b/i, state: 'out_of_service', explicitCharging: false },
   { pattern: /\breserved\b/i, state: 'reserved', explicitCharging: false },
   { pattern: /\bcharging\b/i, state: 'occupied', explicitCharging: true },
   { pattern: /\bin use\b/i, state: 'occupied', explicitCharging: false },
@@ -128,6 +143,47 @@ const STATUS_PATTERNS: ReadonlyArray<{
   { pattern: /\bavailable\b/i, state: 'available', explicitCharging: false },
   { pattern: /\bopen\b/i, state: 'available', explicitCharging: false },
 ];
+
+/**
+ * The provider's status codes, as its own pill definitions map them.
+ *
+ * Captured 2026-09-21 from `na.chargepoint.com/UI/images/pills/states/en-US/
+ * states.json?version=1715755545`, which is the file the station page reads
+ * to render each port pill, plus the two extra members of the page's own
+ * status enum (`out_of_order`, `out_of_network`). The right-hand column is
+ * the display text that file assigns, so the visible words and the code are
+ * two views of the same fact.
+ *
+ * A code not in this table classifies as null here and the visible text
+ * decides. `in_use_by_driver` ("Charging") is the signed-in driver's own
+ * session; ChargeWatch never signs in, so it should never appear, and if it
+ * does it is still just an occupied port.
+ */
+const STATUS_CODES: Readonly<Record<string, PortState>> = {
+  available: 'available', // "Available"
+  in_use: 'occupied', // "In Use"
+  in_use_by_driver: 'occupied', // "Charging"
+  unavailable: 'out_of_service', // "Out of Service"
+  maintenance_required: 'out_of_service', // "Out of Service"
+  out_of_service: 'out_of_service', // "Out of Service"
+  fault: 'out_of_service', // "Out of Service"
+  out_of_order: 'out_of_service', // page enum member; no pill definition
+  closed: 'out_of_service', // "Closed" — station hours, not open to the public
+  unreachable: 'unknown', // "Unknown" — the station is not reporting
+  unknown: 'unknown', // "Unknown"
+  out_of_network: 'unknown', // page enum member; the network has no status for it
+};
+
+/**
+ * Classifies a provider status code, or returns null for one this table does
+ * not know. Never guesses: an unfamiliar code is the caller's cue to fall
+ * back to the visible text.
+ */
+export function classifyStatusCode(code: string | null | undefined): PortState | null {
+  if (!code) return null;
+  const normalized = code.trim().toLowerCase();
+  return STATUS_CODES[normalized] ?? null;
+}
 
 export interface ClassifiedStatus {
   readonly state: PortState;
@@ -156,6 +212,42 @@ export function classifyStatus(text: string | null): ClassifiedStatus {
     }
   }
   return { state: 'unknown', explicitCharging: false, matched: null };
+}
+
+/**
+ * Classifies one port row from its visible words and, when present, the
+ * provider's code beside them.
+ *
+ * The text is what a person sees and is authoritative. The code is a second
+ * witness: it settles a row whose text this parser does not recognise, and
+ * when the two disagree that is recorded so a stale table on either side is
+ * noticed rather than silently absorbed.
+ */
+export function classifyRow(row: PortRowReading): ClassifiedStatus & {
+  readonly disagreement: string | null;
+} {
+  const fromText = classifyStatus(row.statusText);
+  const fromCode = classifyStatusCode(row.statusCode ?? null);
+
+  if (fromCode === null) return { ...fromText, disagreement: null };
+
+  if (fromText.matched === null) {
+    // Unrecognised or missing words; the provider's code is the only witness.
+    return {
+      state: fromCode,
+      explicitCharging: false,
+      matched: `code:${(row.statusCode ?? '').trim().toLowerCase()}`,
+      disagreement: null,
+    };
+  }
+
+  if (fromText.state !== fromCode) {
+    return {
+      ...fromText,
+      disagreement: `status text "${row.statusText ?? ''}" reads as ${fromText.state} but the provider code "${row.statusCode ?? ''}" maps to ${fromCode}; the visible text was used`,
+    };
+  }
+  return { ...fromText, disagreement: null };
 }
 
 /** Maps connector and power text to a charging class, or `unknown`. */
@@ -355,7 +447,8 @@ export function parsePageReading(reading: PageReading, options: ParseOptions): P
     unknown = 0;
 
     for (const row of rows) {
-      const status = classifyStatus(row.statusText);
+      const status = classifyRow(row);
+      if (status.disagreement) warnings.push(status.disagreement);
       switch (status.state) {
         case 'available':
           available += 1;
@@ -466,7 +559,7 @@ export function parsePageReading(reading: PageReading, options: ParseOptions): P
     ports: identityReliable
       ? rows.map((row) => ({
           sourcePortId: row.durablePortId as string,
-          state: classifyStatus(row.statusText).state,
+          state: classifyRow(row).state,
           level: classifyLevel(row.connectorText, row.powerText),
         }))
       : [],

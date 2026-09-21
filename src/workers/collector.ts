@@ -8,7 +8,11 @@
 
 import { BrowserRuntime, resolveBundledChromium } from '../collector/browser.ts';
 import { CollectorService, type RunReport } from '../collector/service.ts';
-import { createChargePointAdapter } from '../collector/adapters/chargepoint/index.ts';
+import { SOURCE_ID, createChargePointAdapter } from '../collector/adapters/chargepoint/index.ts';
+import {
+  discoverStations,
+  type DiscoveryArea,
+} from '../collector/adapters/chargepoint/discover.ts';
 import type { BindingDescriptor } from '../collector/contract.ts';
 import type { QueueEntry } from '../collector/scheduler.ts';
 
@@ -144,6 +148,19 @@ async function dispatch(op: string, payload: unknown): Promise<unknown> {
     case 'openSourceWindow':
       await runtime.openSourceWindow((payload as { url: string }).url);
       return { opened: true };
+    case 'discover': {
+      // Reads the provider's station list for the study area so catalog sites
+      // can be linked. Bounded, paced, user-triggered; never an observation.
+      const { area } = payload as { area: DiscoveryArea };
+      const controller = new AbortController();
+      return discoverStations(area, {
+        runtime,
+        acquireNavigationSlot: () => service.acquireNavigationSlot(SOURCE_ID, controller.signal),
+        log,
+        abortSignal: controller.signal,
+        onProgress: (progress) => notify('discoveryProgress', progress),
+      });
+    }
     case 'healthCheck': {
       // Does the bundled browser actually launch? This is the check the
       // onboarding screen reports, and it must not be a guess.

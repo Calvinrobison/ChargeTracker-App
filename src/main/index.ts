@@ -26,7 +26,8 @@ import { SupervisedWorker } from './workers.ts';
 import { resolveDataPaths, isPermittedWriteDestination, type ResolvedPaths } from './paths.ts';
 import { redactDiagnosticText } from './security.ts';
 import { UpdateService } from './updates.ts';
-import { createUpdaterBackend } from './updates-backend.ts';
+import { createUpdaterBackend, resolveAutoUpdater } from './updates-backend.ts';
+import { parseTrustedKeys } from '../shared/release-manifest.ts';
 import {
   IPC_CHANNEL_EVENT,
   IPC_CHANNEL_REQUEST,
@@ -57,7 +58,7 @@ import type { DatabaseReadyState } from '../database/worker.ts';
 const BRANDING = {
   productName: 'ChargeWatch',
   appId: 'com.formicaria.chargewatch',
-  releaseOwner: 'the-x1x1',
+  releaseOwner: 'Calvinrobison',
   releaseRepo: 'ChargeTracker-App',
 } as const;
 
@@ -352,6 +353,14 @@ function onCollectorNotification(notification: { notify: string; payload: unknow
     case 'status':
       void refreshCollectionStatus().catch(() => undefined);
       break;
+    case 'discoveryProgress': {
+      const progress = notification.payload as { pagesRead: number; stationsSoFar: number };
+      emit('toast', {
+        level: 'info',
+        message: `Finding ChargePoint stations… ${progress.stationsSoFar} so far (page ${progress.pagesRead})`,
+      });
+      break;
+    }
     default:
       break;
   }
@@ -598,8 +607,74 @@ function registerHandlers(): void {
       payload,
       30_000,
     );
-    if (result.ok) await loadCollectorState();
+    if (result.ok) {
+      await loadCollectorState();
+      emit('data.changed', { reason: 'bindings' });
+    }
     return result;
+  });
+
+  router.register('sites.setMonitoredAll', async (payload) => {
+    const siteIds = await db<string[]>('linkedSiteIds');
+    if (siteIds.length === 0) {
+      return { enabledCount: 0, refusedCount: 0, refusals: [] };
+    }
+    const result = await db<{ enabledCount: number; refusedCount: number; refusals: string[] }>(
+      'setMonitored',
+      { siteIds, enabled: payload.enabled },
+      60_000,
+    );
+    await loadCollectorState();
+    await refreshCollectionStatus();
+    emit('data.changed', { reason: 'bindings' });
+    return result;
+  });
+
+  router.register('sources.discover', async (payload) => {
+    if (payload.sourceId !== 'chargepoint') {
+      throw new OperationError('invalid_payload', `no discovery for source ${payload.sourceId}`);
+    }
+    const area = {
+      centerLatitude: setting('study.centerLatitude', STUDY_AREA_DEFAULTS.centerLatitude),
+      centerLongitude: setting('study.centerLongitude', STUDY_AREA_DEFAULTS.centerLongitude),
+      radiusMiles: setting('study.radiusMiles', STUDY_AREA_DEFAULTS.radiusMiles),
+    };
+    logger.log(
+      'info',
+      `discovering ChargePoint stations within ${area.radiusMiles} miles of ${area.centerLatitude}, ${area.centerLongitude}`,
+    );
+    const report = await collector<{
+      stations: readonly unknown[];
+      pagesRead: number;
+      truncated: boolean;
+      warnings: readonly string[];
+    }>('discover', { area }, 840_000);
+
+    const bound = await db<{
+      linked: number;
+      alreadyLinked: number;
+      proposed: number;
+      unmatched: number;
+      siteConflicts: number;
+      proposals: ResponseOf<'sources.discover'>['proposals'];
+      unmatchedStations: ResponseOf<'sources.discover'>['unmatchedStations'];
+    }>('bindDiscoveredStations', { stations: report.stations }, 120_000);
+
+    logger.log(
+      'info',
+      `discovery found ${report.stations.length} stations: ${bound.linked} linked, ${bound.alreadyLinked} already linked, ${bound.proposed} proposed, ${bound.unmatched} not in the catalog`,
+    );
+    if (bound.linked > 0) {
+      await loadCollectorState();
+      emit('data.changed', { reason: 'bindings' });
+    }
+    return {
+      found: report.stations.length,
+      ...bound,
+      pagesRead: report.pagesRead,
+      truncated: report.truncated,
+      warnings: report.warnings,
+    };
   });
 
   router.register('collection.setRunning', async (payload) => {
@@ -964,6 +1039,51 @@ async function startDatabase(): Promise<void> {
   }
 
   settingsCache = await db<Record<string, unknown>>('getSettings');
+  await importBundledCatalog();
+}
+
+/**
+ * Loads the station catalog the application ships into the database.
+ *
+ * Idempotent on the file's hash: the first start imports the 1083 locations,
+ * every later start is a no-op, and an installer carrying a refreshed file
+ * imports the new one through the conflict-recording refresh path. Until
+ * 2026-09-21 this step did not exist — the catalog was packaged and never
+ * read, so an installed copy started with an empty map.
+ */
+async function importBundledCatalog(): Promise<void> {
+  const catalogDir = app.isPackaged
+    ? join(process.resourcesPath, 'catalog')
+    : join(app.getAppPath(), 'resources', 'catalog');
+  try {
+    const result = await db<{
+      imported: boolean;
+      reason: string;
+      sites: number;
+      inserted: number;
+      updated: number;
+      conflicts: number;
+      detail: string | null;
+    }>(
+      'importCatalogFile',
+      {
+        filePath: join(catalogDir, 'mesa-stations.json'),
+        provenancePath: join(catalogDir, 'provenance.json'),
+      },
+      180_000,
+    );
+    logger.log(
+      result.reason === 'missing' || result.reason === 'invalid' ? 'warn' : 'info',
+      `bundled catalog: ${result.reason} (${result.sites} locations${result.detail ? `; ${result.detail}` : ''})`,
+    );
+  } catch (error) {
+    // A catalog that cannot be imported leaves the map empty and the health
+    // check saying so; it must not stop the application from starting.
+    logger.log(
+      'warn',
+      `the bundled catalog could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 async function startCollector(): Promise<void> {
@@ -1026,16 +1146,25 @@ function startUpdates(): void {
         with: { type: 'json' },
       }).catch(() => ({ default: { keys: [] } }));
 
-      const trustedKeys =
-        (
-          keys.default as {
-            keys?: Array<{ keyId: string; publicKeyPem: string; retired?: boolean }>;
-          }
-        ).keys?.map((key) => ({
-          keyId: key.keyId,
-          publicKeyPem: key.publicKeyPem,
-          retired: key.retired ?? false,
-        })) ?? [];
+      const parsed = parseTrustedKeys(keys.default);
+
+      // Refused outright rather than filtered down to the usable entries. A
+      // key file with a duplicate id or a malformed entry is a file nobody
+      // should be trusting the rest of, and quietly verifying updates against
+      // whatever survived is how a bad key becomes permanent.
+      if (parsed.problems.length > 0) {
+        for (const problem of parsed.problems) {
+          logger.log('error', `update key file: ${problem}`);
+        }
+        logger.log(
+          'error',
+          'the embedded update keys are not usable, so this build will not check for or ' +
+            'install updates. Collection is unaffected.',
+        );
+        return;
+      }
+
+      const trustedKeys = parsed.keys;
 
       if (trustedKeys.length === 0) {
         logger.log(
@@ -1045,16 +1174,26 @@ function startUpdates(): void {
         return;
       }
 
+      // electron-updater is CommonJS, and the packaged build resolves its
+      // exports under `.default` rather than on the namespace. Reading
+      // `module.autoUpdater` directly produced `undefined` and the first
+      // property assignment threw, so updates have never worked in a package.
+      const autoUpdater = resolveAutoUpdater(module);
+      if (!autoUpdater) {
+        logger.log(
+          'error',
+          'electron-updater loaded but exposed no usable autoUpdater, so this build cannot ' +
+            'check for or install updates. Collection is unaffected.',
+        );
+        return;
+      }
+
       const backend = createUpdaterBackend({
         owner: BRANDING.releaseOwner,
         repo: BRANDING.releaseRepo,
         channel: 'stable',
         logger,
-        autoUpdater: (
-          module as unknown as {
-            autoUpdater: Parameters<typeof createUpdaterBackend>[0]['autoUpdater'];
-          }
-        ).autoUpdater,
+        autoUpdater,
         fetchReleaseAsset: async (name) => {
           const url = `https://github.com/${BRANDING.releaseOwner}/${BRANDING.releaseRepo}/releases/latest/download/${encodeURIComponent(name)}`;
           const response = await fetch(url, { redirect: 'follow' });

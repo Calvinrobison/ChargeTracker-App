@@ -23,6 +23,11 @@ export default [
       'dist/**',
       'release/**',
       'coverage/**',
+      // The bundled Chromium that setup:browser stages. Never linted before
+      // 2026-09-21 only because no machine had run setup:browser ahead of lint.
+      '.playwright-cache/**',
+      'playwright-report/**',
+      'test-results/**',
       'src/database/migrations/index.ts', // generated
     ],
   },

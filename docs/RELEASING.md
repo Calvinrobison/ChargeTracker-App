@@ -43,6 +43,25 @@ one release signed by the old key that also contains the new public key, before
 signing anything with the new key — otherwise installed copies will not have the
 new key when the new release arrives.
 
+**Key ids must be unique, and this is not theoretical.** Two different Ed25519
+public keys, held by two different people, were both embedded as `cw-2026-09`
+until 2026-09-19. Verification collects every embedded key matching the id a
+manifest declares and accepts a signature from any of them, so either private
+key could have produced an update the application installs — under one name,
+with the log line naming the same id either way. Nothing detected it, because
+the collision was in data rather than in code. `parseTrustedKeys` now refuses a
+key file with a duplicate id, and the application refuses to configure updates
+at all if one appears.
+
+**Two keys are embedded today:** `cw-2026-09-cr` (Calvinrobison) and
+`cw-2026-09-x1` (the-x1x1). Both are active, so `release:prepare` will not
+guess — pass `--key-id` naming the one whose private half you hold.
+
+Note what this cost: installations from before 2026-09-19 trust only
+`cw-2026-09`, an id no release will carry again, so those copies cannot be
+updated and need a fresh install. That was free only because the build they are
+running could not check for updates either.
+
 To see what is currently embedded:
 
 ```powershell
@@ -83,7 +102,7 @@ with `-ExistingHistory` pointing at a genuinely populated file.
 ### 3. Sign
 
 ```powershell
-npm run release:prepare -- --version 0.1.0
+npm run release:prepare -- --version 0.2.0 --key-id cw-2026-09-cr
 ```
 
 This hashes the **final on-disk bytes** of every artifact, so it must run after
@@ -128,14 +147,14 @@ discovering it can establish those.
 ### 5. Stage a draft
 
 ```powershell
-npm run release:publish -- --tag v0.1.0 --dry-run
+npm run release:publish -- --tag v0.2.0 --dry-run
 ```
 
 Prints exactly what would be uploaded and the `gh` command it would run. When
 you are satisfied:
 
 ```powershell
-npm run release:publish -- --tag v0.1.0 --confirm
+npm run release:publish -- --tag v0.2.0 --confirm
 ```
 
 This re-runs verification first and refuses to publish if it fails. It creates a
@@ -152,7 +171,7 @@ Before promoting:
 Only then:
 
 ```powershell
-gh release edit v0.1.0 --repo Calvinrobison/ChargeTracker-App --draft=false
+gh release edit v0.2.0 --repo Calvinrobison/ChargeTracker-App --draft=false
 ```
 
 Publishing is deliberately separate from uploading. Uploading is reversible;

@@ -215,13 +215,26 @@ export class CollectorService {
     return capabilities;
   }
 
-  /** Loads the persisted queue and its bindings. */
+  /**
+   * Loads the persisted queue and its bindings.
+   *
+   * Called at startup and again whenever the set of monitored locations
+   * changes. If collection is already running, the next cycle is re-armed
+   * immediately: the previous cycle may have found nothing to do and parked
+   * its timer a full target interval away, and a location the user just
+   * switched on is due now, not in fifteen minutes. Overdue work is spread
+   * first, so switching on many locations at once cannot produce a burst.
+   */
   load(input: {
     readonly queue: readonly QueueEntry[];
     readonly bindings: readonly (BindingDescriptor & { sourceId: string; siteId: string })[];
   }): void {
     this.scheduler.load(input.queue);
     for (const binding of input.bindings) this.bindings.set(binding.bindingId, binding);
+    if (this.running) {
+      this.scheduler.spreadOverdue(this.nowMs());
+      this.scheduleNextCycle(0);
+    }
   }
 
   /**
@@ -344,6 +357,23 @@ export class CollectorService {
           ? `This source allows one page load at a time, so the refresh starts in about ${Math.round(waitMs / 1000)} seconds.`
           : null,
     };
+  }
+
+  /**
+   * Spends one navigation from a source's budget, for work outside the
+   * collection cycle (station discovery). The same token bucket and the same
+   * minimum interval apply, so a user-triggered action can never add load
+   * beyond what scheduled collection is allowed.
+   */
+  async acquireNavigationSlot(sourceId: string, signal?: AbortSignal): Promise<void> {
+    const budget = this.budgets.get(sourceId);
+    if (!budget) throw new Error(`no source registered as ${sourceId}`);
+    this.scheduler.recordNavigation(sourceId, this.nowMs());
+    try {
+      await budget.acquire(signal ?? new AbortController().signal);
+    } finally {
+      this.scheduler.releaseNavigation(sourceId);
+    }
   }
 
   private scheduleNextCycle(delayMs: number): void {

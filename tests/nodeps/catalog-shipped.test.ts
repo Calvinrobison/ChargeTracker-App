@@ -27,7 +27,13 @@ import { describe, it } from 'node:test';
 import { distanceMiles } from '../../src/domain/geo.ts';
 import { STUDY_AREA_DEFAULTS } from '../../src/domain/thresholds.ts';
 
-const catalogDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'resources', 'catalog');
+const catalogDir = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'resources',
+  'catalog',
+);
 
 interface Site {
   readonly id: string;
@@ -68,7 +74,9 @@ describe('the shipped catalog is a usable file', () => {
   });
 
   it('gives every location a non-empty name', () => {
-    const unnamed = sites.filter((site) => typeof site.name !== 'string' || site.name.trim() === '');
+    const unnamed = sites.filter(
+      (site) => typeof site.name !== 'string' || site.name.trim() === '',
+    );
     assert.deepEqual(unnamed, [], 'an unnamed pin is not something a user can act on');
   });
 });
@@ -217,12 +225,17 @@ describe('the catalog can be traced back to its source', () => {
 
   it('accounts for every row it considered', () => {
     const counts = provenance['counts'] as Record<string, number>;
+    const count = (key: string): number => {
+      const value = counts[key];
+      assert.equal(typeof value, 'number', `provenance.counts.${key} must be a number`);
+      return value as number;
+    };
     const accountedFor =
-      counts['accepted'] +
-      counts['skippedNonElectric'] +
-      counts['skippedNonPublic'] +
-      counts['skippedBadCoordinates'] +
-      counts['skippedOutOfRadius'];
+      count('accepted') +
+      count('skippedNonElectric') +
+      count('skippedNonPublic') +
+      count('skippedBadCoordinates') +
+      count('skippedOutOfRadius');
     assert.equal(
       accountedFor,
       counts['rowsConsidered'],

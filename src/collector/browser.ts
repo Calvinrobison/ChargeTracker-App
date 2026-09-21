@@ -122,6 +122,39 @@ export function chromiumCandidates(root: string, platform: NodeJS.Platform): rea
   return [...direct, ...nested];
 }
 
+/**
+ * Appends this application's identifier to the browser's own user agent.
+ *
+ * ChargeWatch identifies itself so a provider reading its logs can tell what
+ * is asking. The User-Agent is the place to do that. It used to be done with
+ * an `X-Requested-With` header set on the whole browser context, and on
+ * 2026-09-21 the first live run showed what that costs: `X-Requested-With` is
+ * not a CORS-safelisted request header, so setting it context-wide attached it
+ * to every cross-origin request the PAGE made as well as our own. Those
+ * requests then needed a preflight the provider does not grant, so the
+ * station page's own fetches failed -- including the one for the file that
+ * defines its status pills -- and the page rendered "Unable to load page"
+ * instead of any status. Every read timed out and the circuit breaker opened.
+ * Isolated by testing one variable at a time: with the header the page never
+ * renders, without it the same headless browser renders port rows.
+ *
+ * A suffix on the user agent carries the same information and adds nothing to
+ * any other request. It only ever ADDS to what the browser already says: the
+ * browser's own identity, "HeadlessChrome" included, is left intact, because
+ * disguising the client would be a different thing entirely and is not
+ * something this application does.
+ */
+export function identifyingUserAgent(
+  defaultUserAgent: string | null | undefined,
+  suffix: string,
+): string | null {
+  const base = (defaultUserAgent ?? '').trim();
+  const tag = suffix.trim();
+  if (base.length === 0 || tag.length === 0) return null;
+  if (base.includes(tag)) return base;
+  return `${base} ${tag}`;
+}
+
 export type PageHealth = 'healthy' | 'recycle';
 
 interface PooledPage {
@@ -157,6 +190,8 @@ export class BrowserRuntime {
   private browser: Browser | null = null;
   private readonly pool: PooledPage[] = [];
   private closing = false;
+  /** The browser's own user agent plus our identifier; null until resolved. */
+  private userAgent: string | null = null;
 
   constructor(options: BrowserRuntimeOptions) {
     this.options = options;
@@ -195,6 +230,25 @@ export class BrowserRuntime {
       handleSIGHUP: false,
     });
 
+    // Read the browser's own user agent once, so the identifier can be
+    // appended to it rather than replacing it.
+    if (this.userAgent === null) {
+      try {
+        const probe = await this.browser.newContext();
+        const page = await probe.newPage();
+        const reported = await page.evaluate('navigator.userAgent');
+        await probe.close();
+        this.userAgent = identifyingUserAgent(
+          typeof reported === 'string' ? reported : null,
+          this.options.userAgentSuffix,
+        );
+      } catch {
+        // Without it the context simply uses the browser default, which is
+        // correct behaviour minus the identifier.
+        this.userAgent = null;
+      }
+    }
+
     this.browser.on('disconnected', () => {
       this.options.log('warn', 'the bundled browser disconnected; pages will be rebuilt on demand');
       this.browser = null;
@@ -218,9 +272,9 @@ export class BrowserRuntime {
       storageState: undefined,
       locale: this.options.locale,
       timezoneId: this.options.timezoneId,
-      // An identifiable application request, as tile and API policies expect.
-      userAgent: undefined,
-      extraHTTPHeaders: { 'X-Requested-With': this.options.userAgentSuffix },
+      // Self-identification goes in the User-Agent, never in an extra header.
+      // See identifyingUserAgent below for why.
+      userAgent: this.userAgent ?? undefined,
       viewport: { width: 1280, height: 900 },
       serviceWorkers: 'block',
     });

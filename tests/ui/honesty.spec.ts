@@ -233,3 +233,44 @@ test.describe('activity is never described as a recorded session', () => {
     await expect(drawer).not.toContainText(/recorded charging session/i);
   });
 });
+
+test.describe('monitoring is a stated switch, not an implied state', () => {
+  test('a catalog-only location says it has no source page and offers a link box', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await page
+      .getByRole('listbox', { name: 'Stations' })
+      .getByRole('option')
+      .filter({ hasText: 'Fixture Hotel Garage' })
+      .click();
+
+    const drawer = page.locator('.drawer, .station-drawer').first();
+    await expect(drawer).toContainText('Not linked to a source page');
+    await expect(drawer).toContainText('No source page linked');
+    // The link button stays disabled until the box holds a single station page.
+    const link = drawer.getByRole('button', { name: 'Link', exact: true });
+    await expect(link).toBeDisabled();
+    await drawer
+      .getByRole('textbox', { name: 'ChargePoint station page link' })
+      .fill('https://driver.chargepoint.com/stations/11502161');
+    await expect(link).toBeEnabled();
+    // Nothing that looks like a live count appears for a location nobody reads.
+    await expect(drawer.getByRole('switch', { name: 'Monitor this location' })).toHaveCount(0);
+  });
+
+  test('a monitored location shows its switch on and names the cadence', async ({ page }) => {
+    await page.goto('/');
+    await page
+      .getByRole('listbox', { name: 'Stations' })
+      .getByRole('option')
+      .filter({ hasText: 'Fixture Mall North' })
+      .click();
+
+    const drawer = page.locator('.drawer, .station-drawer').first();
+    const toggle = drawer.getByRole('switch', { name: 'Monitor this location' });
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await expect(drawer).toContainText('every 15 minutes');
+    await expect(drawer).toContainText('Monitoring on');
+  });
+});

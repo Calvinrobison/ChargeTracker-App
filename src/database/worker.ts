@@ -11,8 +11,8 @@
  */
 
 import { mkdir } from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
-import { randomUUID } from 'node:crypto';
+import { createWriteStream, existsSync, readFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { applyConnectionPragmas, checkIntegrity, transact, type SqliteDriver } from './driver.ts';
 import { MIGRATIONS } from './migrations/index.ts';
@@ -26,6 +26,7 @@ import {
   settingsRepository,
   sitesRepository,
   type IngestObservation,
+  type SiteRecord,
 } from './repositories.ts';
 import { createBackup, performRestore, pruneBackups, validateRestoreCandidate } from './backup.ts';
 import { csvLines, exportFileName, number, text, trusted } from '../shared/csv.ts';
@@ -45,12 +46,74 @@ import {
   type ChargingLevel,
   type VisitObservation,
 } from '../domain/index.ts';
-import { isAllowedSourceUrl, stationIdFromUrl } from '../collector/adapters/chargepoint/index.ts';
+import {
+  CAPABILITIES as CHARGEPOINT,
+  isAllowedSourceUrl,
+  stationIdFromUrl,
+} from '../collector/adapters/chargepoint/index.ts';
+import type { DiscoveredStation } from '../collector/adapters/chargepoint/discover.ts';
+import {
+  chooseAutomaticMatch,
+  normalizeAddress,
+  proposeMatches,
+  type MatchCandidate,
+} from '../domain/matching.ts';
 import type { FilterState, WindowRequest } from '../shared/ipc.ts';
 import type { RankSort } from '../domain/ranking.ts';
 
 function asNumberOrNull(value: unknown): number | null {
   return value === null || value === undefined ? null : Number(value);
+}
+
+const ACCESS_CONDITIONS = new Set(['public', 'restricted', 'private', 'unknown']);
+const CATALOG_LEVELS = new Set(['level_1', 'level_2', 'dc_fast', 'mixed', 'unknown']);
+
+/**
+ * One row of the bundled catalog file as a site record, or null when it lacks
+ * an id, a name or valid coordinates. Nothing is defaulted into a position:
+ * a row that cannot be placed is not a location.
+ */
+function toSiteRecord(raw: unknown): SiteRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const row = raw as Record<string, unknown>;
+  const text = (key: string): string | null => {
+    const value = row[key];
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  };
+  const finite = (key: string): number | null => {
+    const value = row[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  };
+  const id = text('id');
+  const name = text('name');
+  const latitude = finite('latitude');
+  const longitude = finite('longitude');
+  if (!id || !name || latitude === null || longitude === null) return null;
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
+  const access = text('accessCondition') ?? 'unknown';
+  const level = text('catalogLevel') ?? 'unknown';
+  const ports = finite('catalogPortCount');
+  return {
+    id,
+    registryStationId: text('registryStationId'),
+    name,
+    streetAddress: text('streetAddress'),
+    city: text('city'),
+    state: text('state'),
+    postalCode: text('postalCode'),
+    normalizedAddress: text('normalizedAddress'),
+    latitude,
+    longitude,
+    distanceMiles: finite('distanceMiles'),
+    network: text('network'),
+    accessCondition: (ACCESS_CONDITIONS.has(access)
+      ? access
+      : 'unknown') as SiteRecord['accessCondition'],
+    hoursText: text('hoursText'),
+    timezone: text('timezone') ?? STUDY_TIME_ZONE,
+    catalogPortCount: ports !== null && ports > 0 ? Math.round(ports) : null,
+    catalogLevel: (CATALOG_LEVELS.has(level) ? level : 'unknown') as ChargingLevel,
+  };
 }
 
 export interface DatabaseWorkerConfig {
@@ -1269,29 +1332,33 @@ export class DatabaseWorker {
       };
     }
 
+    const existing = driver
+      .prepare(
+        `SELECT id FROM source_bindings
+          WHERE site_id = ? AND is_primary = 1 AND effective_to_ms IS NULL LIMIT 1`,
+      )
+      .get(input.siteId);
+    if (existing) {
+      return {
+        ok: false,
+        code: 'binding_conflict',
+        detail: 'This location is already linked to a station.',
+      };
+    }
+
     const nowMs = this.nowMs();
-    const scopeKey = `chargepoint:${stationId}`;
     try {
-      driver
-        .prepare(
-          `INSERT INTO source_bindings
-             (id, source_id, site_id, source_station_id, canonical_url, scope_key, physical_scope,
-              granularity, identity_reliability, is_primary, enabled, capability_version,
-              match_basis, match_confidence, match_disposition, effective_from_ms,
-              created_at_ms, updated_at_ms)
-           VALUES (?, 'chargepoint', ?, ?, ?, ?, 'whole station', 'station_aggregate', 'none',
-                   1, 0, 1, 'manual', NULL, 'confirmed', ?, ?, ?)`,
-        )
-        .run(
-          `manual-${stationId}-${nowMs}`,
-          input.siteId,
-          stationId,
-          input.url,
-          scopeKey,
-          nowMs,
-          nowMs,
-          nowMs,
-        );
+      this.insertBinding(driver, {
+        id: `manual-${stationId}-${nowMs}`,
+        siteId: input.siteId,
+        stationId,
+        canonicalUrl: input.url,
+        matchBasis: 'manual',
+        matchConfidence: null,
+        reason: 'link pasted by the user',
+        actor: 'user',
+        nowMs,
+      });
     } catch (error) {
       return {
         ok: false,
@@ -1308,9 +1375,415 @@ export class DatabaseWorker {
     return {
       ok: true,
       code: 'ok',
-      detail:
-        'The link was saved. Collection from this source is still disabled until its eligibility is established.',
+      detail: 'The link was saved. Turn on monitoring for this location to start recording it.',
     };
+  }
+
+  /**
+   * Writes one confirmed ChargePoint binding, with the adapter's own
+   * capability values for granularity and identity so a link made here
+   * behaves exactly like one the adapter would validate.
+   */
+  private insertBinding(
+    driver: SqliteDriver,
+    input: {
+      readonly id: string;
+      readonly siteId: string;
+      readonly stationId: string;
+      readonly canonicalUrl: string;
+      readonly matchBasis: 'manual' | 'coordinates_and_name' | 'address_and_network';
+      readonly matchConfidence: number | null;
+      readonly reason: string;
+      readonly actor: 'user' | 'automatic';
+      readonly nowMs: number;
+    },
+  ): void {
+    const scopeKey = `chargepoint:${input.stationId}`;
+    driver
+      .prepare(
+        `INSERT INTO source_bindings
+           (id, source_id, site_id, source_station_id, canonical_url, scope_key, physical_scope,
+            granularity, identity_reliability, is_primary, enabled, capability_version,
+            match_basis, match_confidence, match_disposition, effective_from_ms,
+            created_at_ms, updated_at_ms)
+         VALUES (?, 'chargepoint', ?, ?, ?, ?, 'whole station', ?, ?,
+                 1, 0, ?, ?, ?, 'confirmed', ?, ?, ?)`,
+      )
+      .run(
+        input.id,
+        input.siteId,
+        input.stationId,
+        input.canonicalUrl,
+        scopeKey,
+        CHARGEPOINT.observationGranularity,
+        CHARGEPOINT.identityReliability,
+        CHARGEPOINT.capabilityVersion,
+        input.matchBasis,
+        input.matchConfidence,
+        input.nowMs,
+        input.nowMs,
+        input.nowMs,
+      );
+    driver
+      .prepare(
+        `INSERT INTO binding_merge_history
+           (binding_id, action, previous_json, next_json, actor, reason, recorded_at_ms)
+         VALUES (?, 'created', NULL, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.id,
+        JSON.stringify({
+          siteId: input.siteId,
+          stationId: input.stationId,
+          basis: input.matchBasis,
+          confidence: input.matchConfidence,
+        }),
+        input.actor,
+        input.reason,
+        input.nowMs,
+      );
+  }
+
+  /**
+   * Links discovered ChargePoint stations to catalog sites.
+   *
+   * Only an automatic match at auto-confirm confidence writes a binding —
+   * today that means an exact provider name at the same coordinates on the
+   * same network (src/domain/matching.ts). Everything weaker is counted and
+   * returned as a proposal for the user, never bound. Stations already
+   * linked are left alone; a catalog site already linked to a different
+   * station is never re-pointed. New bindings start with monitoring OFF; that
+   * remains the user's choice per site or for all at once.
+   */
+  bindDiscoveredStations(input: { readonly stations: readonly DiscoveredStation[] }): {
+    linked: number;
+    alreadyLinked: number;
+    proposed: number;
+    unmatched: number;
+    siteConflicts: number;
+    proposals: Array<{
+      sourceStationId: string;
+      name: string;
+      canonicalUrl: string;
+      candidateSiteId: string;
+      candidateName: string;
+      basis: string;
+      confidence: number;
+    }>;
+    unmatchedStations: Array<{ sourceStationId: string; name: string; canonicalUrl: string }>;
+  } {
+    const driver = this.requireDriver();
+    const nowMs = this.nowMs();
+
+    const candidates: MatchCandidate[] = driver
+      .prepare(
+        `SELECT id, name, network, normalized_address, street_address, city, state, latitude, longitude
+           FROM sites WHERE archived = 0`,
+      )
+      .all()
+      .map((row) => ({
+        siteId: String(row.id),
+        name: String(row.name),
+        network: row.network === null ? null : String(row.network),
+        normalizedAddress:
+          row.normalized_address === null
+            ? normalizeAddress(
+                [row.street_address, row.city, row.state]
+                  .filter((part) => part !== null && part !== undefined)
+                  .map(String)
+                  .join(' '),
+              )
+            : String(row.normalized_address),
+        coordinate: { latitude: Number(row.latitude), longitude: Number(row.longitude) },
+        sourceStationId: null,
+      }));
+    const nameBySite = new Map(candidates.map((c) => [c.siteId, c.name]));
+
+    const boundStations = new Set(
+      driver
+        .prepare(
+          `SELECT source_station_id FROM source_bindings
+            WHERE source_id = 'chargepoint' AND effective_to_ms IS NULL AND source_station_id IS NOT NULL`,
+        )
+        .all()
+        .map((row) => String(row.source_station_id)),
+    );
+    const boundSites = new Set(
+      driver
+        .prepare(
+          `SELECT site_id FROM source_bindings WHERE is_primary = 1 AND effective_to_ms IS NULL`,
+        )
+        .all()
+        .map((row) => String(row.site_id)),
+    );
+
+    const result = {
+      linked: 0,
+      alreadyLinked: 0,
+      proposed: 0,
+      unmatched: 0,
+      siteConflicts: 0,
+      proposals: [] as Array<{
+        sourceStationId: string;
+        name: string;
+        canonicalUrl: string;
+        candidateSiteId: string;
+        candidateName: string;
+        basis: string;
+        confidence: number;
+      }>,
+      unmatchedStations: [] as Array<{
+        sourceStationId: string;
+        name: string;
+        canonicalUrl: string;
+      }>,
+    };
+
+    transact(driver, () => {
+      for (const station of input.stations) {
+        if (boundStations.has(station.sourceStationId)) {
+          result.alreadyLinked += 1;
+          continue;
+        }
+        const subject = {
+          sourceStationId: null,
+          name: station.name,
+          network: station.network,
+          normalizedAddress: normalizeAddress(
+            [station.streetAddress, station.city, 'AZ'].filter(Boolean).join(' '),
+          ),
+          coordinate: { latitude: station.latitude, longitude: station.longitude },
+        };
+        const proposals = proposeMatches(subject, candidates);
+        const automatic = chooseAutomaticMatch(proposals);
+
+        if (automatic) {
+          if (boundSites.has(automatic.siteId)) {
+            // The catalog site is already someone else's binding. Recorded,
+            // never re-pointed: a wrong re-point is invisible in the output.
+            result.siteConflicts += 1;
+            continue;
+          }
+          this.insertBinding(driver, {
+            id: `discovered-${station.sourceStationId}`,
+            siteId: automatic.siteId,
+            stationId: station.sourceStationId,
+            canonicalUrl: station.canonicalUrl,
+            matchBasis:
+              automatic.basis === 'address_and_network'
+                ? 'address_and_network'
+                : 'coordinates_and_name',
+            matchConfidence: automatic.confidence,
+            reason: automatic.reasons.join('; '),
+            actor: 'automatic',
+            nowMs,
+          });
+          boundStations.add(station.sourceStationId);
+          boundSites.add(automatic.siteId);
+          result.linked += 1;
+          continue;
+        }
+
+        const best = proposals[0];
+        if (best) {
+          result.proposed += 1;
+          if (result.proposals.length < 200) {
+            result.proposals.push({
+              sourceStationId: station.sourceStationId,
+              name: station.name,
+              canonicalUrl: station.canonicalUrl,
+              candidateSiteId: best.siteId,
+              candidateName: nameBySite.get(best.siteId) ?? best.siteId,
+              basis: best.basis,
+              confidence: best.confidence,
+            });
+          }
+        } else {
+          result.unmatched += 1;
+          if (result.unmatchedStations.length < 200) {
+            result.unmatchedStations.push({
+              sourceStationId: station.sourceStationId,
+              name: station.name,
+              canonicalUrl: station.canonicalUrl,
+            });
+          }
+        }
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Imports the station catalog the application ships, once per distinct
+   * file.
+   *
+   * `resources/catalog/mesa-stations.json` is packaged with the installer and
+   * until 2026-09-21 nothing read it: the installed application started with
+   * an empty `sites` table and an empty map, while the docs described a
+   * catalog of 1083 locations. This is the missing step. It is idempotent on
+   * the file's own SHA-256 — the same file imports once and is then a no-op
+   * on every start — and a changed file goes through `upsertFromCatalog`,
+   * which records conflicts against user corrections rather than overwriting
+   * them and never touches observations.
+   */
+  importCatalogFile(input: { readonly filePath: string; readonly provenancePath: string | null }): {
+    imported: boolean;
+    reason: 'imported' | 'already_imported' | 'missing' | 'invalid';
+    fileSha256: string | null;
+    sites: number;
+    inserted: number;
+    updated: number;
+    conflicts: number;
+    detail: string | null;
+  } {
+    const driver = this.requireDriver();
+    const nowMs = this.nowMs();
+    const none = {
+      imported: false as const,
+      fileSha256: null,
+      sites: 0,
+      inserted: 0,
+      updated: 0,
+      conflicts: 0,
+    };
+
+    if (!existsSync(input.filePath)) {
+      return { ...none, reason: 'missing', detail: `no catalog file at ${input.filePath}` };
+    }
+
+    let bytes: Buffer;
+    let parsed: { formatVersion?: unknown; sites?: unknown };
+    try {
+      bytes = readFileSync(input.filePath);
+      parsed = JSON.parse(bytes.toString('utf8')) as { formatVersion?: unknown; sites?: unknown };
+    } catch (error) {
+      return {
+        ...none,
+        reason: 'invalid',
+        detail: `the catalog file could not be read: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+    if (parsed.formatVersion !== 1 || !Array.isArray(parsed.sites)) {
+      return {
+        ...none,
+        reason: 'invalid',
+        detail: 'the catalog file is not formatVersion 1 with a sites array',
+      };
+    }
+    const fileSha256 = createHash('sha256').update(bytes).digest('hex');
+
+    let provenance: Record<string, unknown> = {};
+    if (input.provenancePath && existsSync(input.provenancePath)) {
+      try {
+        provenance = JSON.parse(readFileSync(input.provenancePath, 'utf8')) as Record<
+          string,
+          unknown
+        >;
+      } catch {
+        provenance = {};
+      }
+    }
+    const sourceName =
+      typeof provenance['sourceName'] === 'string'
+        ? provenance['sourceName']
+        : 'Bundled station catalog';
+
+    const existing = driver
+      .prepare(
+        `SELECT id, row_count FROM catalog_imports
+          WHERE source_name = ? AND file_sha256 = ? AND outcome = 'succeeded' LIMIT 1`,
+      )
+      .get(sourceName, fileSha256);
+    if (existing) {
+      return {
+        ...none,
+        reason: 'already_imported',
+        fileSha256,
+        sites: Number(existing.row_count),
+        detail: `catalog ${fileSha256.slice(0, 12)} was imported earlier as #${String(existing.id)}`,
+      };
+    }
+
+    const rows: SiteRecord[] = [];
+    const rejected: string[] = [];
+    for (const raw of parsed.sites as unknown[]) {
+      const site = toSiteRecord(raw);
+      if (site) rows.push(site);
+      else rejected.push(JSON.stringify(raw).slice(0, 80));
+    }
+    if (rows.length === 0) {
+      return {
+        ...none,
+        reason: 'invalid',
+        fileSha256,
+        detail: 'the catalog file held no usable rows',
+      };
+    }
+
+    const bounds = (provenance['bounds'] ?? {}) as Record<string, unknown>;
+    const sites = sitesRepository(driver);
+    const result = transact(driver, () => {
+      const importId = sites.recordCatalogImport({
+        sourceName,
+        sourceUrl: typeof provenance['sourceUrl'] === 'string' ? provenance['sourceUrl'] : null,
+        retrievedAtMs:
+          typeof provenance['retrievedAtMs'] === 'number' ? provenance['retrievedAtMs'] : nowMs,
+        importedAtMs: nowMs,
+        license: typeof provenance['license'] === 'string' ? provenance['license'] : 'unknown',
+        attribution:
+          typeof provenance['attribution'] === 'string' ? provenance['attribution'] : 'unknown',
+        fileSha256,
+        fieldMapping:
+          provenance['fieldMapping'] && typeof provenance['fieldMapping'] === 'object'
+            ? (provenance['fieldMapping'] as Record<string, string>)
+            : {},
+        centerLatitude:
+          typeof bounds['centerLatitude'] === 'number'
+            ? bounds['centerLatitude']
+            : STUDY_AREA_DEFAULTS.centerLatitude,
+        centerLongitude:
+          typeof bounds['centerLongitude'] === 'number'
+            ? bounds['centerLongitude']
+            : STUDY_AREA_DEFAULTS.centerLongitude,
+        radiusMiles:
+          typeof bounds['radiusMiles'] === 'number'
+            ? bounds['radiusMiles']
+            : STUDY_AREA_DEFAULTS.radiusMiles,
+        rowCount: rows.length,
+        outcome: rejected.length === 0 ? 'succeeded' : 'partial',
+        notes:
+          rejected.length === 0
+            ? `bundled file ${input.filePath}${typeof provenance['fileSha256'] === 'string' ? `; source export sha256 ${provenance['fileSha256']}` : ''}`
+            : `${rejected.length} rows rejected: ${rejected.slice(0, 5).join(' | ')}`,
+      });
+      const upsert = sites.upsertFromCatalog(importId, rows, nowMs);
+      return { importId, ...upsert };
+    });
+
+    return {
+      imported: true,
+      reason: 'imported',
+      fileSha256,
+      sites: rows.length,
+      inserted: result.inserted,
+      updated: result.updated,
+      conflicts: result.conflicts,
+      detail: `import #${result.importId}: ${result.inserted} inserted, ${result.updated} updated, ${result.conflicts} conflicts${rejected.length > 0 ? `, ${rejected.length} rows rejected` : ''}`,
+    };
+  }
+
+  /** Every enabled-source primary binding, for "monitor all linked" actions. */
+  linkedSiteIds(): string[] {
+    return this.requireDriver()
+      .prepare(
+        `SELECT b.site_id FROM source_bindings b
+           JOIN sources s ON s.id = b.source_id
+          WHERE b.is_primary = 1 AND b.effective_to_ms IS NULL AND s.eligibility_state = 'enabled'
+          ORDER BY b.site_id`,
+      )
+      .all()
+      .map((row) => String(row.site_id));
   }
 
   bindingIdsForSites(input: { readonly siteIds: readonly string[] }): string[] {

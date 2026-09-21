@@ -88,6 +88,87 @@ export interface TrustedKey {
   readonly retired: boolean;
 }
 
+export interface TrustedKeyParseResult {
+  readonly keys: readonly TrustedKey[];
+  /** Non-empty means the file must not be shipped. */
+  readonly problems: readonly string[];
+}
+
+/**
+ * Reads the embedded key file, refusing anything that would make a signature
+ * ambiguous.
+ *
+ * **Key ids must be unique.** A manifest names one id, and verification
+ * collects every embedded key with that id and accepts a signature from any of
+ * them. Two keys sharing an id therefore means two different private keys can
+ * each produce an update this application installs, under one name, with the
+ * log line reporting the same id either way.
+ *
+ * That is not hypothetical: two Ed25519 keys held by two different people were
+ * both embedded as `cw-2026-09`, one on the release on GitHub and one in a
+ * working tree. Nothing detected it, because the collision was in data rather
+ * than in code. They now carry distinct ids, and this function is what stops
+ * it happening again.
+ *
+ * Problems are returned rather than thrown so the caller can log every fault
+ * in the file at once instead of one per rebuild.
+ */
+export function parseTrustedKeys(raw: unknown): TrustedKeyParseResult {
+  const problems: string[] = [];
+
+  if (typeof raw !== 'object' || raw === null) {
+    return { keys: [], problems: ['the key file is not an object'] };
+  }
+
+  const entries = (raw as { keys?: unknown }).keys;
+  if (!Array.isArray(entries)) {
+    return { keys: [], problems: ['the key file has no "keys" array'] };
+  }
+
+  const keys: TrustedKey[] = [];
+  const seen = new Map<string, number>();
+
+  entries.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null) {
+      problems.push(`key ${index} is not an object`);
+      return;
+    }
+    const { keyId, publicKeyPem, retired } = entry as Record<string, unknown>;
+
+    if (typeof keyId !== 'string' || keyId.trim() === '') {
+      problems.push(`key ${index} has no key id`);
+      return;
+    }
+    // The private-key check comes FIRST, and deliberately. Checked second, a
+    // pasted private key file — which contains no BEGIN PUBLIC KEY line at all
+    // — was reported as "has no SPKI public key", so the one message that
+    // names a disclosure could only ever fire for a file containing both. The
+    // likeliest mistake was the one it could not warn about.
+    if (typeof publicKeyPem === 'string' && publicKeyPem.includes('PRIVATE KEY')) {
+      problems.push(`key ${keyId} contains a PRIVATE key and must never be shipped`);
+      return;
+    }
+    if (typeof publicKeyPem !== 'string' || !publicKeyPem.includes('BEGIN PUBLIC KEY')) {
+      problems.push(`key ${keyId} has no SPKI public key`);
+      return;
+    }
+
+    const previous = seen.get(keyId);
+    if (previous !== undefined) {
+      problems.push(
+        `key id ${keyId} appears at positions ${previous} and ${index}; ids must be unique, ` +
+          'because a manifest names one id and any key carrying it can sign an accepted update',
+      );
+      return;
+    }
+
+    seen.set(keyId, index);
+    keys.push({ keyId, publicKeyPem, retired: retired === true });
+  });
+
+  return { keys, problems };
+}
+
 export function sha256Hex(data: Uint8Array | string): string {
   return createHash('sha256').update(data).digest('hex');
 }

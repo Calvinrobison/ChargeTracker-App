@@ -21,6 +21,8 @@ export interface SettingsDrawerProps {
   readonly backups: ResponseOf<'backup.list'>['backups'];
   readonly busy: string | null;
   readonly onSetSetting: (key: string, value: unknown) => void;
+  readonly onDiscoverStations: (sourceId: string) => void;
+  readonly onSetMonitoredAll: (enabled: boolean) => void;
   readonly onExportCurrentView: () => void;
   readonly onExportRawObservations: () => void;
   readonly onBackupNow: () => void;
@@ -151,6 +153,44 @@ export function SettingsDrawer(props: SettingsDrawerProps): ReactNode {
                     ? ''
                     : ` · next attempt ${relativeTime(source.retryAtMs)}`}
                 </div>
+                {source.eligibilityState === 'enabled' ? (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      disabled={props.busy !== null}
+                      onClick={() => props.onDiscoverStations(source.sourceId)}
+                    >
+                      Find {source.displayName} stations
+                    </button>
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      disabled={props.busy !== null}
+                      onClick={() => props.onSetMonitoredAll(true)}
+                    >
+                      Monitor all linked
+                    </button>
+                    <button
+                      type="button"
+                      className="button-text"
+                      disabled={props.busy !== null || bootstrap.counts.monitoredScopes === 0}
+                      onClick={() => props.onSetMonitoredAll(false)}
+                    >
+                      Stop monitoring all
+                    </button>
+                  </div>
+                ) : null}
+                {source.eligibilityState === 'enabled' ? (
+                  <div className="settings-hint">
+                    “Find stations” reads the provider’s list for the study area once and links each
+                    station to the catalog location with the same name at the same spot. It takes
+                    about a minute and records nothing. Monitoring is then a per-location switch in
+                    the station drawer, or all at once here; the source allows one page load every
+                    30 seconds, so the achievable interval grows with the number monitored and is
+                    shown under Collection.
+                  </div>
+                ) : null}
               </div>
             ))}
           </section>
