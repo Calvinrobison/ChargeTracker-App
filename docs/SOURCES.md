@@ -13,22 +13,57 @@ monitored" rather than an empty set of numbers.
 
 ## Current status
 
-| Source      | Eligibility    | Verification | Observations recorded |
-| ----------- | -------------- | ------------ | --------------------- |
-| ChargePoint | `needs_review` | `blocked`    | **none**              |
+| Source      | Eligibility | Verification | Granularity | Port identity | Observations recorded                   |
+| ----------- | ----------- | ------------ | ----------- | ------------- | --------------------------------------- |
+| ChargePoint | `enabled`   | `verified`   | `port`      | `durable`     | once a location is linked and monitored |
 
-**No source is currently cleared for automated collection, so ChargeWatch is
-not recording any observations.** This is shown on the onboarding screen, in a
-banner in the main window, and in the source health panel. It is not hidden
-behind a setting.
+**ChargePoint is cleared for automated collection as of 2026-09-21.** The
+terms review and the live verification are recorded in
+`docs/SOURCE_VERIFICATION.md`, and the capability record carries the same
+basis. Nothing is recorded until a location is linked to a station page and
+monitoring is switched on for it — from the station drawer, or for every linked
+location at once from Settings.
 
-The reason is specific and is recorded in
-`docs/IMPLEMENTATION_STATUS.md` as blocker B2: the build environment had no
-route to `driver.chargepoint.com` **or** to the terms pages that would establish
-whether reading it is permitted. Neither question could be answered, so the
-adapter ships declaring both unanswered rather than assuming an answer.
+### What ChargePoint reports
 
-`docs/SOURCE_VERIFICATION.md` is the process for changing that.
+The public station page (`driver.chargepoint.com/stations/<id>`) lists each
+outlet with one of the provider's own status words:
+
+| Provider code                                                                    | Shown as       | Recorded as      |
+| -------------------------------------------------------------------------------- | -------------- | ---------------- |
+| `available`                                                                      | Available      | `available`      |
+| `in_use`                                                                         | In Use         | `occupied`       |
+| `in_use_by_driver` (the signed-in driver's own session; never seen here)         | Charging       | `occupied`       |
+| `unavailable`, `maintenance_required`, `out_of_service`, `fault`, `out_of_order` | Out of Service | `out_of_service` |
+| `closed` (outside the station's open hours)                                      | Closed         | `out_of_service` |
+| `unreachable`, `unknown`, `out_of_network`                                       | Unknown        | `unknown`        |
+
+"In Use" means the provider reports the port as in use. It does **not** mean
+electricity was flowing, and ChargeWatch says "occupied", never "charging".
+
+Each outlet block carries the physical outlet number, which is a durable
+identifier, so per-port history and inferred occupancy episodes are supported.
+The page shows no "as of" time for its status, so source freshness is recorded
+as unknown rather than fresh. It shows "Last Used · N days ago" for the station;
+that is kept as evidence and is never counted.
+
+### How locations get linked
+
+The catalog comes from the AFDC export, which carries no ChargePoint station
+ids. **Settings → Locations and sources → "Find ChargePoint stations"** reads the
+provider's station list for the study area once (the same list the driver map
+page loads, requested from inside that page in the bundled browser) and links
+each station to the catalog location with exactly the same name, on the same
+network, at the same coordinates (`src/domain/matching.ts`,
+`EXACT_NAME_CONFIDENCE`). On 2026-09-21 that linked 674 of the 706 stations the
+provider lists for the 50-mile area — every ChargePoint location in the catalog —
+with the port count agreeing in every case. The 32 left over are stations the
+catalog does not have; a near-namesake ("SRPZOO-L2-#11" beside "#10") is
+reported, never bound.
+
+Discovery records nothing: it is linking, not collection. New links start with
+monitoring off. A location the step did not link can be linked by pasting its
+station page URL into the station drawer.
 
 ---
 
@@ -96,15 +131,12 @@ nobody spends time writing one.
 
 ## The station catalog
 
-The intended source is the **Alternative Fuels Data Center** station dataset
+The catalog is the **Alternative Fuels Data Center** station dataset
 (`afdc.energy.gov`), filtered to a 50-mile radius of 33.4152, −111.8315.
+`resources/catalog/` holds 1083 locations from the Arizona export of
+2026-09-18, with the source file's hash in `provenance.json`.
 
-**No catalog data is bundled.** `resources/catalog/` contains a README and
-nothing else. AFDC was unreachable from the build environment, and writing
-plausible-looking station rows would have put fabricated locations in front of
-someone with no way to tell they were invented.
-
-To populate it, download the AFDC export once and point the script at it:
+To refresh it, download the AFDC export and point the script at it:
 
 ```powershell
 # 1. Get the CSV from https://afdc.energy.gov/data_download
@@ -126,12 +158,6 @@ a theoretical concern — while writing the specs for this script, a test run
 wrote synthetic stations into `resources/catalog/` exactly where real ones
 belong. `--out` was added in response.
 
-Review what it produces before committing. The field mapping in
-`CatalogImportRecord` is a declared shape that has never processed a real AFDC
-file. The script rejects malformed coordinates explicitly — including the empty
-string, because `Number('')` is `0` and `0,0` is a real place in the Gulf of
-Guinea — but a mapping error would be subtler than that.
-
 A refresh **records conflicts rather than overwriting user corrections**, and
 never erases observations. If AFDC later reports a different port count for a
 location you have already corrected by hand, you get a conflict to resolve, not
@@ -142,7 +168,15 @@ a silent overwrite of your correction and the history attached to it.
 ## How a station gets linked to a source
 
 A catalog entry and a source page are matched by
-`src/domain/matching.ts`. Two rules shape it:
+`src/domain/matching.ts`. Three rules shape it:
+
+**A durable provider id, or an exact provider name at the same spot on the
+same network, binds automatically.** The second rule exists because the AFDC
+export lists each ChargePoint station under the provider's own name and
+coordinates, so that combination is the provider's identity in everything but
+the number. The name must be exactly equal after normalisation: "BAYWOOD 1"
+and "BAYWOOD 2" share every multi-character token and would otherwise be
+indistinguishable.
 
 **Proximity alone never auto-merges.** Two chargers 40 metres apart in the same
 parking structure are routinely different operators. A proposal based only on
@@ -168,9 +202,8 @@ is reviewed.
 Technically, an adapter implements four methods (`src/collector/contract.ts`)
 and must keep its extraction logic in a **pure function** over a structured page
 reading, the way `src/collector/adapters/chargepoint/parse.ts` does. That
-separation is what allows 23 specs to cover the extraction without a browser,
-and it is why the parser is the best-tested part of the collector while the
-wiring around it is the least-tested.
+separation is what allows the parser to be covered without a browser, against
+both synthetic shapes and readings captured from the live page.
 
 Ship a `PARSER_VERSION` and bump it when extraction changes. It is stored with
 every observation, so a future reader can tell which parser produced a reading

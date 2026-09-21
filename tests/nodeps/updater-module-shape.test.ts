@@ -57,7 +57,10 @@ describe('finding autoUpdater in whatever shape the module arrives in', () => {
 
   it('prefers the namespace when both are present and identical', () => {
     const updater = fakeAutoUpdater();
-    const resolved = resolveAutoUpdater({ autoUpdater: updater, default: { autoUpdater: updater } });
+    const resolved = resolveAutoUpdater({
+      autoUpdater: updater,
+      default: { autoUpdater: updater },
+    });
     assert.equal(resolved, updater);
   });
 

@@ -63,6 +63,8 @@ function station(overrides: Partial<StationView> = {}): StationView {
     sourceUpdatedAtMs: 1_757_000_000_000,
     sourceFreshness: 'fresh',
     monitoring: 'monitored',
+    linked: true,
+    monitoringEnabled: true,
     eligibleForRanking: true,
     provisionalReasons: [],
     saved: false,

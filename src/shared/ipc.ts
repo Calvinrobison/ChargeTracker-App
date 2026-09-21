@@ -120,6 +120,10 @@ export interface StationView {
   readonly sourceUpdatedAtMs: number | null;
   readonly sourceFreshness: 'fresh' | 'stale' | 'unknown_source_clock' | null;
   readonly monitoring: Infer<typeof monitoringStateSchema>;
+  /** True when a source page is linked to this location, monitored or not. */
+  readonly linked: boolean;
+  /** True when monitoring is switched on for the linked page. */
+  readonly monitoringEnabled: boolean;
   readonly eligibleForRanking: boolean;
   readonly provisionalReasons: readonly string[];
   readonly saved: boolean;
@@ -440,6 +444,61 @@ export const OPERATIONS = {
       url: v.string({ min: 8, max: 2048, pattern: /^https?:\/\// }),
     }),
     timeoutMs: 30_000,
+    mutating: true,
+  }),
+
+  /**
+   * Reads the provider's station list for the study area and links the
+   * stations it finds to catalog sites. Bounded and paced by the collector;
+   * a full study area takes about a minute. Nothing it finds is recorded as
+   * an observation, and new links start with monitoring off.
+   */
+  'sources.discover': op<
+    { readonly sourceId: string },
+    {
+      readonly found: number;
+      readonly linked: number;
+      readonly alreadyLinked: number;
+      readonly proposed: number;
+      readonly unmatched: number;
+      readonly siteConflicts: number;
+      readonly pagesRead: number;
+      readonly truncated: boolean;
+      readonly warnings: readonly string[];
+      readonly proposals: readonly {
+        readonly sourceStationId: string;
+        readonly name: string;
+        readonly canonicalUrl: string;
+        readonly candidateSiteId: string;
+        readonly candidateName: string;
+        readonly basis: string;
+        readonly confidence: number;
+      }[];
+      readonly unmatchedStations: readonly {
+        readonly sourceStationId: string;
+        readonly name: string;
+        readonly canonicalUrl: string;
+      }[];
+    }
+  >({
+    name: 'sources.discover',
+    request: v.object({ sourceId: v.string({ min: 1, max: 64 }) }),
+    timeoutMs: 900_000,
+    mutating: true,
+  }),
+
+  /** Turns monitoring on for every linked site of every enabled source. */
+  'sites.setMonitoredAll': op<
+    { readonly enabled: boolean },
+    {
+      readonly enabledCount: number;
+      readonly refusedCount: number;
+      readonly refusals: readonly string[];
+    }
+  >({
+    name: 'sites.setMonitoredAll',
+    request: v.object({ enabled: v.boolean() }),
+    timeoutMs: 60_000,
     mutating: true,
   }),
 
@@ -843,7 +902,7 @@ export interface EventPayloads {
   'update.state': ResponseOf<'update.getState'>;
   /** Tells the renderer its cached view models are stale. */
   'data.changed': {
-    readonly reason: 'observations' | 'catalog' | 'visits' | 'settings' | 'restore';
+    readonly reason: 'observations' | 'catalog' | 'visits' | 'settings' | 'restore' | 'bindings';
   };
   toast: { readonly level: 'info' | 'warn' | 'error'; readonly message: string };
 }

@@ -353,6 +353,14 @@ function onCollectorNotification(notification: { notify: string; payload: unknow
     case 'status':
       void refreshCollectionStatus().catch(() => undefined);
       break;
+    case 'discoveryProgress': {
+      const progress = notification.payload as { pagesRead: number; stationsSoFar: number };
+      emit('toast', {
+        level: 'info',
+        message: `Finding ChargePoint stations… ${progress.stationsSoFar} so far (page ${progress.pagesRead})`,
+      });
+      break;
+    }
     default:
       break;
   }
@@ -599,8 +607,74 @@ function registerHandlers(): void {
       payload,
       30_000,
     );
-    if (result.ok) await loadCollectorState();
+    if (result.ok) {
+      await loadCollectorState();
+      emit('data.changed', { reason: 'bindings' });
+    }
     return result;
+  });
+
+  router.register('sites.setMonitoredAll', async (payload) => {
+    const siteIds = await db<string[]>('linkedSiteIds');
+    if (siteIds.length === 0) {
+      return { enabledCount: 0, refusedCount: 0, refusals: [] };
+    }
+    const result = await db<{ enabledCount: number; refusedCount: number; refusals: string[] }>(
+      'setMonitored',
+      { siteIds, enabled: payload.enabled },
+      60_000,
+    );
+    await loadCollectorState();
+    await refreshCollectionStatus();
+    emit('data.changed', { reason: 'bindings' });
+    return result;
+  });
+
+  router.register('sources.discover', async (payload) => {
+    if (payload.sourceId !== 'chargepoint') {
+      throw new OperationError('invalid_payload', `no discovery for source ${payload.sourceId}`);
+    }
+    const area = {
+      centerLatitude: setting('study.centerLatitude', STUDY_AREA_DEFAULTS.centerLatitude),
+      centerLongitude: setting('study.centerLongitude', STUDY_AREA_DEFAULTS.centerLongitude),
+      radiusMiles: setting('study.radiusMiles', STUDY_AREA_DEFAULTS.radiusMiles),
+    };
+    logger.log(
+      'info',
+      `discovering ChargePoint stations within ${area.radiusMiles} miles of ${area.centerLatitude}, ${area.centerLongitude}`,
+    );
+    const report = await collector<{
+      stations: readonly unknown[];
+      pagesRead: number;
+      truncated: boolean;
+      warnings: readonly string[];
+    }>('discover', { area }, 840_000);
+
+    const bound = await db<{
+      linked: number;
+      alreadyLinked: number;
+      proposed: number;
+      unmatched: number;
+      siteConflicts: number;
+      proposals: ResponseOf<'sources.discover'>['proposals'];
+      unmatchedStations: ResponseOf<'sources.discover'>['unmatchedStations'];
+    }>('bindDiscoveredStations', { stations: report.stations }, 120_000);
+
+    logger.log(
+      'info',
+      `discovery found ${report.stations.length} stations: ${bound.linked} linked, ${bound.alreadyLinked} already linked, ${bound.proposed} proposed, ${bound.unmatched} not in the catalog`,
+    );
+    if (bound.linked > 0) {
+      await loadCollectorState();
+      emit('data.changed', { reason: 'bindings' });
+    }
+    return {
+      found: report.stations.length,
+      ...bound,
+      pagesRead: report.pagesRead,
+      truncated: report.truncated,
+      warnings: report.warnings,
+    };
   });
 
   router.register('collection.setRunning', async (payload) => {
@@ -965,6 +1039,51 @@ async function startDatabase(): Promise<void> {
   }
 
   settingsCache = await db<Record<string, unknown>>('getSettings');
+  await importBundledCatalog();
+}
+
+/**
+ * Loads the station catalog the application ships into the database.
+ *
+ * Idempotent on the file's hash: the first start imports the 1083 locations,
+ * every later start is a no-op, and an installer carrying a refreshed file
+ * imports the new one through the conflict-recording refresh path. Until
+ * 2026-09-21 this step did not exist — the catalog was packaged and never
+ * read, so an installed copy started with an empty map.
+ */
+async function importBundledCatalog(): Promise<void> {
+  const catalogDir = app.isPackaged
+    ? join(process.resourcesPath, 'catalog')
+    : join(app.getAppPath(), 'resources', 'catalog');
+  try {
+    const result = await db<{
+      imported: boolean;
+      reason: string;
+      sites: number;
+      inserted: number;
+      updated: number;
+      conflicts: number;
+      detail: string | null;
+    }>(
+      'importCatalogFile',
+      {
+        filePath: join(catalogDir, 'mesa-stations.json'),
+        provenancePath: join(catalogDir, 'provenance.json'),
+      },
+      180_000,
+    );
+    logger.log(
+      result.reason === 'missing' || result.reason === 'invalid' ? 'warn' : 'info',
+      `bundled catalog: ${result.reason} (${result.sites} locations${result.detail ? `; ${result.detail}` : ''})`,
+    );
+  } catch (error) {
+    // A catalog that cannot be imported leaves the map empty and the health
+    // check saying so; it must not stop the application from starting.
+    logger.log(
+      'warn',
+      `the bundled catalog could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
 }
 
 async function startCollector(): Promise<void> {

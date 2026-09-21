@@ -2,7 +2,8 @@
 
 A source goes from `needs_review` to `enabled` only after a person has
 established that reading it is permitted and that the adapter reads it
-correctly. This document is that process.
+correctly. This document is that process, and the record of each time it has
+been applied.
 
 It is written down because the failure mode is quiet: an adapter that works is
 indistinguishable, from the code, from an adapter that works _and should not be
@@ -11,21 +12,20 @@ a request.
 
 ---
 
-## Why nothing is enabled today
+## Status
 
-`docs/IMPLEMENTATION_STATUS.md` blocker B2. The build environment had no route
-to `driver.chargepoint.com` or to the terms pages that govern it, so neither
-question — _may we read this?_ and _do we read it correctly?_ — could be
-answered. The adapter therefore ships declaring both unanswered:
+**ChargePoint is enabled**, as of 2026-09-21. The review is in the record
+below; the capability record in
+`src/collector/adapters/chargepoint/index.ts` carries the same basis in its
+`termsReviewScope` and `eligibilityBasis` fields, and
+`tests/nodeps/source-url-safety.test.ts` fails if an adapter is ever flipped to
+`enabled` without those fields filled in.
 
-```ts
-eligibilityState: 'needs_review',
-verificationState: 'blocked',
-```
-
-and the application surfaces that rather than hiding it. That is the honest
-state of a source nobody has checked, and it is preferable to an adapter that
-defaults to enabled and starts making requests.
+Until 2026-09-21 the adapter shipped `needs_review` / `blocked` because the
+build environment had no route to `driver.chargepoint.com` or to the terms
+pages, so neither question below could be answered
+(`docs/IMPLEMENTATION_STATUS.md`, former blocker B2). That was the honest state
+of a source nobody had checked.
 
 ---
 
@@ -68,9 +68,7 @@ Only after step 1.
 
 **Capture real page readings as fixtures.** Save the structured readings the
 adapter produces, not raw HTML dumps, and label them with where and when they
-came from. `tests/fixtures/chargepoint/README.md` shows the labelling; the
-existing fixtures there are marked **SYNTHETIC** because no real page was ever
-reachable.
+came from. `tests/fixtures/chargepoint/README.md` shows the labelling.
 
 **Cover the states that matter**, not just the happy one:
 
@@ -104,6 +102,8 @@ verificationState: 'verified',
 and in the same commit:
 
 - add the row to the table below, with the date and the basis;
+- fill `termsReviewedAtMs`, `termsReviewScope` and `eligibilityBasis` in the
+  capability record — the spec refuses `enabled` without them;
 - update `docs/SOURCES.md` with what the source can and cannot report;
 - bump `PARSER_VERSION` if extraction changed.
 
@@ -115,13 +115,86 @@ immediately is telling you something about step 1 that step 2 did not.
 
 ## The record
 
-| Source      | Reviewed on | Reviewed by | Terms URL | Rate limit basis | Outcome                                                                                                               |
-| ----------- | ----------- | ----------- | --------- | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
-| ChargePoint | —           | —           | —         | —                | **Not reviewed.** No route to the provider or its terms from the build environment. Ships `needs_review` / `blocked`. |
+| Source      | Reviewed on | Reviewed by                                                      | Terms URL                                                                                                                                                                                                                                                                                              | Rate limit basis                                                                                                | Outcome                                                                                                                 |
+| ----------- | ----------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| ChargePoint | 2026-09-17  | —                                                                | —                                                                                                                                                                                                                                                                                                      | —                                                                                                               | **Not reviewed.** No route to the provider or its terms from the build environment. Shipped `needs_review` / `blocked`. |
+| ChargePoint | 2026-09-21  | the-x1x1 (via Claude, in a browser on the contributor's machine) | `https://www.chargepoint.com/terms-of-use`; `https://na.chargepoint.com/standard-driver-terms?country_id=233&instance=NA-US&locale=en` (last updated 2026-03-25); `https://driver.chargepoint.com/robots.txt`; `https://www.chargepoint.com/robots.txt`; `https://mc.chargepoint.com/robots.txt` (404) | None published. `src/domain/thresholds.ts` floor applies: 30 s between navigations, 15 min cadence per station. | **Enabled.** See below.                                                                                                 |
 
-Add a row per review, including re-reviews. Do not edit an old row when terms
-change — add a new one, so the history of what was believed and when stays
-readable.
+### 2026-09-21 review, in full
+
+**Website Terms of Use** (`www.chargepoint.com/terms-of-use`, 17 sections,
+undated beyond "© 2026"). Read in full. Contains no clause on automated
+access, robots, spiders, scrapers, crawlers, data mining, harvesting or rate
+limits. "Your use of our site" prohibits unlawful use and causing damage.
+"Intellectual property & limited license" permits copying and downloading
+materials for non-commercial use and prohibits reproduction, distribution or
+derivative works of site content without permission.
+
+**Terms of Service for ChargePoint Accounts** (`na.chargepoint.com/
+standard-driver-terms`, last updated 2026-03-25, 23 sections). Read in full.
+Contains no clause on automated access, robots, scraping, crawling, data
+mining, harvesting or rate limits, and no restriction specific to station
+status data. "Use of the Services" permits using the services "to obtain
+information regarding ChargePoint Available Charging Station locations" and
+disclaims accuracy. "Licenses" grants a limited, personal, non-commercial
+licence and prohibits: reproducing, distributing or publicly displaying the
+services or creating derivative works; modifying them; decompiling or reverse
+engineering their source code; and interfering with or circumventing "any
+feature of the Services, including any security or access control mechanism".
+These terms govern _accounts_; ChargeWatch never creates or uses one.
+
+**robots.txt.** `driver.chargepoint.com`: `User-agent: * / Disallow:` —
+everything allowed. `mc.chargepoint.com`: none (404). `www.chargepoint.com`:
+a stock Drupal file disallowing only CMS internals (`/admin/`, `/user/login`,
+…); station content is not under any disallowed path.
+
+**Documented API or feed.** None exists for public station status. ChargePoint
+publishes an owner-facing web-services API for station operators, which
+requires an operator account and does not apply.
+
+**How ChargeWatch's behaviour meets the restrictions that do apply.**
+
+- _Personal, non-commercial._ ChargeWatch is a local desktop tool; everything
+  it records stays on the user's machine, nothing is redistributed, and the
+  application is `UNLICENSED`, private and free.
+- _No circumvention of access controls._ It reads the same public page a
+  person would, without an account. A sign-in wall, a "verify you are human"
+  challenge or an HTTP 401/403 **pauses** the source (`PAUSE_SOURCE_OUTCOMES`);
+  they are never retried through, worked around or automated past.
+- _No reproduction or derivative works of the service._ The application
+  stores port counts and a sanitised one-line evidence string per reading,
+  not page content, images, tips or usernames.
+- _Load._ One page load per monitored station per 15 minutes, never closer
+  than 30 seconds apart, backing off exponentially on any transient failure
+  and honouring `Retry-After`. A station discovery run (linking, not
+  collection) is one map page load plus paced list requests, on demand only.
+
+**Judgement.** Nothing in either document restricts automated reading of the
+public station page; the operator's own `robots.txt` on the page's host allows
+all crawling; and the use is personal and non-commercial with no access
+control involved. Enabled on that basis. If either document gains an
+automated-access clause, this basis expires: add a new row, do not edit this
+one.
+
+**Step 2 — live verification, 2026-09-21.** Three stations read in a browser
+and compared by eye against what the adapter's extraction script returned:
+11502161 BANNER HEALTH / BAYWOOD 1 (two J1772 outlets, one Available, one In
+Use), 17560121 CHAPMAN FORD / POWER LINK S (two 120 kW CCS1 outlets, both
+"Out of Service", provider code `maintenance_required`) and 1804411
+CHARGEPOINT / SCD RTECH DC 1 (one 62.5 kW outlet, "(DC Fast)" plug line,
+provider code `fault`). All three matched. A non-existent station id renders
+"Failed to load station details" with no port blocks and is reported as a
+source error. The captured readings are `tests/fixtures/chargepoint/
+captured.ts`; the specs are `tests/nodeps/chargepoint-captured.test.ts`; the
+provider's complete pill vocabulary was taken from its own
+`na.chargepoint.com/UI/images/pills/states/en-US/states.json` (version 1715755545) and is encoded in `parse.ts` with a spec that covers every entry.
+The identity check is exercised by the same spec file (a reading for 11502161
+is refused when 11502162 was expected).
+
+**Not verified.** The `reserved` state, a sign-in wall and a challenge page
+were not seen on the live site and remain covered only by synthetic fixtures.
+The adapter has not yet run inside the packaged application against the live
+site; that is the first thing `docs/IMPLEMENTATION_STATUS.md` asks for.
 
 ---
 

@@ -180,6 +180,22 @@ async function dispatch(op: string, payload: unknown): Promise<unknown> {
       return worker.setMonitored(payload as Parameters<DatabaseWorker['setMonitored']>[0]);
     case 'addManualLink':
       return worker.addManualLink(payload as Parameters<DatabaseWorker['addManualLink']>[0]);
+    case 'bindDiscoveredStations': {
+      const result = worker.bindDiscoveredStations(
+        payload as Parameters<DatabaseWorker['bindDiscoveredStations']>[0],
+      );
+      if (result.linked > 0) notify('dataChanged', { reason: 'bindings' });
+      return result;
+    }
+    case 'linkedSiteIds':
+      return worker.linkedSiteIds();
+    case 'importCatalogFile': {
+      const result = worker.importCatalogFile(
+        payload as Parameters<DatabaseWorker['importCatalogFile']>[0],
+      );
+      if (result.imported) notify('dataChanged', { reason: 'catalog' });
+      return result;
+    }
     case 'bindingIdsForSites':
       return worker.bindingIdsForSites(
         payload as Parameters<DatabaseWorker['bindingIdsForSites']>[0],

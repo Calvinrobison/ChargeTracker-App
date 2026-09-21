@@ -48,6 +48,24 @@ export interface MatchProposal {
 /** Confidence at or above this is auto-confirmed; below it needs review. */
 export const AUTO_CONFIRM_CONFIDENCE = 0.95;
 /**
+ * Confidence for an EXACT provider name (after normalisation), the same
+ * network, and coordinates inside `MAX_COORDINATE_MATCH_MILES`.
+ *
+ * This is the one non-identifier rule that auto-confirms, and it is there
+ * because of how the catalog is built: the AFDC export carries each
+ * ChargePoint station under the provider's own name ("BANNER HEALTH BAYWOOD 1")
+ * and coordinates, so an exact name at the same spot on the same network is
+ * the provider's identity in everything but the number. Two banks in one lot
+ * differ in that name ("BAYWOOD 1" / "BAYWOOD 2"), which is why the name
+ * must be exactly equal and token overlap is not enough: the token
+ * similarity of those two is 1.0, because single-character tokens are
+ * ignored. A dry run on 2026-09-21 over the 706 stations the provider lists
+ * for the study area bound 674 under this rule, with zero ambiguity and the
+ * catalog port count agreeing in every case; the 32 left over are stations
+ * the catalog does not have, and none of them was bound to a near-namesake.
+ */
+export const EXACT_NAME_CONFIDENCE = 0.97;
+/**
  * Below this a candidate is not even proposed for review.
  *
  * Kept below the coordinates-only score on purpose: a nearby unnamed charger
@@ -148,8 +166,18 @@ export function proposeMatches(
         subject.network.toLowerCase() === candidate.network.toLowerCase();
       const similarity = nameSimilarity(subject.name, candidate.name);
       const closeEnough = separation !== null && separation <= MAX_COORDINATE_MATCH_MILES;
+      const exactName =
+        normalizeName(subject.name) !== null &&
+        normalizeName(subject.name) === normalizeName(candidate.name);
 
-      if (addressMatch && networkMatch) {
+      if (exactName && networkMatch && closeEnough) {
+        basis = 'coordinates_and_name';
+        confidence = EXACT_NAME_CONFIDENCE;
+        reasons.push(
+          `exact provider name, same network, coordinates within ${separation?.toFixed(3)} mi`,
+        );
+        if (addressMatch) reasons.push('normalized address agrees');
+      } else if (addressMatch && networkMatch) {
         basis = 'address_and_network';
         confidence = 0.9;
         reasons.push('normalized address and network agree');

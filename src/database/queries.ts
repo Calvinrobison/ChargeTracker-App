@@ -301,6 +301,8 @@ export class QueryService {
       sourceUpdatedAtMs: latest?.sourceUpdatedAtUtcMs ?? null,
       sourceFreshness: latest ? classifySourceFreshness(latest) : null,
       monitoring,
+      linked: row.bindingId !== null,
+      monitoringEnabled: row.bindingId !== null && row.enabled,
       eligibleForRanking: eligibility?.eligible ?? false,
       provisionalReasons,
       saved: row.saved,

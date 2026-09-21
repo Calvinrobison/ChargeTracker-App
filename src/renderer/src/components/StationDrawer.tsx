@@ -29,12 +29,17 @@ import { BookmarkIcon, ChevronDownIcon, ChevronUpIcon, CloseIcon, ExternalIcon }
 export interface StationDrawerProps {
   readonly detail: StationDetailView;
   readonly timeZone: string;
+  /** Whether the linked source (if any) is cleared for collection. */
+  readonly sourceEnabled: boolean;
+  readonly busy: boolean;
   readonly onClose: () => void;
   readonly onToggleSaved: () => void;
   readonly onOpenSource: () => void;
   readonly onExportStation: () => void;
   readonly onAddVisitCounts: () => void;
   readonly onImportVisitCsv: () => void;
+  readonly onSetMonitored: (enabled: boolean) => void;
+  readonly onAddLink: (url: string) => void;
 }
 
 const QUALITY_LABELS: Record<StationDetailView['dataQuality']['badge'], string> = {
@@ -46,17 +51,25 @@ const QUALITY_LABELS: Record<StationDetailView['dataQuality']['badge'], string> 
 export function StationDrawer({
   detail,
   timeZone,
+  sourceEnabled,
+  busy,
   onClose,
   onToggleSaved,
   onOpenSource,
   onExportStation,
   onAddVisitCounts,
   onImportVisitCsv,
+  onSetMonitored,
+  onAddLink,
 }: StationDrawerProps): ReactNode {
   const { state, dispatch } = useUi();
   const [technicalOpen, setTechnicalOpen] = useState(false);
+  const [linkDraft, setLinkDraft] = useState('');
   const station = detail.station;
   const band = occupancyBandOf(station.occupancy);
+  const linkLooksRight = /^https:\/\/(driver|na)\.chargepoint\.com\/stations\/\d{1,12}\b/.test(
+    linkDraft.trim(),
+  );
 
   return (
     <aside className="drawer" aria-label={`${station.name} details`}>
@@ -141,6 +154,88 @@ export function StationDrawer({
             <span>{freshnessText(station)}</span>
           </div>
           <div className="chart-footnote">{detail.currentStatusNote}</div>
+        </section>
+
+        {/* 1b — Monitoring. Whether this location is linked to a source page and
+            whether that page is being read. The words say which of the two is
+            missing, because "not monitored" alone does not tell you what to do. */}
+        <section aria-label="Monitoring">
+          <div className="section-eyebrow-row">
+            <span className="section-eyebrow">Monitoring</span>
+            <span className="section-note">
+              {!station.linked
+                ? 'Not linked to a source page'
+                : station.monitoringEnabled
+                  ? `Reading ${detail.source.displayName ?? 'the source'} every 15 minutes`
+                  : `Linked to ${detail.source.displayName ?? 'a source'} · off`}
+            </span>
+          </div>
+          {station.linked ? (
+            <div className="status-card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                type="button"
+                className="toggle"
+                role="switch"
+                aria-checked={station.monitoringEnabled}
+                aria-label="Monitor this location"
+                disabled={busy || (!station.monitoringEnabled && !sourceEnabled)}
+                onClick={() => onSetMonitored(!station.monitoringEnabled)}
+              >
+                <span className="toggle-knob" />
+              </button>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+                  {station.monitoringEnabled ? 'Monitoring on' : 'Monitor this location'}
+                </div>
+                <div className="small-metric-note">
+                  {station.monitoringEnabled
+                    ? 'Each reading records the port counts the source page shows. Turning this off keeps the history and records the gap.'
+                    : sourceEnabled
+                      ? 'Reads the linked source page on the collection schedule and records what it shows.'
+                      : `${detail.source.displayName ?? 'This source'} is not cleared for collection, so this cannot be turned on yet.`}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="dashed-card">
+              <div style={{ fontSize: 12.5, fontWeight: 500 }}>No source page linked</div>
+              <div className="small-metric-note">
+                Settings → Locations and sources → “Find ChargePoint stations” links every station
+                the provider lists at the catalog’s name and position. For a location that step did
+                not link, paste its ChargePoint station page here — the address bar shows{' '}
+                <code>driver.chargepoint.com/stations/…</code> when the station is selected on the
+                ChargePoint map.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <input
+                  type="url"
+                  className="text-input"
+                  style={{ flex: '1 1 200px', minWidth: 0 }}
+                  placeholder="https://driver.chargepoint.com/stations/…"
+                  aria-label="ChargePoint station page link"
+                  value={linkDraft}
+                  onChange={(event) => setLinkDraft(event.target.value)}
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="button-accent"
+                  disabled={busy || !linkLooksRight}
+                  onClick={() => {
+                    onAddLink(linkDraft.trim());
+                    setLinkDraft('');
+                  }}
+                >
+                  Link
+                </button>
+              </div>
+              {linkDraft.trim().length > 0 && !linkLooksRight ? (
+                <div className="small-metric-note" style={{ color: 'var(--status-warning)' }}>
+                  That is not a single ChargePoint station page.
+                </div>
+              ) : null}
+            </div>
+          )}
         </section>
 
         {/* 2 — Data quality. */}

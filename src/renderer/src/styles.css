@@ -331,6 +331,26 @@ select {
   color: var(--text-tertiary);
 }
 
+/* A standalone text field with the search field's look, for the link box. */
+.text-input {
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control-lg);
+  outline: none;
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.text-input:focus {
+  border-color: var(--border-hover);
+}
+
+.text-input::placeholder {
+  color: var(--text-tertiary);
+}
+
 .filter-chips {
   display: flex;
   flex-wrap: wrap;

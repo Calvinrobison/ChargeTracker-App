@@ -91,12 +91,29 @@ describe('station identity from URL', () => {
 });
 
 describe('eligibility gating', () => {
-  test('the adapter ships not-enabled and unverified, with the reason recorded', () => {
-    assert.equal(CAPABILITIES.eligibilityState, 'needs_review');
-    assert.equal(CAPABILITIES.verificationState, 'blocked');
-    assert.equal(CAPABILITIES.termsReviewedAtMs, null);
-    assert.equal(CAPABILITIES.eligibilityBasis, null);
-    assert.match(CAPABILITIES.notes ?? '', /not automation permission/);
+  test('an enabled adapter carries the review that enabled it, in the record itself', () => {
+    // Until 2026-09-21 this spec asserted `needs_review` / `blocked`, because
+    // nobody had been able to read the provider's terms. The review has now
+    // been done and recorded (docs/SOURCE_VERIFICATION.md), so the invariant
+    // is the general one: `enabled` is only legitimate alongside a dated
+    // review with a stated scope and basis. An adapter flipped to enabled
+    // without those fails here.
+    assert.equal(CAPABILITIES.eligibilityState, 'enabled');
+    assert.equal(CAPABILITIES.verificationState, 'verified');
+    assert.ok(
+      typeof CAPABILITIES.termsReviewedAtMs === 'number' &&
+        Number.isFinite(CAPABILITIES.termsReviewedAtMs),
+      'an enabled source must record when its terms were reviewed',
+    );
+    assert.ok(
+      (CAPABILITIES.termsReviewScope ?? '').length > 0,
+      'an enabled source must say what the review covered',
+    );
+    assert.ok(
+      (CAPABILITIES.eligibilityBasis ?? '').length > 0,
+      'an enabled source must say on what basis it is enabled',
+    );
+    assert.match(CAPABILITIES.eligibilityBasis ?? '', /robots\.txt/);
   });
 
   test('capability limits are at least as strict as the product defaults', () => {
@@ -107,7 +124,10 @@ describe('eligibility gating', () => {
   test('no recorded-session or charging-distinction claim is made', () => {
     assert.equal(CAPABILITIES.providesRecordedSessions, false);
     assert.equal(CAPABILITIES.distinguishesCharging, false);
-    assert.equal(CAPABILITIES.identityReliability, 'none');
+    // Port identity IS claimed, because the page carries the physical outlet
+    // number on every port block; tests/nodeps/chargepoint-captured.test.ts
+    // shows it on captured readings.
+    assert.equal(CAPABILITIES.identityReliability, 'durable');
   });
 
   test('the terms URLs that must be reviewed are recorded', () => {

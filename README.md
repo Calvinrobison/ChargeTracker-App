@@ -10,22 +10,26 @@ browser and its own database.
 
 ---
 
-## Current status: installs and runs; collection not yet enabled
+## Current status: collection is enabled; first live run pending
 
-**No release has been published yet.** The application builds, installs and
-starts on Windows: as of 2026-09-18 a packaged installer exited 0 and the
-installed copy passes its own integrity self-check, and it now ships a catalog
-of 1083 charging locations within 50 miles of Mesa.
+v0.2.0 built, installed and passed its self-check on Windows (2026-09-19) with
+a catalog of 1083 charging locations within 50 miles of Mesa. As of 2026-09-21
+(v0.3.0) **ChargePoint is cleared for collection**: the terms review and a
+bounded live read are recorded in `docs/SOURCE_VERIFICATION.md`, the adapter
+reads the real station page, and the application can find the provider's
+stations in the study area and link them to the catalog (674 of 706 on the
+first dry run, every ChargePoint location the catalog has).
 
-What it still cannot do is **collect**. No source has been cleared for
-automated observation, so the map shows where the chargers are and nothing
-about how busy they are. `docs/IMPLEMENTATION_STATUS.md` has the ordered
-roadmap.
+What has **not** happened yet is a collection cycle inside the packaged
+application against the live site. The adapter's readings were verified in a
+browser, not through the bundled Chromium in the installed copy; the first
+run of `npm run dev` after **Find ChargePoint stations → Monitor all linked**
+is that test. `docs/IMPLEMENTATION_STATUS.md` has the ordered roadmap.
 
 |                 |                                                                     |
 | --------------- | ------------------------------------------------------------------- |
-| Specs passing   | 418, via `npm run test:nodeps` (no install) and `npm test` (Vitest) |
-| UI specs        | 42 passing, via `npm run test:e2e` against the built renderer       |
+| Specs passing   | 500, via `npm run test:nodeps` (no install) and `npm test` (Vitest) |
+| UI specs        | 44, via `npm run test:e2e` against the built renderer               |
 | Typechecked     | **Yes**, `npm run typecheck` is clean                               |
 | Linted          | **Yes**, `npm run lint` and `npm run format` are clean              |
 | Built           | **Yes** — on Linux and on Windows                                   |
@@ -101,7 +105,7 @@ for the bundled browser.
 From a clean clone, with nothing installed:
 
 ```powershell
-npm run test:nodeps      # 418 specs, no dependencies needed
+npm run test:nodeps      # 500 specs, no dependencies needed
 npm run check:migrations # confirms the embedded schema matches the SQL files
 ```
 
@@ -132,7 +136,7 @@ npm run verify           # migrations, icons, specs, format, lint, types
 npm test                 # the same specs under Vitest
 npm run setup:browser    # downloads and stages the Chromium payload (~200 MB)
 npm run build
-npm run test:e2e         # 42 UI specs; needs the renderer built by the line above
+npm run test:e2e         # 44 UI specs; needs the renderer built by the line above
 npm run package:win      # produces release\ChargeWatch-Setup-<version>.exe
 npm run verify:package   # checks the package for the faults that only show up on a user's machine
 ```

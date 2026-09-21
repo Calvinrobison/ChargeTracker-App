@@ -147,10 +147,11 @@ Stated here so it is not discovered by a user.
 
 - **Whether the interface is usable.** The UI specs check honesty rules, not
   whether anyone can find anything.
-- **Whether collection works against a real provider.** No source has been
-  cleared, so no end-to-end collection has ever happened. The parser is tested
-  as a pure function over structured page readings; the browser wiring around it
-  is not.
+- **Whether collection works end to end inside the packaged app.** The parser
+  is tested as a pure function over readings captured from the live page
+  (`tests/nodeps/chargepoint-captured.test.ts`) and the extraction script was
+  run in a desktop browser on 2026-09-21; the Playwright wiring in the bundled
+  Chromium has still never produced an observation.
 - **Anything over a long run.** No soak test has run. Backoff behaviour under
   sustained failure, database growth, and memory over days are all unmeasured.
 - **Accessibility.** No automated or manual audit has been done. The components

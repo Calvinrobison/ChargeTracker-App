@@ -1,40 +1,51 @@
-# ChargePoint adapter fixtures — SYNTHETIC
+# ChargePoint adapter fixtures
 
-**Everything in this directory is synthetic.** These fixtures are written by
-hand to model page _shapes_ the adapter must handle. They are **not** captured
-provider content, and they are **not** evidence that the adapter works against
-the live source.
+Two files, two kinds of evidence. Read the label before trusting a fixture.
 
-## Why they are synthetic
+## `captured.ts` — CAPTURED (2026-09-21)
 
-Two separate reasons, both recorded honestly:
+These are the exact objects the adapter's own extraction script returned when
+it was run against the live station page in a browser on 2026-09-21, one per
+station, with the read instant from the same run. They are **structured
+readings** — status words, provider status codes, kW, plug lines, outlet
+numbers — not raw page content, which is what `docs/SOURCE_VERIFICATION.md`
+step 2 asks for and why they can be committed.
 
-1. Raw provider content is kept out of this repository unless redistribution is
-   permitted. It is not, so captured pages are never committed here.
-2. At the time these were written the build environment had **no network route
-   to `driver.chargepoint.com`** (the sandbox egress policy denied the host), so
-   no live page could be captured at all. See `docs/SOURCE_VERIFICATION.md`.
+| Fixture                       | Station                              | What it shows                                                           |
+| ----------------------------- | ------------------------------------ | ----------------------------------------------------------------------- |
+| `baywood1OneInUse`            | 11502161 BANNER HEALTH / BAYWOOD 1   | 2 × L2 J1772; one Available, one In Use; "Last Used 2 days ago"         |
+| `chapmanFordBothOutOfService` | 17560121 CHAPMAN FORD / POWER LINK S | 2 × 120 kW CCS1; both "Out of Service" with code `maintenance_required` |
+| `scdRtechFault`               | 1804411 CHARGEPOINT / SCD RTECH DC 1 | 1 × 62.5 kW, plug line "(DC Fast)", code `fault` → "Out of Service"     |
+| `unknownStationError`         | 999999999 (no such station)          | "Failed to load station details" and no port blocks                     |
 
-## What they do and do not establish
+What they establish: the extraction script finds the port blocks on the real
+page, and the parser turns them into the counts a person reading the page
+would write down (`tests/nodeps/chargepoint-captured.test.ts`).
 
-They establish that `parsePageReading` behaves correctly for the modelled
-shapes: status vocabulary, missing dimensions, ambiguous identity, aggregate-only
-summaries, layout changes, identity mismatch, sign-in walls and challenges.
+What they do not establish: that the page still has this shape today. The
+selectors are the page's own `data-qa-id` test hooks — the only stable thing
+on it — and a change that removes them surfaces as a `layout_changed` outcome
+in the source health panel, never as a wrong number.
 
-They establish **nothing** about:
+## `readings.ts` — SYNTHETIC
 
-- whether the live page still has that shape,
-- whether automated collection from the source is permitted,
-- regional coverage,
-- whether a real observation can be recorded.
+Hand-written page _shapes_ from before any live page could be reached
+(2026-09-17). They still model conditions the captured set does not cover —
+an aggregate-only summary, an update-time phrase, a sign-in wall, a challenge,
+an identity mismatch — and the parser specs in
+`tests/nodeps/chargepoint-parse.test.ts` run against them for exactly those
+paths. They are not evidence about the live page and never were.
 
-Those require the live verification recorded in `docs/SOURCE_VERIFICATION.md`,
-which is currently `blocked`.
+Two of their assumptions turned out wrong on the real page, which is worth
+knowing when reading them: the page has **no** "N of M available" summary and
+**no** "updated N minutes ago" text for status, and its port rows **do** carry
+a durable identifier (the outlet number). The synthetic fixtures are kept as
+written because the parser must still handle those shapes if the page ever
+grows them.
 
-## The one real-world detail these are modelled on
+## Raw content
 
-The handoff brief records a prior research spot check (September 2026) that read
-public status text for `BANNER HEALTH / BAYWOOD 2`, 6644 E Baywood Ave, Mesa,
-showing two displayed J1772 port entries. The `twoPortJ1772` fixture models that
-shape. That spot check is second-hand information in this repository: it was not
-reproduced here, and it is not treated as verification.
+Raw page content is kept out of this repository. The captured readings above
+carry nothing personal — the tips section, usernames and photos on the page
+are not read — and the evidence string the parser stores is passed through
+`sanitizeEvidence` first.
