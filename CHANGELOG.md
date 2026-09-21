@@ -77,6 +77,25 @@ separate reasons, all fixed here.
 
 ### Fixed
 
+- **The way the collector introduced itself broke every page it opened.**
+  Found on the second live run, 2026-09-21, after the timer fix above: the
+  application collected nothing, every read recorded `timeout`, and the
+  circuit breaker opened. `X-Requested-With: ChargeWatch/<version>` was set on
+  the browser context, and a header set there is attached to every
+  cross-origin request the PAGE makes, not only to ours. `X-Requested-With`
+  is not a CORS-safelisted request header, so each of those requests needed a
+  preflight the provider does not answer — including the one for
+  `states.json`, the file that defines the status pills — and the station page
+  rendered "Unable to load page" instead of any status. Isolated by testing
+  one variable at a time against the same page: with the header the page never
+  renders, without it the same headless browser renders port rows; the user
+  agent and `navigator.webdriver` make no difference either way. The
+  identifier now rides on the User-Agent, which is safelisted and which the
+  page sends anyway, appended to what the browser already says about itself —
+  "HeadlessChrome" is left in place, because disguising the client would be a
+  different thing entirely and is not something this application does.
+  `tests/nodeps/browser-identity.test.ts` covers the appending and refuses a
+  context-wide request header being set again.
 - **Switching locations on while collecting did not start reading them.**
   Found on the first live run, 2026-09-21: with collection already started on
   an empty queue, turning on 674 locations loaded their due-now queue entries

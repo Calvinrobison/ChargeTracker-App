@@ -191,10 +191,35 @@ provider's complete pill vocabulary was taken from its own
 The identity check is exercised by the same spec file (a reading for 11502161
 is refused when 11502162 was expected).
 
+**How the collector identifies itself, and what that cost.** The adapter set
+`X-Requested-With: ChargeWatch/<version>` on the browser context so the
+provider could see who was reading. A header set there is attached to every
+cross-origin request the _page_ makes as well as to ours, and
+`X-Requested-With` is not a CORS-safelisted request header, so those requests
+needed a preflight the provider does not answer — including the one for the
+`states.json` above. The page rendered "Unable to load page" and there was no
+status to read; in the packaged application on 2026-09-21 this produced a
+`timeout` on every attempt and an open circuit breaker, with zero observations
+recorded. Isolated by holding everything else constant and changing one thing
+at a time against station 11502161: with the header the page never renders,
+without it the same headless browser renders port rows. The user agent and
+`navigator.webdriver` are irrelevant — a page that fails with an ordinary
+Chrome user agent and succeeds with the headless one only when the header is
+gone settles it.
+
+The identifier now rides on the User-Agent instead: safelisted, sent by the
+page anyway, and appended to the browser's own string rather than replacing
+it. `HeadlessChrome` stays in what we send. Identifying the reader is the
+point; pretending to be an ordinary browser would be the opposite of it, and
+the paragraph above about paced, bounded reading only means anything if the
+operator can see who is doing it.
+
 **Not verified.** The `reserved` state, a sign-in wall and a challenge page
 were not seen on the live site and remain covered only by synthetic fixtures.
-The adapter has not yet run inside the packaged application against the live
-site; that is the first thing `docs/IMPLEMENTATION_STATUS.md` asks for.
+The adapter has run inside the packaged application against the live site as
+of 2026-09-21 — that is how the header fault above was found — but a
+successful observation recorded end to end from the installed build is still
+outstanding; `docs/IMPLEMENTATION_STATUS.md` tracks it.
 
 ---
 

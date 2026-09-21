@@ -105,7 +105,7 @@ for the bundled browser.
 From a clean clone, with nothing installed:
 
 ```powershell
-npm run test:nodeps      # 500 specs, no dependencies needed
+npm run test:nodeps      # 507 specs, no dependencies needed
 npm run check:migrations # confirms the embedded schema matches the SQL files
 ```
 

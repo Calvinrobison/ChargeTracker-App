@@ -45,7 +45,7 @@
     "release:verify": "node --experimental-strip-types --no-warnings scripts/release-verify.mjs",
     "release:publish": "node scripts/release-publish.mjs"
   },
-  "//scripts-not-yet-implemented": "test:installed and test:update require Windows and a packaged build; they fail with a stated reason rather than passing vacuously elsewhere. npm run test:nodeps runs 413 real specs with no install required; npm test runs the same 413 under Vitest; npm run test:e2e runs 42 UI specs against the built renderer and needs npm run build first. Nothing here has been packaged or installed on Windows — see docs/VERIFICATION_REPORT.md.",
+  "//scripts-not-yet-implemented": "test:installed and test:update require Windows and a packaged build; they fail with a stated reason rather than passing vacuously elsewhere. npm run test:nodeps runs 507 real specs with no install required; npm test runs the same 507 under Vitest; npm run test:e2e runs 42 UI specs against the built renderer and needs npm run build first. Nothing here has been packaged or installed on Windows — see docs/VERIFICATION_REPORT.md.",
   "dependencies": {
     "electron-updater": "^6.6.2",
     "playwright-core": "^1.55.0"

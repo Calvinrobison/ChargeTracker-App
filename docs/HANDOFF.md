@@ -308,8 +308,11 @@ the provider's terms nor its pages were reachable from the build sandbox. Both
 have now been read from a real machine, a bounded live read matched by eye,
 and the adapter is `enabled` / `verified`; the review is
 `docs/SOURCE_VERIFICATION.md`. The adapter was also rewritten against the
-real page, because the original selectors matched nothing on it. What has not
-yet happened is a collection cycle inside the packaged application.
+real page, because the original selectors matched nothing on it. Collection
+cycles have since run inside the packaged application; they found two defects
+(the cycle timer not re-arming, and an `X-Requested-With` header that broke
+the page it was sent to), both fixed and covered by specs. What has not yet
+happened is a successful observation written by the installed build.
 
 ### GitHub Actions are pinned to tags, not commit SHAs
 

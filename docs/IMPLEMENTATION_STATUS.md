@@ -303,13 +303,24 @@ has, 11 proposed, 22 not in the catalog. It also found one defect nothing
 else could have: switching monitoring on while collection was already running
 did not re-arm the cycle timer, so nothing was read. Fixed and covered.
 
-**What has still not run: an observation written by the packaged application.** The
-extraction script was executed in a desktop browser, not through Playwright in
-the bundled Chromium, and no observation has yet been written by the app. The
-first `npm run dev` after linking and monitoring is that test; watch the log
-for `[collector]` lines and the station drawer for "Observed N min ago". If
-the source health panel shows `layout_changed`, the page changed between
-2026-09-21 and now and the captured fixtures say exactly what it looked like.
+A second run then found a second defect, and this one explains why the
+application had never recorded anything: the adapter set `X-Requested-With`
+on the browser context to identify itself, which is not a CORS-safelisted
+request header, so the station page's own cross-origin fetches failed
+preflight and the page rendered "Unable to load page". Every attempt recorded
+`timeout` and the circuit opened. The identifier moved to the User-Agent.
+`docs/SOURCE_VERIFICATION.md` holds the isolation, and
+`tests/nodeps/browser-identity.test.ts` keeps the header from returning.
+
+**What has still not run: an observation written by the packaged application.**
+The header fix has been proved in the bundled Chromium — the same headless
+browser that rendered nothing renders port rows without the header — but no
+observation has yet been written to the database by the app itself. Watch the
+log for `[collector]` lines and the station drawer for "Observed N min ago",
+and expect the ChargePoint circuit breaker to need one successful read to
+close. If the source health panel shows `layout_changed`, the page changed
+between 2026-09-21 and now and the captured fixtures say exactly what it
+looked like.
 
 Note the cadence: the source allows one page load every 30 seconds, so 30
 monitored stations fill the 15-minute target exactly and 674 would take about
