@@ -77,6 +77,19 @@ separate reasons, all fixed here.
 
 ### Fixed
 
+- **`release:verify` could not run on Windows, and could not have passed if it
+  had.** Two defects, both found by running the real release block on 2026-09-21
+  and both fatal to publishing, since `release:publish` runs verification first.
+  The script imported the verifier by filesystem path, and `join` on Windows
+  produces `C:\...`, which Node's ESM loader reads as the scheme `c:` and
+  rejects with `ERR_UNSUPPORTED_ESM_URL_SCHEME` — so the gate crashed before
+  doing anything, on the only platform this application ships on. Wrapped in
+  `pathToFileURL`. Separately, `--installed-version` defaulted to the literal
+  `0.0.1` while `release:prepare` defaults the supported floor to `0.1.0`, so
+  the upgrade check asked whether a version _below_ the release's own floor
+  could install it — false by construction, failing every release at its own
+  gate. It now defaults to the manifest's own `minimumSupportedAppVersion`,
+  which asks whether the oldest copy the release claims to support can take it.
 - **The way the collector introduced itself broke every page it opened.**
   Found on the second live run, 2026-09-21, after the timer fix above: the
   application collected nothing, every read recorded `timeout`, and the
