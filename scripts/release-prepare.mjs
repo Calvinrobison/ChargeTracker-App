@@ -22,6 +22,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
+import {
+  partitionArtifactsByVersion,
+  foreignArtifactFailure,
+} from './lib/release-artifacts.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
@@ -104,9 +109,21 @@ const artifacts = [];
 let updaterMetadataFileName = null;
 
 if (existsSync(releaseDir)) {
-  for (const name of readdirSync(releaseDir)) {
+  // Only files belonging to THIS version are signed into the manifest. A
+  // leftover installer from an earlier build used to be collected alongside
+  // the current one, and the version check then inspected whichever the
+  // directory listing returned first.
+  const artifactNames = readdirSync(releaseDir).filter((name) => {
     const path = join(releaseDir, name);
-    if (!statSync(path).isFile()) continue;
+    return statSync(path).isFile() && ARTIFACT_KINDS.some((c) => c.pattern.test(name));
+  });
+  const { belonging, foreign, unversioned } = partitionArtifactsByVersion(artifactNames, version);
+  if (foreign.length > 0) {
+    failures.push(foreignArtifactFailure(foreign, version, releaseDir));
+  }
+
+  for (const name of [...belonging, ...unversioned]) {
+    const path = join(releaseDir, name);
     const match = ARTIFACT_KINDS.find((candidate) => candidate.pattern.test(name));
     if (!match) continue;
 
@@ -133,11 +150,14 @@ if (existsSync(releaseDir)) {
 
   // The installer's name must contain the version, so a user can tell what
   // they downloaded and the manifest cannot be paired with the wrong file.
-  const installer = artifacts.find((artifact) => artifact.kind === 'installer');
-  if (installer && !installer.fileName.includes(version)) {
-    failures.push(
-      `The installer is named ${installer.fileName}, which does not contain ${version}.`,
-    );
+  // Partitioning above guarantees this for anything collected, so a failure
+  // here means an installer whose name carries no version at all.
+  for (const installer of artifacts.filter((artifact) => artifact.kind === 'installer')) {
+    if (!installer.fileName.includes(version)) {
+      failures.push(
+        `The installer is named ${installer.fileName}, which does not contain ${version}.`,
+      );
+    }
   }
 }
 

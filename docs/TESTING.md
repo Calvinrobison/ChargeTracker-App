@@ -5,7 +5,7 @@ What each suite covers, what none of them cover, and how to run them.
 The organising idea: the parts of ChargeWatch that must not be wrong — the
 metric contract, the SQL schema, the scheduler budget, the source parser, the
 update verifier and the display formatters — are testable **with nothing
-installed**. That was not a convenience; it is why 413 specs exist for a project
+installed**. That was not a convenience; it is why 532 specs exist for a project
 whose dependency tree went unresolved for most of its life.
 
 ---
@@ -14,14 +14,14 @@ whose dependency tree went unresolved for most of its life.
 
 | Suite                   | Command                                | Needs                        | Status           |
 | ----------------------- | -------------------------------------- | ---------------------------- | ---------------- |
-| No-dependency specs     | `npm run test:nodeps`                  | Node 22.12+                  | **413 passing**  |
-| Same specs under Vitest | `npm test`                             | the dependency tree          | **413 passing**  |
+| No-dependency specs     | `npm run test:nodeps`                  | Node 22.12+                  | **532 passing**  |
+| Same specs under Vitest | `npm test`                             | the dependency tree          | **532 passing**  |
 | Integration specs       | `npm test`                             | the dependency tree          | **none written** |
 | UI specs                | `npm run test:e2e`                     | Playwright, a built renderer | **42 passing**   |
 | Installed-build check   | `.\scripts\windows\test-installed.ps1` | Windows, a packaged build    | never run        |
 | Upgrade check           | `.\scripts\windows\test-update.ps1`    | Windows, two installers      | never run        |
 
-### `npm run test:nodeps` — 413 specs
+### `npm run test:nodeps` — 532 specs
 
 Runs on Node's built-in test runner using `--experimental-strip-types` and
 `node:sqlite`. No install, no network, no mock database: the schema under test
@@ -54,7 +54,7 @@ Vitest used to collect **zero** of those specs and fail: they register with
 `node:test`, which Vitest cannot see. `vitest.config.ts` now aliases `node:test`
 to `tests/support/node-test-shim.ts`, which re-exports the same names from
 Vitest, so one set of spec files satisfies both runners. `npm test` runs the
-same 413 specs and passes.
+same specs and passes.
 
 No integration specs exist yet. `passWithNoTests` is deliberately off, because a
 green run over zero tests is the most misleading result a suite can produce.

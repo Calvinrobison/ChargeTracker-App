@@ -26,10 +26,10 @@ is marked green because it looks right in the source.
 
 ```
 $ node scripts/test-nodeps.mjs
-Running 22 spec file(s) on Node 22.22.2
-# tests 454
-# suites 123
-# pass 454
+Running 28 spec file(s) on Node 22.22.2
+# tests 532
+# suites 143
+# pass 532
 # fail 0
 # cancelled 0
 # skipped 0
@@ -40,7 +40,7 @@ Running 22 spec file(s) on Node 22.22.2
 $ npm run typecheck     # tsconfig.node.json and tsconfig.web.json, no errors
 $ npm run lint          # eslint . --max-warnings=0, clean
 $ npm run format        # prettier --check ., clean
-$ npm test              # vitest run: the same 413 specs, all passing
+$ npm test              # vitest run: the same specs, all passing
 $ npm run build         # main, preload, renderer, out/workers/{database,collector}.js
 $ npm run test:e2e      # 42 passed (3 projects)
 ```
@@ -276,7 +276,7 @@ Other manual smoke runs, not part of the suite:
 | ~~`npm run lint`~~                       | **now run — clean** (after the eslint config fix below)          |
 | ~~`npm run format`~~                     | **now run — clean** (the tree was reformatted first)             |
 | ~~`npm run typecheck`~~                  | **now run on Windows and on Linux — clean.** Found two real bugs |
-| ~~`npm run test`~~ / `test:coverage`     | `npm test` **now run — 413 passing.** Coverage not run           |
+| ~~`npm run test`~~ / `test:coverage`     | `npm test` **now run — 532 passing.** Coverage not run           |
 | ~~`npm run test:e2e`~~                   | **now run — 42 passing**, in Chromium, not Electron              |
 | ~~`npm run build`~~ / `package:win`      | build **now run on Linux.** Packaging still needs a Windows host |
 | `npm run test:installed` / `test:update` | needs a Windows host and a built installer                       |
@@ -334,7 +334,7 @@ plain browser with a stub bridge and synthetic fixtures.
 | 19  | CI, release preparation, signing and artifact verification implemented     | **P (written)** / **NT (never run)** | `ci.yml` and `release.yml` are written; the release workflow keeps the signing key out of the job that runs the project build and stages a draft rather than publishing. Manifest signing and verification are implemented and tested. No workflow has ever executed — GitHub Actions cannot run from here.                                                                                                                                                                                                                                                                                                                          |
 | 20  | GitHub publication/discovery verified, or remaining setup reported         | **P (reported)**                     | Push is blocked — B6. The exact pending commands are in `HANDOFF.md`. No release is claimed to exist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 21  | Required docs, real screenshots, source notices and roadmap current        | **Partial**                          | Docs are written and current as of this commit. **No screenshots**: the only rendering so far is headless Chromium over synthetic fixtures, so there is nothing real to photograph; none were faked or mocked up.                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 22  | Relevant tests and bounded soak ran; failures/skips explicitly reported    | **Partial**                          | 413 specs ran and passed, under both Node's runner and Vitest, plus 42 UI specs. **No soak ran**: a soak needs a live source, which is blocked at item 4.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 22  | Relevant tests and bounded soak ran; failures/skips explicitly reported    | **Partial**                          | 532 specs ran and passed, under both Node's runner and Vitest, plus 42 UI specs. **No soak ran**: a soak needs a live source, which is blocked at item 4.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 23  | No production fake data, private credentials, test trust keys or paid core | **P**                                | No catalog data, no keys and no credentials in the tree. Test fixtures are labelled synthetic in `tests/fixtures/chargepoint/README.md` and in the header of `tests/ui/fixtures.ts`, and `scripts/verify-package.mjs` fails a package that contains anything from `tests/`. The Ed25519 key pair used for the pipeline run was deleted.                                                                                                                                                                                                                                                                                              |
 
 **Totals: 10 pass, 0 fail, 13 not-tested / blocked / partial.**
