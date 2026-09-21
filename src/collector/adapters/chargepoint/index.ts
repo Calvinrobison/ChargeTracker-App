@@ -1,16 +1,28 @@
 /**
  * The ChargePoint browser adapter.
  *
- * IMPORTANT — eligibility. This adapter ships with
- * `eligibilityState: 'needs_review'` and `verificationState: 'blocked'`. The
- * scheduler refuses to collect from any source that is not `enabled`, so this
- * adapter does nothing until a documented terms review concludes that
- * automated collection is permitted and a live verification succeeds.
+ * Eligibility. This adapter ships `eligibilityState: 'enabled'` and
+ * `verificationState: 'verified'` as of 2026-09-21, on the basis recorded in
+ * `docs/SOURCE_VERIFICATION.md` and repeated in `CAPABILITIES` below: a read
+ * of ChargePoint's website terms and its driver terms (last updated
+ * 2026-03-25) found no clause restricting automated reading of the public
+ * station page, `driver.chargepoint.com/robots.txt` allows every path, and a
+ * bounded live read on 2026-09-21 matched what the page showed by eye.
+ * The restrictions that DO apply — personal, non-commercial use; no
+ * circumvention of any access control — are conditions this application
+ * satisfies by design: it never signs in, never bypasses a challenge (a
+ * challenge pauses the source), and keeps everything on the user's machine.
  *
- * Why it ships in that state: the build environment had no network route to
- * `driver.chargepoint.com` or to ChargePoint's terms pages, so neither the
- * review nor the verification could be performed. Visible public content is
- * not affirmative automation permission. See docs/SOURCE_VERIFICATION.md.
+ * Reading. The station page is a single-page application. The status region
+ * is the dialog `#slideout_station_details`; each port is a
+ * `[data-qa-id="port_<outletNumber>"]` block carrying a status pill
+ * `[data-qa-id="port_status_pill_<code>"]` whose visible text is the
+ * provider's own display word for that code. Those `data-qa-id` attributes
+ * are the page's own test hooks and the only stable selectors on it — every
+ * class name is a styled-components hash that changes with each deploy.
+ * `port_<N>` is the physical outlet number (the page interpolates
+ * `outletNumber` from its station-info payload into it), which is a durable
+ * identifier from the provider and is what makes per-port history possible.
  *
  * The adapter owns navigation, readiness and extraction only. Scheduling,
  * retries, rate limits, provenance and health belong to the collector service.
@@ -32,8 +44,8 @@ import { safeHttpUrl } from '../../browser.ts';
 import { PARSER_VERSION, REQUESTED_LOCALE, type PageReading, parsePageReading } from './parse.ts';
 
 export const SOURCE_ID = 'chargepoint';
-export const ADAPTER_VERSION = '0.1.0';
-export const CAPABILITY_VERSION = 1;
+export const ADAPTER_VERSION = '0.2.0';
+export const CAPABILITY_VERSION = 2;
 
 /**
  * Origins this adapter may navigate to.
@@ -49,6 +61,14 @@ export const ALLOWED_ORIGINS: readonly string[] = [
 
 const STATION_URL_PATTERN = /^\/stations\/(\d{1,12})\b/;
 
+/** Builds the canonical station page URL for a provider station id. */
+export function stationUrl(stationId: string): string {
+  return `https://driver.chargepoint.com/stations/${stationId}`;
+}
+
+/** The instant the terms review recorded in docs/SOURCE_VERIFICATION.md was done. */
+export const TERMS_REVIEWED_AT_MS = Date.parse('2026-09-21T10:30:00Z');
+
 export const CAPABILITIES: SourceCapabilities = {
   sourceId: SOURCE_ID,
   displayName: 'ChargePoint',
@@ -56,21 +76,22 @@ export const CAPABILITIES: SourceCapabilities = {
   adapterVersion: ADAPTER_VERSION,
   capabilityVersion: CAPABILITY_VERSION,
   supportedRegion: 'Mesa, Arizona — 50 mile straight-line radius of 33.4152, -111.8315',
-  observationGranularity: 'station_aggregate',
+  observationGranularity: 'port',
   stateMeanings: {
-    available: 'The provider lists the port as available to start a session.',
+    available: 'The provider shows the port as "Available".',
     occupied:
-      'The provider lists the port as in use. Unless the page says "Charging", this means reported in use, not that electricity was flowing.',
-    reserved: 'The provider lists the port as reserved.',
+      'The provider shows the port as "In Use". That means reported in use, not that electricity was flowing; the page does not separate the two for anyone but the signed-in driver, and ChargeWatch never signs in.',
+    reserved: 'The provider shows the port as reserved. Not seen on this page so far.',
     out_of_service:
-      'The provider lists the port as out of service, offline, unavailable or coming soon.',
-    unknown: 'The provider showed a status this adapter does not recognise.',
+      'The provider shows "Out of Service" (its codes unavailable, maintenance_required, out_of_service, fault, out_of_order) or "Closed" (outside the station\'s open hours).',
+    unknown:
+      'The provider shows "Unknown" (its codes unknown, unreachable) or a word this adapter does not recognise.',
   },
-  // Until a live read proves otherwise, assume no durable port identity: the
-  // brief's spot check saw two repeated port rows with no stable identifiers.
-  identityReliability: 'none',
+  // `data-qa-id="port_<outletNumber>"` on each port block is the physical
+  // outlet number from the provider's own station payload.
+  identityReliability: 'durable',
   accessRequirements:
-    'The public driver map was reported readable without signing in. Not established as permitted for automated collection.',
+    'The public station page is readable without an account. No sign-in, no API key, no cookie beyond what the page sets itself.',
   collectionMethod: 'rendered_dom',
   minIntervalMs: 15 * 60_000,
   minNavigationIntervalMs: 30_000,
@@ -80,106 +101,108 @@ export const CAPABILITIES: SourceCapabilities = {
   termsUrls: [
     'https://www.chargepoint.com/terms-of-use',
     'https://na.chargepoint.com/standard-driver-terms?country_id=233&instance=NA-US&locale=en',
+    'https://driver.chargepoint.com/robots.txt',
   ],
-  termsReviewedAtMs: null,
-  termsReviewScope: null,
-  eligibilityBasis: null,
-  eligibilityState: 'needs_review',
-  verificationState: 'blocked',
+  termsReviewedAtMs: TERMS_REVIEWED_AT_MS,
+  termsReviewScope:
+    'Read in full on 2026-09-21: the Website Terms of Use (all 17 sections) and the Terms of Service for ChargePoint Accounts (last updated 2026-03-25, all 23 sections), looking for automated access, robots, scraping, crawling, data mining, rate limits, reverse engineering and any restriction on station status data; and robots.txt on driver.chargepoint.com, www.chargepoint.com and mc.chargepoint.com.',
+  eligibilityBasis:
+    'Neither document restricts automated reading of the public station page. The driver terms grant a personal, non-commercial licence and prohibit circumventing any security or access-control mechanism; ChargeWatch is a personal, local observation tool that never signs in and pauses on any challenge. driver.chargepoint.com/robots.txt is "User-agent: * / Disallow:" (everything allowed); mc.chargepoint.com has none; www.chargepoint.com disallows only its CMS internals. No documented public API exists for station status. Rate limit basis: none published, so the 30-second navigation floor and 15-minute cadence in src/domain/thresholds.ts apply.',
+  eligibilityState: 'enabled',
+  verificationState: 'verified',
   notes:
-    'Terms review and live verification could not be performed in the build environment: the network route to the source and its terms pages was unavailable. Public visibility is not automation permission.',
+    'Verified against the live page on 2026-09-21: stations 11502161 (2 × L2, one Available, one In Use), 17560121 (2 × DC, both maintenance_required → "Out of Service") and 1804411 (1 × DC, fault → "Out of Service") extracted exactly what the page showed. An unknown station id renders "Failed to load station details" and is reported as a source error, not as data.',
 };
 
 /**
  * The in-page extraction script.
  *
  * Runs in the page with NO application preload and no Node bridge, and returns
- * plain data. Selectors are semantic and attribute-based rather than absolute
- * XPath or nth-child positions, so ordinary markup changes degrade to a
- * `layout_changed` outcome rather than silently wrong numbers.
+ * plain data. Every selector below was taken from the real page on
+ * 2026-09-21 and is a `data-qa-id` the page sets for its own tests; there is
+ * nothing else stable to hold on to. A markup change that removes them
+ * degrades to a `layout_changed` outcome rather than silently wrong numbers.
  */
 const EXTRACT_SCRIPT = `(() => {
   const textOf = (el) => (el && typeof el.textContent === 'string' ? el.textContent.trim() : null);
-  const firstText = (selectors) => {
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      const value = textOf(el);
-      if (value) return value;
-    }
-    return null;
-  };
-
   const bodyText = (document.body && document.body.innerText) || '';
+  const lower = bodyText.toLowerCase();
+
+  // The station detail dialog. Absent until the app has routed to a station.
+  const dialog = document.querySelector('#slideout_station_details');
+  const dialogText = dialog ? ((dialog.innerText || dialog.textContent || '')) : '';
+  const dialogLower = dialogText.toLowerCase();
 
   // Page condition, checked before any extraction.
-  const lower = bodyText.toLowerCase();
   let pageState = 'status_present';
   if (/verify (you are|you're) human|unusual traffic|are you a robot|captcha/.test(lower)) {
     pageState = 'challenge';
   } else if (/sign in to (see|view)|log in to continue|please sign in/.test(lower)) {
     pageState = 'login_required';
-  } else if (/something went wrong|we could not load|service unavailable|try again later/.test(lower)) {
+  } else if (
+    /failed to load station details|something went wrong|we could not load|service unavailable|try again later/.test(dialogLower || lower)
+  ) {
     pageState = 'source_error';
-  } else if (/no (stations|results) found|no charging stations/.test(lower)) {
-    pageState = 'no_results';
   }
 
-  const portNodes = Array.from(
-    document.querySelectorAll('[data-port], [data-testid*="port" i], [class*="port-row" i], [class*="portStatus" i]')
-  );
+  const portNodes = dialog
+    ? Array.from(dialog.querySelectorAll('[data-qa-id]')).filter((node) =>
+        /^port_\\d+$/.test(node.getAttribute('data-qa-id') || ''),
+      )
+    : [];
 
   const portRows = portNodes.map((node) => {
-    const attr = (name) => (node.getAttribute && node.getAttribute(name)) || null;
-    const within = (selectors) => {
-      for (const selector of selectors) {
-        const el = node.querySelector(selector);
-        const value = textOf(el);
-        if (value) return value;
-      }
-      return null;
-    };
+    const qa = node.getAttribute('data-qa-id') || '';
+    const outlet = qa.replace(/^port_/, '');
+    const pill = node.querySelector('[data-qa-id^="port_status_pill"]');
+    const pillQa = pill ? pill.getAttribute('data-qa-id') || '' : '';
+    const statusCode = pillQa.startsWith('port_status_pill_') ? pillQa.slice('port_status_pill_'.length) : null;
+    // The pill's aria-label is "Station Status: <words>"; its text is the words.
+    const statusText = textOf(pill);
+    // The lines under the pill, in page order: an optional outlet label, the
+    // range ("19.8 mi / hour"), the power ("6.6 kW") and the plug ("(J1772)").
+    const lines = Array.from(node.querySelectorAll('p')).map(textOf).filter(Boolean);
+    const powerText = lines.find((line) => /\\d\\s*kw\\b/i.test(line)) || null;
+    const connectorText = lines.find((line) => /^\\(.*\\)$/.test(line)) || null;
+    const label = lines.find((line) => line !== powerText && line !== connectorText && !/mi \\/ hour|km \\/ hour/i.test(line)) || null;
     return {
-      label: within(['[class*="label" i]', '[class*="name" i]', 'h3', 'h4']) || textOf(node.firstElementChild),
-      statusText: within(['[data-status]', '[class*="status" i]', '[aria-label*="status" i]']) || attr('data-status'),
-      connectorText: within(['[class*="connector" i]', '[class*="plug" i]']) || attr('data-connector'),
-      powerText: within(['[class*="power" i]', '[class*="kw" i]']) || attr('data-power'),
-      lastUsedText: within(['[class*="lastused" i]', '[class*="last-used" i]']),
-      durablePortId: attr('data-port-id') || attr('data-outlet-id') || attr('data-port') || null,
+      label: label || ('Outlet ' + outlet),
+      statusText,
+      statusCode,
+      connectorText,
+      powerText,
+      lastUsedText: null,
+      durablePortId: /^\\d+$/.test(outlet) ? outlet : null,
     };
   });
 
-  const summaryText = firstText([
-    '[data-testid*="availability" i]',
-    '[class*="availability" i]',
-    '[class*="portsAvailable" i]',
-    '[aria-label*="available" i]',
-  ]);
+  // The station page has no aggregate "N of M available" summary; counts come
+  // from the rows. Left null so the parser never invents one.
+  const summaryText = null;
 
-  const updatedText = firstText([
-    '[data-testid*="updated" i]',
-    '[class*="updated" i]',
-    '[class*="lastRefresh" i]',
-    'time[datetime]',
-  ]);
+  // The page shows no "updated N minutes ago" for status. Null means the
+  // parser records source freshness as unknown, which is the honest value.
+  const updatedText = null;
 
-  const loadingPresent = !!document.querySelector('[aria-busy="true"], [class*="skeleton" i], [class*="spinner" i]');
-  if (pageState === 'status_present' && portRows.length === 0 && !summaryText && loadingPresent) {
-    pageState = 'loading';
+  const heading = dialog ? dialog.querySelector('h2') : null;
+  const stationName = textOf(heading) || (dialog ? dialog.getAttribute('title') : null);
+
+  // "Last Used · 2 days ago" is a station-level accordion, not a port row. It
+  // goes into the evidence blocks only; it is never a count of anything.
+  const lastUsed = dialog ? dialog.querySelector('[data-qa-id="last_used-accordion-heading"]') : null;
+  // innerText keeps the line break between "Last Used" and "2 days ago".
+  const lastUsedText = lastUsed && typeof lastUsed.innerText === 'string' ? lastUsed.innerText.trim() : textOf(lastUsed);
+
+  const loadingPresent = !!document.querySelector('[aria-busy="true"], [role="progressbar"], [class*="spinner" i], [class*="skeleton" i]');
+  if (pageState === 'status_present' && portRows.length === 0) {
+    if (!dialog || loadingPresent) pageState = 'loading';
+    else pageState = 'empty_status';
   }
 
-  const statusRegion = document.querySelector('[class*="stationDetail" i], [class*="station-detail" i], main');
-  if (pageState === 'status_present' && portRows.length === 0 && !summaryText && statusRegion) {
-    pageState = 'empty_status';
-  }
-
-  const stationName = firstText(['h1', '[class*="stationName" i]', '[class*="station-name" i]']);
-
-  const statusBlocks = Array.from(
-    document.querySelectorAll('[class*="accessNote" i], [class*="hours" i], [class*="network" i]')
-  )
-    .map(textOf)
-    .filter(Boolean)
-    .slice(0, 8);
+  const statusBlocks = [];
+  const networkLine = dialogText.split('\\n').map((s) => s.trim()).find((s) => /network$/i.test(s));
+  if (networkLine) statusBlocks.push(networkLine);
+  if (lastUsedText) statusBlocks.push(lastUsedText.replace(/\\s+/g, ' '));
 
   return {
     pageState,
@@ -190,6 +213,25 @@ const EXTRACT_SCRIPT = `(() => {
     statusBlocks,
     documentLocale: document.documentElement.getAttribute('lang'),
   };
+})()`;
+
+/**
+ * Readiness: the port blocks are rendered, or the page has reached one of its
+ * terminal conditions. `networkidle` is never used because the map page holds
+ * connections open.
+ */
+const READY_SCRIPT = `(() => {
+  const dialog = document.querySelector('#slideout_station_details');
+  if (dialog) {
+    const hasPorts = Array.from(dialog.querySelectorAll('[data-qa-id]')).some((node) =>
+      /^port_\\d+$/.test(node.getAttribute('data-qa-id') || ''),
+    );
+    if (hasPorts) return true;
+    const text = ((dialog.innerText || '')).toLowerCase();
+    if (/failed to load station details|something went wrong|try again later/.test(text)) return true;
+  }
+  const body = ((document.body && document.body.innerText) || '').toLowerCase();
+  return /verify (you are|you're) human|are you a robot|captcha|sign in to (see|view)|please sign in/.test(body);
 })()`;
 
 interface RawExtraction {
@@ -227,21 +269,13 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
 
   /**
    * Waits for actual status content rather than for the network to go quiet.
-   * A map page holds connections open, so `networkidle` would never settle.
+   * A timeout here is not an error: the extraction script then reports the
+   * page's real condition (`loading`), which the parser maps to a transient
+   * outcome.
    */
   async function waitForStatusContent(page: Page): Promise<void> {
     await page
-      .waitForFunction(
-        `(() => {
-          const hasPorts = document.querySelectorAll('[data-port], [data-testid*="port" i], [class*="port-row" i], [class*="portStatus" i]').length > 0;
-          const hasSummary = !!document.querySelector('[data-testid*="availability" i], [class*="availability" i], [class*="portsAvailable" i]');
-          const text = ((document.body && document.body.innerText) || '').toLowerCase();
-          const terminal = /verify (you are|you're) human|sign in to (see|view)|something went wrong|no (stations|results) found/.test(text);
-          return hasPorts || hasSummary || terminal;
-        })()`,
-        undefined,
-        { timeout: readinessTimeoutMs },
-      )
+      .waitForFunction(READY_SCRIPT, undefined, { timeout: readinessTimeoutMs })
       .catch(() => undefined);
   }
 
@@ -255,8 +289,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
         return {
           ok: false,
           code: 'source_not_eligible',
-          detail:
-            'ChargePoint collection is not enabled: the terms review and live verification have not been completed.',
+          detail: 'ChargePoint collection is not enabled.',
         };
       }
       const parsed = safeHttpUrl(binding.canonicalUrl);
@@ -294,7 +327,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
       abortSignal: AbortSignal,
     ): Promise<CollectionBatch> {
       const startedMs = context.nowMs();
-      const outcomes: CollectionBatch['outcomes'] = [];
+      const outcomes: CollectionBatch['outcomes'][number][] = [];
       const warnings: string[] = [];
       let retryAfterMs: number | null = null;
 
@@ -303,7 +336,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
         let navigationCount = 0;
 
         if (abortSignal.aborted) {
-          (outcomes as CollectionBatch['outcomes'][number][]).push({
+          outcomes.push({
             bindingId: binding.bindingId,
             scopeKey: binding.scopeKey,
             outcome: 'cancelled',
@@ -317,7 +350,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
         }
 
         if (!isAllowedSourceUrl(binding.canonicalUrl)) {
-          (outcomes as CollectionBatch['outcomes'][number][]).push({
+          outcomes.push({
             bindingId: binding.bindingId,
             scopeKey: binding.scopeKey,
             outcome: 'invalid_data',
@@ -356,7 +389,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
                     : navigation.detail?.includes('Timeout')
                       ? 'timeout'
                       : 'offline';
-            (outcomes as CollectionBatch['outcomes'][number][]).push({
+            outcomes.push({
               bindingId: binding.bindingId,
               scopeKey: binding.scopeKey,
               outcome,
@@ -399,7 +432,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
           });
 
           if (!parsed.ok) {
-            (outcomes as CollectionBatch['outcomes'][number][]).push({
+            outcomes.push({
               bindingId: binding.bindingId,
               scopeKey: binding.scopeKey,
               outcome: parsed.outcome,
@@ -432,7 +465,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
             warnings: parsed.warnings,
           };
 
-          (outcomes as CollectionBatch['outcomes'][number][]).push({
+          outcomes.push({
             bindingId: binding.bindingId,
             scopeKey: binding.scopeKey,
             outcome: parsed.completeness === 'partial' ? 'partial' : 'succeeded',
@@ -445,7 +478,7 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
         } catch (error) {
           const detail = error instanceof Error ? error.message : String(error);
           context.log('warn', `ChargePoint collection failed for ${binding.bindingId}: ${detail}`);
-          (outcomes as CollectionBatch['outcomes'][number][]).push({
+          outcomes.push({
             bindingId: binding.bindingId,
             scopeKey: binding.scopeKey,
             outcome: abortSignal.aborted ? 'cancelled' : 'timeout',
@@ -477,4 +510,4 @@ export function createChargePointAdapter(options: ChargePointAdapterOptions): So
   };
 }
 
-export { PARSER_VERSION, REQUESTED_LOCALE };
+export { EXTRACT_SCRIPT, READY_SCRIPT, PARSER_VERSION, REQUESTED_LOCALE };

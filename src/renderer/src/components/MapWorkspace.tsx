@@ -42,6 +42,9 @@ export interface MapWorkspaceProps {
   readonly onExportStation: (siteId: string) => void;
   readonly onAddVisitCounts: (siteId: string) => void;
   readonly onImportVisitCsv: () => void;
+  readonly onSetMonitored: (siteId: string, enabled: boolean) => void;
+  readonly onAddLink: (siteId: string, url: string) => void;
+  readonly busy: boolean;
   readonly onOpenSourceDetails: () => void;
   readonly onRetrySource: () => void;
   readonly retrying: boolean;
@@ -257,6 +260,12 @@ export function MapWorkspace(props: MapWorkspaceProps): ReactNode {
         <StationDrawer
           detail={detail}
           timeZone={props.bootstrap.studyArea.timeZone}
+          sourceEnabled={props.sources.some(
+            (source) =>
+              source.eligibilityState === 'enabled' &&
+              (detail.source.sourceId === null || source.sourceId === detail.source.sourceId),
+          )}
+          busy={props.busy}
           onClose={() => dispatch({ type: 'selectStation', id: null })}
           // `detail` is captured, not read through props inside the callback.
           // A callback runs after the render that created it, by which point
@@ -267,6 +276,8 @@ export function MapWorkspace(props: MapWorkspaceProps): ReactNode {
           onExportStation={() => props.onExportStation(selected)}
           onAddVisitCounts={() => props.onAddVisitCounts(selected)}
           onImportVisitCsv={props.onImportVisitCsv}
+          onSetMonitored={(enabled) => props.onSetMonitored(selected, enabled)}
+          onAddLink={(url) => props.onAddLink(selected, url)}
         />
       ) : null}
     </div>

@@ -246,14 +246,17 @@ if ($browserExe) {
     "no chrome.exe under $installRoot\resources\browser"
 }
 
-$nativeSqlite = Get-ChildItem -Path (Join-Path $installRoot 'resources\app.asar.unpacked') `
-  -Filter '*.node' -Recurse -File -ErrorAction SilentlyContinue |
-  Where-Object { $_.Name -match 'better[_-]?sqlite3' } | Select-Object -First 1
-if ($nativeSqlite) {
-  Add-Result 'native SQLite module unpacked' 'PASS' $nativeSqlite.FullName
+# SQLite comes from node:sqlite (ADR-0003), so there must be NO native module
+# to unpack. This check used to assert the opposite - a better_sqlite3 .node
+# under app.asar.unpacked - and failed every build since the driver changed,
+# which made the gate red for a reason that was not a defect.
+$nativeModule = Get-ChildItem -Path (Join-Path $installRoot 'resources\app.asar.unpacked') `
+  -Filter '*.node' -Recurse -File -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($nativeModule) {
+  Add-Result 'no native module shipped' 'FAIL' `
+    "$($nativeModule.FullName) - SQLite is node:sqlite; a native module here means the packaging regressed"
 } else {
-  Add-Result 'native SQLite module unpacked' 'FAIL' `
-    'no better_sqlite3 .node under resources\app.asar.unpacked - it cannot be loaded from inside the archive'
+  Add-Result 'no native module shipped' 'PASS' 'SQLite comes from node:sqlite; nothing under app.asar.unpacked'
 }
 
 # --------------------------------------------------------------- the self-check
@@ -278,6 +281,10 @@ try {
   $run = Start-Process -FilePath $exePath `
     -ArgumentList @("--self-check=$reportPath") `
     -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+  # Touching the handle before the process exits is what makes .ExitCode
+  # readable afterwards; without it PowerShell reports an empty exit code and
+  # the "exit code agrees with the report" check failed on a passing run.
+  $null = $run.Handle
 
   # Generous: a first run migrates the database and starts Chromium.
   if (-not $run.WaitForExit(180000)) {

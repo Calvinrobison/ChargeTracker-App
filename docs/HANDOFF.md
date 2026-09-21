@@ -158,8 +158,8 @@ a third should not be offered without evidence.
 ### Still open - the thing under all of it (`I0c`)
 
 432 MB of the payload is a complete second Chromium, shipped beside the one
-already inside Electron, for a collector that **cannot currently run** because
-no source is cleared for collection (`docs/SOURCES.md`). It is most of the
+already inside Electron. Since 2026-09-21 the collector can run — ChargePoint is
+cleared (`docs/SOURCES.md`) — so this is now a size question. It is most of the
 installer's size. Whether to keep bundling it, drive collection through
 Electron's own browser, or fetch it on first use is a product decision nobody
 has made.
@@ -293,23 +293,26 @@ Mesa, built by `catalog:refresh` from the AFDC Arizona export
 mapping and the counts: 1652 rows considered, 1083 accepted, 99 non-public, 470
 outside the radius, 0 with bad coordinates).
 
-Because no source is cleared for collection, this catalog is currently the
-entire product: the map of where chargers are. Every occupancy figure is empty
-by design. `tests/nodeps/catalog-shipped.test.ts` covers the shipped file
+Until 2026-09-21 no source was cleared for collection and this catalog was the
+entire product; occupancy figures fill in once locations are linked and
+monitored (`docs/SOURCES.md`, "How locations get linked"). `tests/nodeps/catalog-shipped.test.ts` covers the shipped file
 rather than the refresh script - recomputing every distance with the
 application's own `distanceMiles`, refusing any live-state field on a catalog
 row, and reconciling the provenance counts - because a wrong row here is not
 cosmetic.
 
-### No source is cleared for collection
+### ChargePoint is cleared for collection (2026-09-21)
 
-The ChargePoint adapter ships `eligibilityState: 'needs_review'` and
-`verificationState: 'blocked'`, and the application surfaces that state on the
-onboarding screen and in a banner rather than hiding it. Neither the provider's
-terms nor its status pages were reachable, so nothing could be established.
-`docs/SOURCE_VERIFICATION.md` is the process. It may conclude the source is
-ineligible; that is a real outcome, and the honest thing is then to say so in
-`docs/SOURCES.md` rather than collect anyway.
+The adapter shipped `needs_review` / `blocked` until 2026-09-21 because neither
+the provider's terms nor its pages were reachable from the build sandbox. Both
+have now been read from a real machine, a bounded live read matched by eye,
+and the adapter is `enabled` / `verified`; the review is
+`docs/SOURCE_VERIFICATION.md`. The adapter was also rewritten against the
+real page, because the original selectors matched nothing on it. Collection
+cycles have since run inside the packaged application; they found two defects
+(the cycle timer not re-arming, and an `X-Requested-With` header that broke
+the page it was sent to), both fixed and covered by specs. What has not yet
+happened is a successful observation written by the installed build.
 
 ### GitHub Actions are pinned to tags, not commit SHAs
 

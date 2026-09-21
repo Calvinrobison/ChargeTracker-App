@@ -602,6 +602,70 @@ describe('catalog matching', () => {
     assert.equal(chooseAutomaticMatch(proposals), null);
   });
 
+  test('an exact provider name at the same spot on the same network auto-confirms', () => {
+    const proposals = proposeMatches(
+      {
+        sourceStationId: null,
+        name: 'Banner Health Baywood 1',
+        network: 'ChargePoint',
+        normalizedAddress: normalizeAddress('6644 E Baywood Ave, Mesa, AZ'),
+        coordinate: { latitude: 33.3892, longitude: -111.6997 },
+      },
+      candidates.map((c) => ({ ...c, sourceStationId: null })),
+    );
+    const auto = chooseAutomaticMatch(proposals);
+    assert.equal(auto?.siteId, 'site-b');
+    assert.equal(auto?.basis, 'coordinates_and_name');
+    assert.equal(auto?.disposition, 'confirmed');
+    assert.ok(auto?.reasons.some((r) => /exact provider name/.test(r)));
+    // The sibling bank at the same address is proposed, never confirmed.
+    const sibling = proposals.find((p) => p.siteId === 'site-a');
+    assert.equal(sibling?.disposition, 'proposed');
+  });
+
+  test('"BAYWOOD 1" and "BAYWOOD 2" are different names even though their tokens agree', () => {
+    // Token overlap ignores single-character tokens, so these two score 1.0
+    // on similarity. Exactness is what keeps them apart.
+    const proposals = proposeMatches(
+      {
+        sourceStationId: null,
+        name: 'BANNER HEALTH BAYWOOD 2',
+        network: 'ChargePoint',
+        normalizedAddress: normalizeAddress('6644 E Baywood Ave, Mesa, AZ'),
+        coordinate: { latitude: 33.3891, longitude: -111.6996 },
+      },
+      candidates.map((c) => ({ ...c, sourceStationId: null })),
+    );
+    assert.equal(chooseAutomaticMatch(proposals)?.siteId, 'site-a');
+    assert.equal(proposals.filter((p) => p.disposition === 'confirmed').length, 1);
+  });
+
+  test('an exact name on a different network or far away is only a proposal', () => {
+    const farAway = proposeMatches(
+      {
+        sourceStationId: null,
+        name: 'Banner Health Baywood 1',
+        network: 'ChargePoint',
+        normalizedAddress: null,
+        coordinate: { latitude: 33.4, longitude: -111.7 },
+      },
+      candidates.map((c) => ({ ...c, sourceStationId: null })),
+    );
+    assert.equal(chooseAutomaticMatch(farAway), null);
+
+    const otherNetwork = proposeMatches(
+      {
+        sourceStationId: null,
+        name: 'Banner Health Baywood 1',
+        network: 'Blink',
+        normalizedAddress: null,
+        coordinate: { latitude: 33.3892, longitude: -111.6997 },
+      },
+      candidates.map((c) => ({ ...c, sourceStationId: null })),
+    );
+    assert.equal(chooseAutomaticMatch(otherNetwork), null);
+  });
+
   test('two equally confident candidates are an ambiguity, not a coin flip', () => {
     const ambiguous = proposeMatches(
       {
