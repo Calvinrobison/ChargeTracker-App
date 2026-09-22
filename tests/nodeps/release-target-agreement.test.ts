@@ -43,7 +43,7 @@ describe('every declaration of the release repository agrees', () => {
   const publishDefault = capture(
     publishScript,
     /arg\('repo',\s*'([^']+)'\)/,
-    "release-publish.mjs --repo default",
+    'release-publish.mjs --repo default',
   );
 
   it('electron-builder and the application name the same repository', () => {
