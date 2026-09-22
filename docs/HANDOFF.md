@@ -240,10 +240,11 @@ npm run test:e2e
 ```
 
 `npm run build` succeeds on Linux: main, preload, renderer and both worker
-bundles (`out/workers/database.js`, `out/workers/collector.js`). The 42 UI specs
-in `tests/ui/honesty.spec.ts` now pass, across three Playwright projects, in
-plain Chromium against the built renderer — **not** under Electron. The first
-run needed three corrections, all in the specs rather than the application.
+bundles (`out/workers/database.js`, `out/workers/collector.js`). The 21 UI specs
+in `tests/ui/honesty.spec.ts` now pass, across three Playwright projects — 63
+runs — in plain Chromium against the built renderer, on Windows and on Linux,
+but **not** under Electron. The first run needed three corrections, all in the
+specs rather than the application.
 **Correct the selector, not the assertion** — the assertions are the point, and
 each one guards a specific way the interface could mislead someone.
 

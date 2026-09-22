@@ -6,11 +6,11 @@
  * measurement, reports a partial window as partial, and does not describe
  * inferred activity as a recorded charging session.
  *
- * 42 of these have been executed: all 42 pass against the built renderer in
- * Chromium, across the three projects in playwright.config.ts. The five at the
- * end of this file, covering the stall filters and the disputed-capacity
- * marking, have NOT been run and are labelled where they start. The first run
- * needed the selector corrections its author expected — a locator that matched
+ * These have now been executed: 21 specs across the three projects in
+ * playwright.config.ts, 63 runs, all passing against the built renderer in
+ * Chromium. (Earlier documents said "42 passing", which was a stale figure —
+ * this file held 16 specs, not 14, before the five below were added.) The
+ * first run needed the selector corrections its author expected — a locator that matched
  * a hidden <select> option, an assertion that the basemap tiles are not
  * requested on the opening view, and a second installBridge that tried to
  * redefine the frozen bridge — each fixed in the spec or the stub, not by
@@ -278,12 +278,10 @@ test.describe('monitoring is a stated switch, not an implied state', () => {
 });
 
 /**
- * The five specs below have NOT been executed. Playwright cannot run in the
- * environment they were written in, and the repository's own record is that
- * every UI spec written against the source rather than against a running page
- * needed correcting on its first run. Treat them as unverified until
- * `npm run test:e2e` has been run on Windows; if a selector is wrong, correct
- * the selector, not the assertion.
+ * The five specs below were written without Playwright available, and so were
+ * unverified when first committed. They have since been run on Windows and all
+ * five pass, on the first attempt and with no selector corrected — which is
+ * worth recording precisely because the earlier batch needed three.
  */
 
 test.describe('a capacity the sources disagree about is marked, not resolved', () => {

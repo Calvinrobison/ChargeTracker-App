@@ -13,8 +13,8 @@ preserve.
 **Schema version**: 1
 **Test count**: 538 specs / 148 suites, all passing, via `npm run test:nodeps` —
 on Linux with Node 22.22.2 and on Windows 11 x64 with Node 24.19.0. The same
-specs pass under Vitest via `npm test`, and 42 UI specs run against the built
-renderer in Chromium.
+specs pass under Vitest via `npm test`, and 21 UI specs run against the built
+renderer in Chromium across three projects (63 runs), on Windows and on Linux.
 
 A caution that belongs beside that number rather than in a footnote: **every
 defect found since this application was first packaged was covered by specs
@@ -204,8 +204,8 @@ correctly refuses a backup on a driver without online-backup support), but never
 under Electron with better-sqlite3.
 
 `src/renderer/` and `tests/ui/` have come off this list. `npm run build`
-succeeds (main, preload, renderer and both worker bundles) and the 42 UI specs
-pass against the built renderer in Chromium. That is Chromium with a stub
+succeeds (main, preload, renderer and both worker bundles) and the 21 UI specs
+pass against the built renderer in Chromium, 63 runs across three projects. That is Chromium with a stub
 bridge and synthetic fixtures — **not** Electron, no database, no collection.
 
 ---

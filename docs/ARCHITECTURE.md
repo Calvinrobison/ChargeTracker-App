@@ -540,7 +540,8 @@ nothing has run them:
   build and typecheck; nothing has forked them.
 
 The renderer under `src/renderer/` is no longer on that list: it builds, and the
-42 UI specs under `tests/ui/` pass against `out/renderer/` in Chromium. That is
+21 UI specs under `tests/ui/` pass against `out/renderer/` in Chromium, 63 runs
+across three projects. That is
 a browser with a stub bridge and synthetic fixtures — no Electron, no database,
 no network — so it establishes the honesty rules on screen and nothing about
 the application as installed.

@@ -12,14 +12,14 @@ whose dependency tree went unresolved for most of its life.
 
 ## The suites
 
-| Suite                   | Command                                | Needs                        | Status                      |
-| ----------------------- | -------------------------------------- | ---------------------------- | --------------------------- |
-| No-dependency specs     | `npm run test:nodeps`                  | Node 22.12+                  | **538 passing**             |
-| Same specs under Vitest | `npm test`                             | the dependency tree          | **538 passing**             |
-| Integration specs       | `npm test`                             | the dependency tree          | **none written**            |
-| UI specs                | `npm run test:e2e`                     | Playwright, a built renderer | **42 passing, 5 never run** |
-| Installed-build check   | `.\scripts\windows\test-installed.ps1` | Windows, a packaged build    | never run                   |
-| Upgrade check           | `.\scripts\windows\test-update.ps1`    | Windows, two installers      | never run                   |
+| Suite                   | Command                                | Needs                        | Status           |
+| ----------------------- | -------------------------------------- | ---------------------------- | ---------------- |
+| No-dependency specs     | `npm run test:nodeps`                  | Node 22.12+                  | **538 passing**  |
+| Same specs under Vitest | `npm test`                             | the dependency tree          | **538 passing**  |
+| Integration specs       | `npm test`                             | the dependency tree          | **none written** |
+| UI specs                | `npm run test:e2e`                     | Playwright, a built renderer | **63 passing**   |
+| Installed-build check   | `.\scripts\windows\test-installed.ps1` | Windows, a packaged build    | never run        |
+| Upgrade check           | `.\scripts\windows\test-update.ps1`    | Windows, two installers      | never run        |
 
 ### `npm run test:nodeps` — 538 specs
 
@@ -64,7 +64,7 @@ What belongs there: anything needing `better-sqlite3` under the Electron ABI,
 `electron-updater`, or the real Playwright browser API. Those are precisely the
 modules `docs/VERIFICATION_REPORT.md` lists as written-but-never-executed.
 
-### `npm run test:e2e` — 47 UI specs, 42 of them executed
+### `npm run test:e2e` — 21 specs, 63 runs
 
 Loads the **built** renderer bundle in Chromium with a stub preload bridge that
 answers from `tests/ui/fixtures.ts`. No Electron, no database, no network.
@@ -81,19 +81,29 @@ npm run test:e2e
 npm run test:e2e:ui    # interactive
 ```
 
-**All 42 pass**, across three projects (`desktop-dark`, `desktop-light`,
-`narrow`), in Chromium on Linux. `playwright.config.ts` takes an optional
-`CHARGEWATCH_CHROMIUM` environment variable pointing at a preinstalled Chromium
-if you do not want Playwright to download one.
+**All 63 pass** — 21 specs run across three projects (`desktop-dark`,
+`desktop-light`, `narrow`) — in Chromium, on Windows and on Linux.
+`playwright.config.ts` takes an optional `CHARGEWATCH_CHROMIUM` environment
+variable pointing at a preinstalled Chromium if you do not want Playwright to
+download one.
 
-**Five more have never been run.** They cover the disputed-capacity marking and
-the availability filter's disclosure, and they are labelled as unverified where
-they begin in `tests/ui/honesty.spec.ts`. They were written in an environment
-where Playwright could not be installed — which is exactly the situation that
-produced this suite's three first-run selector corrections, so assume they need
-the same treatment. Run `npm run test:e2e` on Windows before the next release
-and correct the selectors, not the assertions. Until then the honest count for
-this suite is 42, not 47.
+Two corrections worth keeping, because both were figures this document stated
+confidently and got wrong:
+
+- **"42 passing" was stale.** Before the stall filters were added this file
+  held 16 specs, not 14, so the run was 48 and not 42. The number had been
+  copied forward past the change that invalidated it — which is the failure
+  mode `docs/ARCHITECTURE.md` already records for the no-dependency count. The
+  runner's output is the authority; a count in prose is stale the moment a spec
+  is added.
+- **The five specs for the stall filters were committed unverified**, because
+  Playwright could not be installed where they were written, and this document
+  and the spec file both said so rather than counting them as passing. They
+  have since been run and all five pass — on the first attempt, with no
+  selector corrected. That is the exception, not the rule: the earlier batch
+  needed three corrections on its first run, so a spec written against source
+  rather than a running page should still be treated as unproven until it has
+  run.
 
 Their selectors had been written against the source rather than against a
 running page, and the first run needed three corrections — a locator that

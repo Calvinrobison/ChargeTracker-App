@@ -78,13 +78,19 @@ minor, not a patch.
   the Leaflet marker built as an HTML string); it fails if the two drift apart
   and start marking one condition in two colours.
 
-- **Five UI specs were added and have not been run.** They are labelled as
-  unverified in `tests/ui/honesty.spec.ts` and in `docs/TESTING.md`, and the
-  suite's stated count stays 42 rather than 47. Playwright could not be
-  installed where they were written, and this suite's history is that specs
-  written against the source rather than a running page need their selectors
-  corrected on first run. `npm run test:e2e` on Windows must happen before this
-  section is cut as a release.
+- **Five UI specs were added.** They were committed unverified — Playwright
+  could not be installed where they were written — and were labelled as such in
+  `tests/ui/honesty.spec.ts`, `docs/TESTING.md` and this file rather than
+  counted as passing. They have since been run on Windows and all five pass, on
+  the first attempt with no selector corrected. The suite is now 21 specs, 63
+  runs across three Playwright projects, all green.
+
+- **"42 UI specs" was wrong before this change.** The file held 16 specs, not
+  14, so the run was 48. The figure had been copied forward past the change
+  that invalidated it, in four documents. Corrected in `docs/TESTING.md`,
+  `docs/ARCHITECTURE.md`, `docs/HANDOFF.md` and `docs/IMPLEMENTATION_STATUS.md`;
+  `docs/VERIFICATION_REPORT.md` keeps its figures, because it is a transcript of
+  a run on a given day rather than a claim about the suite today.
 
 ## [0.3.1] - 2026-09-21
 
