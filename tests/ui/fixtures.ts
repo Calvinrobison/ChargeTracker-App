@@ -42,6 +42,9 @@ function baseStation(overrides: Partial<StationView>): StationView {
     lng: -111.8315,
     ports: 4,
     catalogPorts: 4,
+    stalls: 4,
+    stallsBasis: 'source',
+    capacityDisagrees: false,
     available: 2,
     occupied: 2,
     offline: 0,
@@ -76,7 +79,10 @@ function baseStation(overrides: Partial<StationView>): StationView {
  *  2. a monitored location with NO current reading — must show "No current
  *     status", never "0 / 4";
  *  3. a provisional location — enough history to show, not enough to rank;
- *  4. a catalog-only location — known to exist, never observed.
+ *  4. a catalog-only location — known to exist, never observed;
+ *  5. a location whose source and catalog disagree about capacity — must be
+ *     marked rather than silently reconciled, and marked in words, not only
+ *     in colour.
  */
 export const STATIONS: readonly StationView[] = [
   baseStation({
@@ -89,6 +95,7 @@ export const STATIONS: readonly StationView[] = [
     occupied: 7,
     ports: 8,
     catalogPorts: 8,
+    stalls: 8,
   }),
   baseStation({
     id: 'fixture-no-reading',
@@ -131,6 +138,9 @@ export const STATIONS: readonly StationView[] = [
     monitoringEnabled: false,
     ports: null,
     catalogPorts: 2,
+    // Never observed, so the catalog is the only figure there is.
+    stalls: 2,
+    stallsBasis: 'catalog',
     available: null,
     occupied: null,
     offline: null,
@@ -149,12 +159,29 @@ export const STATIONS: readonly StationView[] = [
     dwell: null,
     scopeNote: 'In the station catalog but not monitored, so no history exists for it.',
   }),
+  baseStation({
+    id: 'fixture-disputed-capacity',
+    name: 'Fixture Airport Deck',
+    // The provider's page reported 12 stalls while this scope was monitored;
+    // the catalog lists 6. ChargeWatch filters and sorts by the source figure
+    // and must SAY it is doing that, rather than showing one number as though
+    // nothing contradicted it.
+    ports: 12,
+    catalogPorts: 6,
+    stalls: 12,
+    stallsBasis: 'source',
+    capacityDisagrees: true,
+    available: 4,
+    occupied: 8,
+    occupancy: 66.7,
+    hours: 33.4,
+  }),
 ];
 
 /** A window clipped by the study start: requested 30 days, collected 11. */
 export const SUMMARY: SummaryView = {
-  monitoredLocations: 3,
-  catalogLocations: 4,
+  monitoredLocations: 4,
+  catalogLocations: 5,
   observedOccupancyPct: 54.7,
   comparableLocations: 2,
   occupiedPortHours: 80.5,
@@ -231,8 +258,8 @@ export const SOURCES: readonly SourceHealthView[] = [
 
 export const COLLECTION_STATUS: CollectionStatusView = {
   kind: 'partial_coverage',
-  label: 'Partial coverage · 3 locations',
-  monitoredCount: 3,
+  label: 'Partial coverage · 4 locations',
+  monitoredCount: 4,
   lastObservationMs: NOW_MS - 5 * 60_000,
   nextCheckMs: NOW_MS + 4 * 60_000,
   effectiveIntervalMs: 900_000,

@@ -34,7 +34,10 @@ import {
   METRIC_ALGORITHM_VERSION,
   NO_SESSION_RECORDS_EXPLANATION,
   observedOccupiedIncreases,
+  matchesRange,
+  normalizeRange,
   rankScopes,
+  resolveCapacity,
   resolveWindow,
   splitByLocalHour,
   toLocalParts,
@@ -272,6 +275,19 @@ export class QueryService {
           ? 'Catalog only · not monitored'
           : null;
 
+    // How many ports the SOURCE reported, averaged over the time the scope was
+    // actually monitored. Null when nothing was monitored: an unmonitored
+    // location has not reported a capacity, which is not the same as zero.
+    const sourcePorts =
+      metrics && metrics.expectedInstalledPortMinutes !== null && metrics.monitoredMinutes > 0
+        ? Math.round(metrics.expectedInstalledPortMinutes / metrics.monitoredMinutes)
+        : null;
+
+    // One rule, one place. The filter, the list and the drawer all read the
+    // same resolved figure, so a location cannot be filtered by one number and
+    // labelled with another.
+    const capacity = resolveCapacity({ sourcePorts, catalogPorts: row.catalogPortCount });
+
     return {
       id: row.siteId,
       name: row.name,
@@ -280,11 +296,11 @@ export class QueryService {
       type: LEVEL_LABELS[metrics?.level ?? row.catalogLevel] ?? null,
       lat: row.latitude,
       lng: row.longitude,
-      ports:
-        metrics && metrics.expectedInstalledPortMinutes !== null && metrics.monitoredMinutes > 0
-          ? Math.round(metrics.expectedInstalledPortMinutes / metrics.monitoredMinutes)
-          : null,
+      ports: sourcePorts,
       catalogPorts: row.catalogPortCount,
+      stalls: capacity.stalls,
+      stallsBasis: capacity.basis,
+      capacityDisagrees: capacity.disagrees,
       available: latest?.counts.available ?? null,
       occupied: latest?.counts.occupied ?? null,
       offline: latest?.counts.outOfService ?? null,
@@ -338,6 +354,16 @@ export class QueryService {
                 : 'unknown';
         if (!filters.chargingTypes.includes(typeKey)) return false;
       }
+      // Capacity: how many stalls the location HAS.
+      const stallRange = normalizeRange(filters.stalls);
+      if (!matchesRange(station.stalls, stallRange)) return false;
+
+      // Availability: how many are FREE right now. A location that was never
+      // observed, or whose source reported no available count, has `null`
+      // here and is excluded rather than counted as zero free.
+      const freeRange = normalizeRange(filters.freeStalls);
+      if (!matchesRange(station.available, freeRange)) return false;
+
       if (query.length > 0) {
         const haystack = [station.name, station.network, station.type, station.address]
           .filter(Boolean)

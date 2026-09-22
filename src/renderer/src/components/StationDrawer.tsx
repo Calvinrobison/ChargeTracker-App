@@ -90,12 +90,28 @@ export function StationDrawer({
               {[
                 station.network ?? 'Network unknown',
                 station.type ?? 'Charging type unknown',
-                station.ports === null
-                  ? 'port count unknown'
-                  : `${station.ports} port${station.ports === 1 ? '' : 's'}`,
+                station.stalls === null
+                  ? 'stall count unknown'
+                  : `${station.stalls} stall${station.stalls === 1 ? '' : 's'}${
+                      station.stallsBasis === 'catalog' ? ' (catalog)' : ''
+                    }`,
               ].join(' · ')}
             </span>
           </div>
+          {/*
+            Two figures for the same location, and no way to tell which is
+            right from here. Both are shown with their origin rather than one
+            being chosen silently; the filter uses the source figure, and says
+            so.
+          */}
+          {station.capacityDisagrees ? (
+            <p className="drawer-capacity-conflict">
+              {`Stalls disputed: the source reports ${String(station.stalls)}, the catalog lists ${String(station.catalogPorts)}.`}{' '}
+              Filtering and sorting use the source figure, because it was read from the
+              provider&rsquo;s own page and the catalog figure may simply be older. Neither has been
+              verified on site.
+            </p>
+          ) : null}
         </div>
         <div className="drawer-header-actions">
           <button

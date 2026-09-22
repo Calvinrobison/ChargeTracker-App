@@ -19,3 +19,4 @@ export * from './episodes.ts';
 export * from './visits.ts';
 export * from './geo.ts';
 export * from './matching.ts';
+export * from './stalls.ts';

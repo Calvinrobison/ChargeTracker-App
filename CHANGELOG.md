@@ -7,6 +7,91 @@ can be released.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the
 project uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Not versioned yet, deliberately. 0.3.1 is the patch that makes collection
+record anything, and folding a feature into it would make that release two
+things at once. This section becomes 0.4.0 when it is cut — a new feature is a
+minor, not a patch.
+
+### Added
+
+- **Filter by how many stalls a location has, and how many are free.** Two
+  separate controls above the list, because they answer different questions and
+  one of them can speak for far fewer locations than the other.
+
+  **Capacity** ("Stalls at the location") is answerable for the whole catalog:
+  all 1,083 shipped locations have a known count, from 1 to 55. It is also the
+  filter the feature was asked for — the area is dominated by small sites (633
+  locations have exactly 2 stalls, 217 have 1), so the 75 locations with 8 to 20
+  are otherwise impossible to find by scrolling.
+
+  **Availability** ("Stalls free right now") is answerable only for a location
+  that is monitored **and** has actually been read. Everything else is excluded
+  from the result rather than counted as zero free, and the control says so
+  underneath, including when nothing is monitored yet. "Nobody looked" is not
+  "none were free", and a result set that conflated them would be the exact
+  class of claim this application exists not to make.
+
+  An empty box is no bound, never 0. A minimum of `0` is therefore a different
+  filter from an empty minimum: it is a set filter, so it excludes locations
+  whose count is unknown, while an empty one keeps them. A range typed
+  backwards is read as the range meant rather than returning nothing.
+
+- **A disagreement about capacity is shown, not resolved.** ChargeWatch has two
+  figures for how many stalls a site has — the count the provider's page
+  reported while the site was monitored, and the count in the bundled AFDC
+  catalog. Filtering and sorting use the source figure, because it was read
+  today and a catalog entry may be years old. That is a defensible default and
+  not a verdict, so where the two differ the location is marked: a blue edge and
+  a **"Stalls disputed · N vs M"** badge on the row, a blue ring on the map
+  marker, both figures and the reasoning in the station drawer, and an asterisk
+  with both numbers on the Overview table. Colour is never the only signal.
+
+  `resolveCapacity` in `src/domain/stalls.ts` is the single place that decides,
+  so a location cannot be filtered by one number and labelled with another.
+
+- **The empty state names the filter that emptied the list.** "Try including
+  Level 2 chargers" was already generic advice; with an availability filter set
+  and nothing monitored it would have been wrong advice, because no amount of
+  widening the range makes an unread location able to report free stalls. The
+  empty state now says which of the two filters is binding and, for
+  availability with nothing monitored, says that monitoring is the thing that
+  is missing.
+
+### Changed
+
+- **Map marker size and the Overview "Ports" column now use the resolved stall
+  count** rather than the source count alone. A monitored location whose source
+  reported no capacity still has a catalog figure; sizing and listing it as
+  though it had none understated real locations. The column is now headed
+  "Stalls".
+
+### Notes
+
+- 22 new specs. `tests/nodeps/stalls.test.ts` asserts the honesty rules
+  directly — an unknown count never satisfies a bounded range, `min: 0` and
+  `min: null` are different filters — and checks the capacity bands against the
+  catalog that actually ships rather than a fixture invented to suit them.
+  `tests/nodeps/conflict-colour.test.ts` exists because the conflict colour is
+  necessarily defined twice (a CSS custom property for the rail, a literal for
+  the Leaflet marker built as an HTML string); it fails if the two drift apart
+  and start marking one condition in two colours.
+
+- **Five UI specs were added.** They were committed unverified — Playwright
+  could not be installed where they were written — and were labelled as such in
+  `tests/ui/honesty.spec.ts`, `docs/TESTING.md` and this file rather than
+  counted as passing. They have since been run on Windows and all five pass, on
+  the first attempt with no selector corrected. The suite is now 21 specs, 63
+  runs across three Playwright projects, all green.
+
+- **"42 UI specs" was wrong before this change.** The file held 16 specs, not
+  14, so the run was 48. The figure had been copied forward past the change
+  that invalidated it, in four documents. Corrected in `docs/TESTING.md`,
+  `docs/ARCHITECTURE.md`, `docs/HANDOFF.md` and `docs/IMPLEMENTATION_STATUS.md`;
+  `docs/VERIFICATION_REPORT.md` keeps its figures, because it is a transcript of
+  a run on a given day rather than a claim about the suite today.
+
 ## [0.3.1] - 2026-09-21
 
 0.3.0 could collect and could not record. This is the release that stores

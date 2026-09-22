@@ -435,7 +435,9 @@ describe('observation ingestion', () => {
     const obs = observationsRepository(driver);
     const result = obs.ingest('run-1', [
       observation({
-        ports: [{ portId: 'scope-1:CP-1', sourcePortId: 'CP-1', state: 'occupied', level: 'level_2' }],
+        ports: [
+          { portId: 'scope-1:CP-1', sourcePortId: 'CP-1', state: 'occupied', level: 'level_2' },
+        ],
       }),
     ]);
     assert.equal(result.portRowsWritten, 1);

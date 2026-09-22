@@ -79,6 +79,18 @@ not have it. That matters for honesty as much as for security: a renderer that
 could query SQLite could compute its own version of occupancy, and the single
 definition in `src/domain/metrics.ts` would stop being single.
 
+The same reasoning governs stall capacity, which is the one figure ChargeWatch
+has two independent sources for: the count a provider's page reported while a
+scope was monitored, and the count in the bundled AFDC catalog.
+`resolveCapacity` in `src/domain/stalls.ts` is the only place that chooses
+between them, it is called once per station in `toStationView`, and the result
+travels on the view model as `stalls`, `stallsBasis` and `capacityDisagrees`.
+The filter, the list, the map and the drawer all read that one resolution, so a
+location cannot be filtered by one number and labelled with another. Where the
+two differ the resolution says so instead of hiding it, and every surface marks
+it — which is the reason `capacityDisagrees` is a field rather than something
+each view recomputes.
+
 **Provider pages never load in a privileged context.** The collector's browser
 has no preload and no Node bridge (`src/main/security.ts` header;
 `src/preload/index.ts` header). A provider page is untrusted HTML, and it is
@@ -528,7 +540,8 @@ nothing has run them:
   build and typecheck; nothing has forked them.
 
 The renderer under `src/renderer/` is no longer on that list: it builds, and the
-42 UI specs under `tests/ui/` pass against `out/renderer/` in Chromium. That is
+21 UI specs under `tests/ui/` pass against `out/renderer/` in Chromium, 63 runs
+across three projects. That is
 a browser with a stub bridge and synthetic fixtures — no Electron, no database,
 no network — so it establishes the honesty rules on screen and nothing about
 the application as installed.
@@ -598,8 +611,8 @@ Report these rather than trusting either document:
   `test:installed`, `test:update`. Every one of those scripts is now present,
   and `scripts/windows/test-installed.ps1` and `test-update.ps1` both exist.
 - The test count has been stated as **329 specs / 55 suites** and later as
-  **380**. Running `node scripts/test-nodeps.mjs` today gives **516 tests / 142
-  suites, 516 passing, 0 failing**, and `npm test` runs the same specs under
+  **380**. Running `node scripts/test-nodeps.mjs` today gives **538 tests / 148
+  suites, 538 passing, 0 failing**, and `npm test` runs the same specs under
   Vitest. A count written into prose is stale the moment a spec is added, and
   every figure in this list has been wrong at least once; the runner's output
   is the authority.

@@ -53,6 +53,8 @@ export const INITIAL_UI_STATE: UiState = {
   metric: 'occupancy',
   filters: {
     query: '',
+    stalls: { min: null, max: null },
+    freeStalls: { min: null, max: null },
     chargingTypes: [],
     networks: [],
     monitoringStates: [],
@@ -80,6 +82,10 @@ export type UiAction =
   | { type: 'setMetric'; metric: MapMetric }
   | { type: 'setQuery'; query: string }
   | { type: 'toggleSavedOnly' }
+  /** Capacity: how many stalls a location HAS. */
+  | { type: 'setStallRange'; range: { min: number | null; max: number | null } }
+  /** Availability: how many stalls are FREE right now. */
+  | { type: 'setFreeStallRange'; range: { min: number | null; max: number | null } }
   | { type: 'setCohort'; cohort: FilterState['cohort'] }
   | { type: 'setChargingTypes'; types: FilterState['chargingTypes'] }
   | { type: 'setNetworks'; networks: readonly string[] }
@@ -123,6 +129,12 @@ export function uiReducer(state: UiState, action: UiAction): UiState {
 
     case 'toggleSavedOnly':
       return { ...state, filters: { ...state.filters, savedOnly: !state.filters.savedOnly } };
+
+    case 'setStallRange':
+      return { ...state, filters: { ...state.filters, stalls: action.range } };
+
+    case 'setFreeStallRange':
+      return { ...state, filters: { ...state.filters, freeStalls: action.range } };
 
     case 'setCohort':
       return { ...state, filters: { ...state.filters, cohort: action.cohort } };

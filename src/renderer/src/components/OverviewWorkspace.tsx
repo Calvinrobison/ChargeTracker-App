@@ -51,7 +51,7 @@ export interface OverviewWorkspaceProps {
 const RANKING_COLUMNS = [
   'Station',
   'Type',
-  'Ports',
+  'Stalls',
   'Occupancy',
   'Occupied hours',
   'Coverage',
@@ -379,7 +379,20 @@ function RankingRow({
         <span className="visually-hidden">{statusDotLabel(station)}</span>
       </span>
       <span className="cell ellipsize">{station.type ?? 'Unknown'}</span>
-      <span className="cell numeric nowrap">{count(station.ports)}</span>
+      {/* The resolved count, the same one the filter uses. An asterisk, with
+          the two figures on hover, where the source and the catalog disagree —
+          a bare number here would look like a settled fact. */}
+      <span className="cell numeric nowrap">
+        {count(station.stalls)}
+        {station.capacityDisagrees ? (
+          <span
+            className="capacity-conflict-mark"
+            title={`Stalls disputed: the source reports ${String(station.stalls)}, the catalog lists ${String(station.catalogPorts)}.`}
+          >
+            *<span className="visually-hidden"> stall count disputed</span>
+          </span>
+        ) : null}
+      </span>
       <span
         className="cell numeric nowrap"
         style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}

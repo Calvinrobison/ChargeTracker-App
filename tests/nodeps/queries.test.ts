@@ -31,8 +31,12 @@ const APP_VERSION = '0.1.0-test';
 /** "Now" for every test: 10 days after T0. */
 const NOW = T0 + 10 * DAY;
 
+const OPEN_STALLS = { min: null, max: null } as const;
+
 const FILTERS: FilterState = {
   query: '',
+  stalls: OPEN_STALLS,
+  freeStalls: OPEN_STALLS,
   chargingTypes: [],
   networks: [],
   monitoringStates: [],

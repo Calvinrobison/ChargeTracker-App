@@ -57,8 +57,46 @@ export const windowRequestSchema = v
  * Filters are GLOBAL: the same object drives Overview and Map, so changing a
  * filter on one workspace is reflected on the other.
  */
+/**
+ * An inclusive range of stalls, with either end left open.
+ *
+ * `null` at an end means "no bound", which is a different statement from 0.
+ * A minimum of 0 would be a filter for locations with no stalls; a minimum of
+ * null is a filter that does not constrain the lower end at all. Keeping them
+ * distinct is why this is nullable rather than defaulted.
+ *
+ * The upper bound is 500 rather than unbounded so a malformed request cannot
+ * ask the renderer to reason about absurd numbers; the largest location in the
+ * shipped catalog has 55.
+ */
+export const stallRangeSchema = v.object({
+  min: v.integer({ min: 0, max: 500 }).nullable().withDefault(null),
+  max: v.integer({ min: 0, max: 500 }).nullable().withDefault(null),
+});
+
+export type StallRange = Infer<typeof stallRangeSchema>;
+
 export const filterStateSchema = v.object({
   query: v.string({ max: 200 }).withDefault(''),
+  /**
+   * How many stalls a location HAS. Capacity, not availability.
+   *
+   * Source-reported capacity is used where monitoring has established one and
+   * the catalog count otherwise, so this filter reads the best number known
+   * per location. Where the two disagree the station is marked rather than
+   * silently reconciled — see `capacityDisagrees` on StationView.
+   */
+  stalls: stallRangeSchema.withDefault({ min: null, max: null }),
+  /**
+   * How many stalls are FREE right now. Availability, not capacity.
+   *
+   * Only a monitored location can answer this, and only from its most recent
+   * observation. A location that has never been observed, or whose source did
+   * not report an available count, is EXCLUDED when this filter is set — it is
+   * not counted as zero free. "Unknown" and "none free" are different answers
+   * and this filter must not merge them.
+   */
+  freeStalls: stallRangeSchema.withDefault({ min: null, max: null }),
   chargingTypes: v
     .array(v.enumOf(['level_2', 'dc_fast', 'level_1', 'unknown'] as const), { max: 8 })
     .withDefault([]),
@@ -101,6 +139,28 @@ export interface StationView {
   readonly ports: number | null;
   /** Catalog port count, for "6 monitored of 12 catalog ports". */
   readonly catalogPorts: number | null;
+  /**
+   * The stall count this location is filtered and sorted by: the
+   * source-reported figure where monitoring has established one, the catalog
+   * figure otherwise, and null when neither is known.
+   *
+   * Derived rather than stored so the basis is always recomputed from the two
+   * numbers beside it, and so a reader can check it.
+   */
+  readonly stalls: number | null;
+  /** Which of the two the number above came from. Null when neither exists. */
+  readonly stallsBasis: 'source' | 'catalog' | null;
+  /**
+   * True when BOTH counts are known and they disagree.
+   *
+   * The application does not pick a winner quietly. The source figure is used,
+   * because it was measured rather than imported, and the location is marked
+   * so the disagreement is visible instead of being resolved behind the
+   * filter. A catalog that says 2 and a source that says 8 is a fact about the
+   * data, and hiding it would make the filter look authoritative when it is
+   * arbitrating between two claims.
+   */
+  readonly capacityDisagrees: boolean;
   /** Current status counts. Null means the source did not report it. */
   readonly available: number | null;
   readonly occupied: number | null;

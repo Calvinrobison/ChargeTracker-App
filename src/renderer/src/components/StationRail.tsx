@@ -8,7 +8,7 @@
 
 import { useMemo, type ReactNode } from 'react';
 
-import type { SourceHealthView, StationView } from '../../../shared/ipc.ts';
+import type { SourceHealthView, StallRange, StationView } from '../../../shared/ipc.ts';
 import { isRailExpanded, useUi } from '../state.tsx';
 import {
   bandColor,
@@ -23,6 +23,39 @@ import {
 } from '../format.ts';
 import { CollapseIcon, ExpandIcon, SearchIcon, WarningIcon } from './Icons.tsx';
 import { WarningBanner, needsWarning } from './WarningBanner.tsx';
+import { StallRangeFilter } from './StallRangeFilter.tsx';
+import { describeRange, isOpenRange, normalizeRange } from '../../../domain/stalls.ts';
+
+/**
+ * Why the list is empty, in the words of whatever actually emptied it.
+ *
+ * A generic "try widening your filters" is a small dishonesty when the
+ * application knows the answer. The availability filter is singled out because
+ * it is the one that can return nothing for a reason that is not about the
+ * range at all — nothing is monitored, so nothing can answer it, and no amount
+ * of widening will change that.
+ */
+function emptyStateReason(
+  filters: { readonly stalls: StallRange; readonly freeStalls: StallRange },
+  monitoredCount: number,
+): string {
+  const free = normalizeRange(filters.freeStalls);
+  if (!isOpenRange(free)) {
+    if (monitoredCount === 0) {
+      return 'Nothing is monitored yet, so no location can report how many stalls are free. Turn on monitoring for a location, or clear that filter.';
+    }
+    return `Only monitored locations that have been read can answer "${String(
+      describeRange(free, 'free'),
+    )}". A location nobody has read is left out rather than counted as none free.`;
+  }
+
+  const stalls = normalizeRange(filters.stalls);
+  if (!isOpenRange(stalls)) {
+    return `No location in range matches ${String(describeRange(stalls))}. Locations whose stall count is unknown are excluded rather than assumed.`;
+  }
+
+  return 'Try including Level 2 chargers or catalog-only locations.';
+}
 
 export interface StationRailProps {
   readonly stations: readonly StationView[];
@@ -50,7 +83,9 @@ function StationRow({
   return (
     <button
       type="button"
-      className="station-row"
+      className={
+        station.capacityDisagrees ? 'station-row station-row--capacity-conflict' : 'station-row'
+      }
       aria-selected={selected}
       role="option"
       onClick={onSelect}
@@ -87,6 +122,24 @@ function StationRow({
           {pct(station.occupancy)}
         </span>
         {badge ? <span className="state-badge">{badge}</span> : null}
+        {/*
+          The source and the catalog disagree about how many stalls this
+          location has. The filter uses the source figure, so the row could
+          otherwise appear in a result set that contradicts the catalog number
+          shown elsewhere with nothing to explain it. Marked rather than
+          reconciled: colour alone is never the signal, so the count is stated
+          too.
+        */}
+        {station.capacityDisagrees ? (
+          <span
+            className="state-badge state-badge--capacity-conflict"
+            title={`The source reports ${String(station.stalls)} stalls; the catalog lists ${String(
+              station.catalogPorts,
+            )}. Filtering uses the source figure.`}
+          >
+            {`Stalls disputed · ${String(station.stalls)} vs ${String(station.catalogPorts)}`}
+          </span>
+        ) : null}
         <span className="spacer" />
         <span className="station-row-trailing">{trailing}</span>
       </span>
@@ -262,6 +315,14 @@ export function StationRail({
             More filters
           </button>
         </div>
+
+        <StallRangeFilter
+          stalls={state.filters.stalls}
+          freeStalls={state.filters.freeStalls}
+          onStallsChange={(range) => dispatch({ type: 'setStallRange', range })}
+          onFreeStallsChange={(range) => dispatch({ type: 'setFreeStallRange', range })}
+          monitoredCount={monitoredCount}
+        />
       </div>
 
       {showBanner && warningSource ? (
@@ -297,7 +358,7 @@ export function StationRail({
         <div className="empty-state">
           <span className="empty-state-title">No stations match these filters</span>
           <span className="empty-state-body">
-            Try including Level 2 chargers or catalog-only locations.
+            {emptyStateReason(state.filters, monitoredCount)}
           </span>
           <button
             type="button"
