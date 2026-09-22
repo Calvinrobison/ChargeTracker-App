@@ -170,6 +170,18 @@ function AppInner(): ReactNode {
   }, [state.selectedId, filtersKey]);
 
   // Settings data is only needed while the drawer is open.
+  //
+  // The bootstrap payload is reloaded here too, and that is not a refinement.
+  // `loadBootstrap` otherwise runs once on mount, and the drawer renders
+  // `bootstrap.counts.observations` as "Observations stored" — so a session
+  // that started with an empty database kept reporting **0 while it was
+  // actively recording observations**. Confirmed on 2026-09-21: the station
+  // drawer read "Latest observation 1 min ago" with real port counts, the
+  // exported CSV contained the row, and Settings still said 0.
+  //
+  // A number that reads 0 when the true value is not 0 is the failure this
+  // application exists to avoid, and it was on the one figure anyone checks to
+  // decide whether collection is working.
   useEffect(() => {
     if (!state.settingsOpen) return;
     void (async () => {
@@ -184,7 +196,8 @@ function AppInner(): ReactNode {
         report(error, 'Could not load settings');
       }
     })();
-  }, [state.settingsOpen, report]);
+    void loadBootstrap();
+  }, [state.settingsOpen, report, loadBootstrap]);
 
   // ---------------------------------------------------------------- actions
 

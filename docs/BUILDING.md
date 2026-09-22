@@ -117,7 +117,7 @@ npm run test:nodeps
 npm run check:migrations
 ```
 
-`test:nodeps` runs 413 specs on Node's built-in test runner. It executes the
+`test:nodeps` runs 516 specs on Node's built-in test runner. It executes the
 TypeScript directly through type-stripping and opens real SQLite databases
 through `node:sqlite`. This is not a mock layer — the schema under test is the
 same `001_initial.sql` that ships.

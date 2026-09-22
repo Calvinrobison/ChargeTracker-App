@@ -34,7 +34,12 @@ const flag = (name) => process.argv.includes(`--${name}`);
 const tag = arg('tag');
 const releaseDir = resolve(root, arg('dir', 'release'));
 const dryRun = flag('dry-run') || !flag('confirm');
-const repo = arg('repo', 'the-x1x1/ChargeTracker-App');
+// The repository the application actually looks in for updates. This defaulted
+// to a fork while electron-builder.yml, the generated app-update.yml and
+// BRANDING.releaseOwner all said Calvinrobison, so 0.2.0 was published where no
+// installed copy would look and the updater reported "Found version 0.1.0".
+// These four must agree; changing one means changing all of them.
+const repo = arg('repo', 'Calvinrobison/ChargeTracker-App');
 
 if (!tag) {
   console.error('A tag is required: node scripts/release-publish.mjs --tag v0.1.1 --dry-run');

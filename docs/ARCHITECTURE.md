@@ -598,9 +598,11 @@ Report these rather than trusting either document:
   `test:installed`, `test:update`. Every one of those scripts is now present,
   and `scripts/windows/test-installed.ps1` and `test-update.ps1` both exist.
 - The test count has been stated as **329 specs / 55 suites** and later as
-  **380**. Running `node scripts/test-nodeps.mjs` today gives **413 tests / 113
-  suites, 413 passing, 0 failing**, and `npm test` now runs the same 413 under
-  Vitest. Both documents and the comment in `package.json` say 413.
+  **380**. Running `node scripts/test-nodeps.mjs` today gives **516 tests / 142
+  suites, 516 passing, 0 failing**, and `npm test` runs the same specs under
+  Vitest. A count written into prose is stale the moment a spec is added, and
+  every figure in this list has been wrong at least once; the runner's output
+  is the authority.
 - Both documents state the schema has **54 indexes**. `001_initial.sql`
   contains **39 explicit `CREATE INDEX` statements** (12 of them `UNIQUE`). The
   table count of 28 is correct. The higher figure is presumably counting

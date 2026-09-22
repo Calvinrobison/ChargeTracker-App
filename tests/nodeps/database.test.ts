@@ -423,17 +423,19 @@ describe('observation ingestion', () => {
   test('port rows are stored only when the source supplies durable identity', () => {
     const driver = freshDb();
     seedSiteAndBinding(driver);
-    driver
-      .prepare(
-        `INSERT INTO ports (id, scope_key, site_id, source_port_id, level, first_seen_ms, last_seen_ms, retired)
-         VALUES ('port-1','scope-1','site-1','CP-1','level_2',?,?,0)`,
-      )
-      .run(T0, T0);
 
+    // This used to INSERT the `ports` row itself before ingesting. That one
+    // line hid the defect that made 0.3.0 record nothing: nothing in the
+    // application creates a ports row, so production wrote a port observation
+    // whose foreign key had no parent and lost the whole run. The spec did the
+    // thing production never does, then asserted production worked.
+    //
+    // Ingest creates it now, and this spec no longer pretends otherwise.
+    // tests/nodeps/ingest-ports-end-to-end.test.ts covers that directly.
     const obs = observationsRepository(driver);
     const result = obs.ingest('run-1', [
       observation({
-        ports: [{ portId: 'port-1', sourcePortId: 'CP-1', state: 'occupied', level: 'level_2' }],
+        ports: [{ portId: 'scope-1:CP-1', sourcePortId: 'CP-1', state: 'occupied', level: 'level_2' }],
       }),
     ]);
     assert.equal(result.portRowsWritten, 1);
