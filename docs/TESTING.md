@@ -5,23 +5,23 @@ What each suite covers, what none of them cover, and how to run them.
 The organising idea: the parts of ChargeWatch that must not be wrong — the
 metric contract, the SQL schema, the scheduler budget, the source parser, the
 update verifier and the display formatters — are testable **with nothing
-installed**. That was not a convenience; it is why 516 specs exist for a project
+installed**. That was not a convenience; it is why 538 specs exist for a project
 whose dependency tree went unresolved for most of its life.
 
 ---
 
 ## The suites
 
-| Suite                   | Command                                | Needs                        | Status           |
-| ----------------------- | -------------------------------------- | ---------------------------- | ---------------- |
-| No-dependency specs     | `npm run test:nodeps`                  | Node 22.12+                  | **516 passing**  |
-| Same specs under Vitest | `npm test`                             | the dependency tree          | **516 passing**  |
-| Integration specs       | `npm test`                             | the dependency tree          | **none written** |
-| UI specs                | `npm run test:e2e`                     | Playwright, a built renderer | **42 passing**   |
-| Installed-build check   | `.\scripts\windows\test-installed.ps1` | Windows, a packaged build    | never run        |
-| Upgrade check           | `.\scripts\windows\test-update.ps1`    | Windows, two installers      | never run        |
+| Suite                   | Command                                | Needs                        | Status                      |
+| ----------------------- | -------------------------------------- | ---------------------------- | --------------------------- |
+| No-dependency specs     | `npm run test:nodeps`                  | Node 22.12+                  | **538 passing**             |
+| Same specs under Vitest | `npm test`                             | the dependency tree          | **538 passing**             |
+| Integration specs       | `npm test`                             | the dependency tree          | **none written**            |
+| UI specs                | `npm run test:e2e`                     | Playwright, a built renderer | **42 passing, 5 never run** |
+| Installed-build check   | `.\scripts\windows\test-installed.ps1` | Windows, a packaged build    | never run                   |
+| Upgrade check           | `.\scripts\windows\test-update.ps1`    | Windows, two installers      | never run                   |
 
-### `npm run test:nodeps` — 516 specs
+### `npm run test:nodeps` — 538 specs
 
 Runs on Node's built-in test runner using `--experimental-strip-types` and
 `node:sqlite`. No install, no network, no mock database: the schema under test
@@ -32,17 +32,18 @@ npm run test:nodeps
 npm run test:nodeps -- --filter metrics    # one file
 ```
 
-| Area                       | Specs | What it establishes                                                                                                                                                        |
-| -------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Domain and metrics         | 77    | Half-open intervals, bounded carry-forward, port-minute weighting, all five §15 acceptance examples, Phoenix-local attribution independent of machine timezone             |
-| Database                   | 25    | Idempotent ingestion, migration refusal on checksum mismatch and newer schema, savepoint transactions, close/reopen with history intact, unclean-exit recovery             |
-| View models                | 28    | Every screen's data built from one shared window                                                                                                                           |
-| Collector                  | 51    | Token-bucket budget, jittered backoff capped at 6h, `Retry-After` honoured and never shortened, circuit breaker, source pause vs retry, ChargePoint extraction, URL safety |
-| Security, paths, contracts | 72    | CSP, navigation and permission denial, sender identity, diagnostic redaction, data-path placement, the IPC registry, the hand-written validator                            |
-| Update authenticity        | 35    | Signature, claim, sequence, schema, artifact digest and traversal checks                                                                                                   |
-| CSV                        | 31    | Formula-injection neutralisation on untrusted text only, missing values exported empty, strict instant parsing                                                             |
-| Display formatting         | 31    | `null` never becomes a number; a measured zero stays distinguishable from an absent measurement                                                                            |
-| Episodes and visits        | 26    | Censoring, continuity breaks, refused proration, undefined ratios                                                                                                          |
+| Area                       | Specs | What it establishes                                                                                                                                                                                                                                                     |
+| -------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain and metrics         | 77    | Half-open intervals, bounded carry-forward, port-minute weighting, all five §15 acceptance examples, Phoenix-local attribution independent of machine timezone                                                                                                          |
+| Database                   | 25    | Idempotent ingestion, migration refusal on checksum mismatch and newer schema, savepoint transactions, close/reopen with history intact, unclean-exit recovery                                                                                                          |
+| View models                | 28    | Every screen's data built from one shared window                                                                                                                                                                                                                        |
+| Collector                  | 51    | Token-bucket budget, jittered backoff capped at 6h, `Retry-After` honoured and never shortened, circuit breaker, source pause vs retry, ChargePoint extraction, URL safety                                                                                              |
+| Security, paths, contracts | 72    | CSP, navigation and permission denial, sender identity, diagnostic redaction, data-path placement, the IPC registry, the hand-written validator                                                                                                                         |
+| Update authenticity        | 35    | Signature, claim, sequence, schema, artifact digest and traversal checks                                                                                                                                                                                                |
+| CSV                        | 31    | Formula-injection neutralisation on untrusted text only, missing values exported empty, strict instant parsing                                                                                                                                                          |
+| Display formatting         | 31    | `null` never becomes a number; a measured zero stays distinguishable from an absent measurement                                                                                                                                                                         |
+| Episodes and visits        | 26    | Censoring, continuity breaks, refused proration, undefined ratios                                                                                                                                                                                                       |
+| Stall capacity and filters | 22    | Source and catalog capacity resolved in one place with the disagreement reported rather than reconciled, an unknown count never matching a bounded range, capacity bands asserted against the catalog that ships, the conflict colour identical in the map and the rail |
 
 ### `npm test` — Vitest
 
@@ -63,7 +64,7 @@ What belongs there: anything needing `better-sqlite3` under the Electron ABI,
 `electron-updater`, or the real Playwright browser API. Those are precisely the
 modules `docs/VERIFICATION_REPORT.md` lists as written-but-never-executed.
 
-### `npm run test:e2e` — 42 UI specs
+### `npm run test:e2e` — 47 UI specs, 42 of them executed
 
 Loads the **built** renderer bundle in Chromium with a stub preload bridge that
 answers from `tests/ui/fixtures.ts`. No Electron, no database, no network.
@@ -84,6 +85,15 @@ npm run test:e2e:ui    # interactive
 `narrow`), in Chromium on Linux. `playwright.config.ts` takes an optional
 `CHARGEWATCH_CHROMIUM` environment variable pointing at a preinstalled Chromium
 if you do not want Playwright to download one.
+
+**Five more have never been run.** They cover the disputed-capacity marking and
+the availability filter's disclosure, and they are labelled as unverified where
+they begin in `tests/ui/honesty.spec.ts`. They were written in an environment
+where Playwright could not be installed — which is exactly the situation that
+produced this suite's three first-run selector corrections, so assume they need
+the same treatment. Run `npm run test:e2e` on Windows before the next release
+and correct the selectors, not the assertions. Until then the honest count for
+this suite is 42, not 47.
 
 Their selectors had been written against the source rather than against a
 running page, and the first run needed three corrections — a locator that

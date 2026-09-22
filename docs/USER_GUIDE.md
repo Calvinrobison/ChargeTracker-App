@@ -88,6 +88,46 @@ means the source did not say how fresh its data was.
 **Colour is never the only signal.** Every status dot has a text label beside
 it.
 
+## Filtering by how many stalls
+
+Two filters sit above the list, and they answer different questions. Keeping
+them apart is deliberate: one of them can speak for the whole map today and the
+other cannot.
+
+**Stalls at the location** is capacity — how many stalls the site has, whatever
+state they are in right now. This is the one for "show me the big sites": type
+`8` and `20` and you get locations with 8 to 20 stalls instead of the
+two-charger sites that dominate the area by count. It works across the whole
+catalog, because every catalogued location has a known stall count.
+
+**Stalls free right now** is availability, taken from the most recent reading.
+It can only answer for a location that is **monitored and has actually been
+read**. Everything else is left out of the result rather than counted as zero
+free, so the list never implies that a location nobody looked at had no free
+stalls. Until you turn monitoring on for some locations, this filter returns
+little or nothing, and the control says so underneath rather than looking
+broken.
+
+Leaving a box empty means "no bound", not zero. `8` with an empty maximum is
+"8 or more"; an empty minimum with `2` is "up to 2". Typing the larger number
+first is read as the range you meant. Typing `0` into the minimum is a real
+filter, not an empty one — so it excludes locations whose count is unknown,
+which is the point.
+
+**Where the two capacity figures disagree, the location is marked in blue.**
+ChargeWatch has two sources for how many stalls a site has: the figure the
+provider's own page reported while the site was monitored, and the figure in the
+bundled AFDC catalog. Usually they agree. When they do not, the row gets a blue
+edge and a **"Stalls disputed"** badge with both numbers, the map marker gets a
+blue ring, and the station drawer states both figures and which one is being
+used. Filtering and sorting use the source figure, on the reasoning that it was
+read from the provider today and the catalog entry may be years old — but that
+is a default, not a verdict, which is why the disagreement is shown to you
+instead of being quietly resolved. Neither figure has been verified on site.
+
+As everywhere else, colour is not the only signal: the badge, the tooltip and
+the drawer all say it in words.
+
 ## Windows and coverage
 
 Every metric is over a window, and the summary tells you the window it actually

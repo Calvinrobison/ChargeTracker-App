@@ -6,8 +6,10 @@
  * measurement, reports a partial window as partial, and does not describe
  * inferred activity as a recorded charging session.
  *
- * These have now been executed: all 42 pass against the built renderer in
- * Chromium, across the three projects in playwright.config.ts. The first run
+ * 42 of these have been executed: all 42 pass against the built renderer in
+ * Chromium, across the three projects in playwright.config.ts. The five at the
+ * end of this file, covering the stall filters and the disputed-capacity
+ * marking, have NOT been run and are labelled where they start. The first run
  * needed the selector corrections its author expected — a locator that matched
  * a hidden <select> option, an assertion that the basemap tiles are not
  * requested on the opening view, and a second installBridge that tried to
@@ -272,5 +274,83 @@ test.describe('monitoring is a stated switch, not an implied state', () => {
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
     await expect(drawer).toContainText('every 15 minutes');
     await expect(drawer).toContainText('Monitoring on');
+  });
+});
+
+/**
+ * The five specs below have NOT been executed. Playwright cannot run in the
+ * environment they were written in, and the repository's own record is that
+ * every UI spec written against the source rather than against a running page
+ * needed correcting on its first run. Treat them as unverified until
+ * `npm run test:e2e` has been run on Windows; if a selector is wrong, correct
+ * the selector, not the assertion.
+ */
+
+test.describe('a capacity the sources disagree about is marked, not resolved', () => {
+  test('the row says which two numbers disagree, in words', async ({ page }) => {
+    await page.goto('/');
+
+    // Fixture Airport Deck: the source reported 12 stalls, the catalog lists 6.
+    const row = page
+      .getByRole('listbox', { name: 'Stations' })
+      .getByRole('option')
+      .filter({ hasText: 'Fixture Airport Deck' });
+
+    await expect(row).toBeVisible();
+    // The marking must survive with colour removed, which is the whole reason
+    // both figures are in the badge text rather than only in a blue edge.
+    await expect(row).toContainText('Stalls disputed');
+    await expect(row).toContainText('12');
+    await expect(row).toContainText('6');
+  });
+
+  test('a location the sources agree about carries no marking', async ({ page }) => {
+    await page.goto('/');
+
+    const row = page
+      .getByRole('listbox', { name: 'Stations' })
+      .getByRole('option')
+      .filter({ hasText: 'Fixture Mall North' });
+
+    await expect(row).toBeVisible();
+    await expect(row).not.toContainText('Stalls disputed');
+  });
+
+  test('the drawer states both figures and which one is being used', async ({ page }) => {
+    await page.goto('/');
+    await page
+      .getByRole('listbox', { name: 'Stations' })
+      .getByRole('option')
+      .filter({ hasText: 'Fixture Airport Deck' })
+      .click();
+
+    const drawer = page.locator('.drawer, .station-drawer').first();
+    await expect(drawer).toContainText('Stalls disputed');
+    await expect(drawer).toContainText('the source reports 12');
+    await expect(drawer).toContainText('the catalog lists 6');
+    // Which figure is used, and why — not merely that the two differ.
+    await expect(drawer).toContainText('use the source figure');
+  });
+});
+
+test.describe('the availability filter does not claim to cover the map', () => {
+  test('it names how many locations can answer it', async ({ page }) => {
+    await page.goto('/');
+
+    const rail = page.getByRole('complementary', { name: 'Stations' });
+    await expect(rail).toContainText('Stalls free right now');
+    await expect(rail).toContainText('monitored location');
+    await expect(rail).toContainText('rather than counted as none free');
+  });
+
+  test('its boxes start empty, which means no bound rather than zero', async ({ page }) => {
+    await page.goto('/');
+
+    // A zero here would be a filter for "no free stalls", which is a claim.
+    // An empty box is the absence of one.
+    const rail = page.getByRole('complementary', { name: 'Stations' });
+    for (const box of await rail.getByRole('spinbutton').all()) {
+      await expect(box).toHaveValue('');
+    }
   });
 });

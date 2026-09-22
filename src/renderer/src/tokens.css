@@ -39,6 +39,14 @@
   --status-critical: #d66c6c;
   --status-warning-wash: rgba(231, 182, 106, 0.14);
 
+  /* Capacity dispute: the source and the catalog disagree about stall count.
+     Deliberately blue - the only blue in the palette - because it is not a
+     fault, a warning or a value on the occupancy scale. It marks a place where
+     two records contradict each other and the application has picked one. */
+  --conflict: #6aa6e7;
+  --conflict-wash: rgba(106, 166, 231, 0.14);
+  --conflict-border: rgba(106, 166, 231, 0.45);
+
   /* Warning banner surface */
   --warn-bg: #1f2119;
   --warn-border: #4a4128;

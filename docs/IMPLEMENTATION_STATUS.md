@@ -11,7 +11,7 @@ refs), so this is an initial implementation. No unrelated changes existed to
 preserve.
 **Branch**: `chargewatch-v1`, pushed and the repository's default branch
 **Schema version**: 1
-**Test count**: 516 specs / 142 suites, all passing, via `npm run test:nodeps` —
+**Test count**: 538 specs / 148 suites, all passing, via `npm run test:nodeps` —
 on Linux with Node 22.22.2 and on Windows 11 x64 with Node 24.19.0. The same
 specs pass under Vitest via `npm test`, and 42 UI specs run against the built
 renderer in Chromium.

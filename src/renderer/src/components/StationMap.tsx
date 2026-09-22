@@ -35,6 +35,17 @@ const BAND_COLORS = {
   unsupported: '#91A39B',
 } as const;
 
+/**
+ * The disputed-capacity ring.
+ *
+ * Markers are built as HTML strings for Leaflet's divIcon, so this is a
+ * literal rather than the `--conflict` custom property. It MUST equal that
+ * token, or the map and the rail would mark the same condition in two
+ * different colours; `tests/nodeps/conflict-colour.test.ts` fails if they
+ * drift apart.
+ */
+const CONFLICT_COLOR = '#6aa6e7';
+
 const CENTER: [number, number] = [
   STUDY_AREA_DEFAULTS.centerLatitude,
   STUDY_AREA_DEFAULTS.centerLongitude,
@@ -69,7 +80,10 @@ export interface StationMapProps {
 function markerSize(station: StationView, selected: boolean): number {
   if (selected) return 20;
   if (station.monitoring === 'catalog') return 9;
-  return (station.ports ?? 0) >= 8 ? 15 : 12;
+  // The resolved stall count, not the source count alone: a monitored site
+  // whose source did not report a capacity still has a catalog figure, and
+  // sizing it as though it had none would understate a large location.
+  return (station.stalls ?? 0) >= 8 ? 15 : 12;
 }
 
 function buildIcon(station: StationView, metric: MapMetric, selected: boolean): L.DivIcon {
@@ -101,10 +115,18 @@ function buildIcon(station: StationView, metric: MapMetric, selected: boolean): 
     inner = `<span class="cw-mk" style="width:${size}px;height:${size}px;background:${hollow ? 'rgba(43,59,53,.55)' : color};border:${hollow ? '1.5px dashed #6f8279' : '1.5px solid rgba(13,20,18,.65)'};opacity:${stale ? 0.62 : 1};box-shadow:${selected ? '0 0 0 5px rgba(134,224,186,.18), 0 0 0 1.5px #86E0BA' : '0 1px 3px rgba(0,0,0,.5)'}"></span>`;
   }
 
+  // A ring, not a recolour. The fill encodes occupancy or coverage and that
+  // meaning must survive; the ring says only that the two capacity figures
+  // disagree. Colour is not the sole signal: the tooltip states the two
+  // numbers in words, and the rail row carries a text badge.
+  const conflictRing = station.capacityDisagrees
+    ? `<span style="position:absolute;width:${size + 8}px;height:${size + 8}px;border-radius:50%;border:1.5px solid ${CONFLICT_COLOR};pointer-events:none"></span>`
+    : '';
+
   const box = selected ? 34 : 26;
   return L.divIcon({
     className: 'cw-mkwrap',
-    html: `<span style="display:grid;place-items:center;width:${box}px;height:${box}px">${inner}</span>`,
+    html: `<span style="position:relative;display:grid;place-items:center;width:${box}px;height:${box}px">${conflictRing}${inner}</span>`,
     iconSize: [box, box],
     iconAnchor: [box / 2, box / 2],
   });
@@ -130,6 +152,18 @@ function buildTooltip(station: StationView): HTMLElement {
   meta.textContent =
     [station.network, station.type].filter(Boolean).join(' · ') || 'Network unknown';
   root.append(meta);
+
+  // The ring around a marker means this, and only a hover says so. Added
+  // before the catalog-only early return so it is never the branch that
+  // swallows it.
+  if (station.capacityDisagrees) {
+    const conflict = document.createElement('div');
+    conflict.style.cssText = `margin-top:6px;font-size:11px;color:${CONFLICT_COLOR}`;
+    conflict.textContent = `Stalls disputed · source reports ${String(
+      station.stalls,
+    )}, catalog lists ${String(station.catalogPorts)}`;
+    root.append(conflict);
+  }
 
   if (station.monitoring === 'catalog') {
     const note = document.createElement('div');
@@ -205,7 +239,7 @@ export function StationMap({
       stations
         .map(
           (station) =>
-            `${station.id}:${station.lat}:${station.lng}:${station.occupancy ?? 'n'}:${station.coverage ?? 'n'}:${station.available ?? 'n'}:${station.occupied ?? 'n'}:${station.offline ?? 'n'}:${station.monitoring}:${station.ports ?? 'n'}`,
+            `${station.id}:${station.lat}:${station.lng}:${station.occupancy ?? 'n'}:${station.coverage ?? 'n'}:${station.available ?? 'n'}:${station.occupied ?? 'n'}:${station.offline ?? 'n'}:${station.monitoring}:${station.ports ?? 'n'}:${station.stalls ?? 'n'}:${station.capacityDisagrees ? 'x' : '-'}`,
         )
         .join('|'),
     [stations],
