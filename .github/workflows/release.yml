@@ -64,10 +64,10 @@ jobs:
       version: ${{ steps.resolve.outputs.version }}
       tag: ${{ steps.resolve.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+      - uses: actions/checkout@v7 # TODO: pin to a commit SHA
         with:
           fetch-depth: 0 # release:prepare reads git state
-      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v7 # TODO: pin to a commit SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -124,8 +124,8 @@ jobs:
     timeout-minutes: 60
     needs: gate
     steps:
-      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
-      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+      - uses: actions/checkout@v7 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v7 # TODO: pin to a commit SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -154,7 +154,7 @@ jobs:
       # job, so anything that rewrote them between here and there would break
       # verification rather than pass silently.
       - name: Upload the unsigned artifacts
-        uses: actions/upload-artifact@v4 # TODO: pin to a commit SHA
+        uses: actions/upload-artifact@v7 # TODO: pin to a commit SHA
         with:
           name: unsigned-release-${{ needs.gate.outputs.version }}
           path: |
@@ -180,15 +180,15 @@ jobs:
     permissions:
       contents: write # only this job needs it, only to create the draft
     steps:
-      - uses: actions/checkout@v4 # TODO: pin to a commit SHA
+      - uses: actions/checkout@v7 # TODO: pin to a commit SHA
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4 # TODO: pin to a commit SHA
+      - uses: actions/setup-node@v7 # TODO: pin to a commit SHA
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Download the unsigned artifacts
-        uses: actions/download-artifact@v4 # TODO: pin to a commit SHA
+        uses: actions/download-artifact@v8 # TODO: pin to a commit SHA
         with:
           name: unsigned-release-${{ needs.gate.outputs.version }}
           path: release
